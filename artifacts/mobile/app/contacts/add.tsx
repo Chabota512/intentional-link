@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -24,6 +24,11 @@ interface User {
   username: string;
 }
 
+interface Contact {
+  id: number;
+  contactUser: User;
+}
+
 export default function AddContactScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -34,16 +39,34 @@ export default function AddContactScreen() {
   const [results, setResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const search = async (q: string) => {
+  const { data: existingContacts = [] } = useQuery<Contact[]>({
+    queryKey: ["contacts"],
+    queryFn: () => get("/contacts"),
+  });
+
+  const existingContactUserIds = new Set(existingContacts.map((c) => c.contactUser.id));
+
+  const search = (q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!q.trim()) { setResults([]); return; }
-    setSearching(true);
-    try {
-      const data = await get(`/users/search?q=${encodeURIComponent(q)}`);
-      setResults(data.filter((u: User) => u.id !== user?.id));
-    } catch {}
-    finally { setSearching(false); }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const data = await get(`/users/search?q=${encodeURIComponent(q)}`);
+        setResults(data.filter((u: User) => u.id !== user?.id));
+      } catch {}
+      finally { setSearching(false); }
+    }, 350);
   };
+
+  useEffect(() => {
+    search(query);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
 
   const addMutation = useMutation({
     mutationFn: (contactUserId: number) => post("/contacts", { contactUserId }),
@@ -55,7 +78,7 @@ export default function AddContactScreen() {
   });
 
   const renderUser = ({ item }: { item: User }) => {
-    const isAdded = addedIds.has(item.id);
+    const isAdded = addedIds.has(item.id) || existingContactUserIds.has(item.id);
     return (
       <View style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
@@ -69,21 +92,34 @@ export default function AddContactScreen() {
             @{item.username}
           </Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [
-            styles.addBtn,
-            {
-              backgroundColor: isAdded ? colors.surfaceAlt : colors.accent,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-          onPress={() => {
-            if (!isAdded) addMutation.mutate(item.id);
-          }}
-          disabled={isAdded || addMutation.isPending}
-        >
-          <Feather name={isAdded ? "check" : "user-plus"} size={16} color={isAdded ? colors.textSecondary : "#fff"} />
-        </Pressable>
+        {existingContactUserIds.has(item.id) && !addedIds.has(item.id) ? (
+          <View style={[styles.alreadyTag, { backgroundColor: colors.surfaceAlt }]}>
+            <Feather name="check" size={13} color={colors.textSecondary} />
+            <Text style={[styles.alreadyTagText, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
+              Contact
+            </Text>
+          </View>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [
+              styles.addBtn,
+              {
+                backgroundColor: isAdded ? "#E8F5E9" : colors.accent,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+            onPress={() => {
+              if (!isAdded) addMutation.mutate(item.id);
+            }}
+            disabled={isAdded || addMutation.isPending}
+          >
+            <Feather
+              name={isAdded ? "check" : "user-plus"}
+              size={16}
+              color={isAdded ? "#388E3C" : "#fff"}
+            />
+          </Pressable>
+        )}
       </View>
     );
   };
@@ -109,13 +145,22 @@ export default function AddContactScreen() {
             placeholder="Search by username…"
             placeholderTextColor={colors.textTertiary}
             value={query}
-            onChangeText={(t) => { setQuery(t); search(t); }}
+            onChangeText={setQuery}
             autoFocus
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
           />
-          {searching && <ActivityIndicator size="small" color={colors.accent} />}
+          {searching
+            ? <ActivityIndicator size="small" color={colors.accent} />
+            : query.length > 0
+            ? (
+              <Pressable onPress={() => setQuery("")} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                <Feather name="x-circle" size={16} color={colors.textTertiary} />
+              </Pressable>
+            )
+            : null
+          }
         </View>
       </View>
 
@@ -135,6 +180,13 @@ export default function AddContactScreen() {
               <Feather name="user-x" size={40} color={colors.textTertiary} />
               <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
                 No users found for "{query}"
+              </Text>
+            </View>
+          ) : query.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Feather name="users" size={40} color={colors.textTertiary} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                Search for people by their username
               </Text>
             </View>
           ) : null
@@ -181,6 +233,15 @@ const styles = StyleSheet.create({
   userName: { fontSize: 15 },
   userUsername: { fontSize: 13, marginTop: 2 },
   addBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  alreadyTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  alreadyTagText: { fontSize: 12 },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingTop: 60 },
-  emptyText: { fontSize: 14, textAlign: "center" },
+  emptyText: { fontSize: 14, textAlign: "center", paddingHorizontal: 30 },
 });

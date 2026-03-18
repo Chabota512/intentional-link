@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -25,8 +25,27 @@ export default function AuthScreen() {
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const nameRef = useRef<TextInput>(null);
+  const usernameRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+
+  const passwordStrength = password.length === 0
+    ? null
+    : password.length < 6
+    ? "weak"
+    : password.length < 10
+    ? "fair"
+    : "strong";
+
+  const strengthColor = {
+    weak: colors.danger,
+    fair: "#F59E0B",
+    strong: colors.success,
+  };
 
   const handleSubmit = async () => {
     setError("");
@@ -36,6 +55,10 @@ export default function AuthScreen() {
     }
     if (mode === "register" && !name.trim()) {
       setError("Please enter your name");
+      return;
+    }
+    if (mode === "register" && password.length < 6) {
+      setError("Password must be at least 6 characters");
       return;
     }
 
@@ -54,6 +77,12 @@ export default function AuthScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const switchMode = (newMode: "login" | "register") => {
+    setMode(newMode);
+    setError("");
+    setPassword("");
   };
 
   return (
@@ -84,7 +113,7 @@ export default function AuthScreen() {
             <View style={[styles.tabRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
               <Pressable
                 style={[styles.tab, mode === "login" && { backgroundColor: colors.accent }]}
-                onPress={() => { setMode("login"); setError(""); }}
+                onPress={() => switchMode("login")}
               >
                 <Text style={[styles.tabText, { color: mode === "login" ? "#fff" : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
                   Sign In
@@ -92,7 +121,7 @@ export default function AuthScreen() {
               </Pressable>
               <Pressable
                 style={[styles.tab, mode === "register" && { backgroundColor: colors.accent }]}
-                onPress={() => { setMode("register"); setError(""); }}
+                onPress={() => switchMode("register")}
               >
                 <Text style={[styles.tabText, { color: mode === "register" ? "#fff" : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
                   Create Account
@@ -105,6 +134,7 @@ export default function AuthScreen() {
                 <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                   <Feather name="user" size={18} color={colors.textSecondary} />
                   <TextInput
+                    ref={nameRef}
                     style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular" }]}
                     placeholder="Full name"
                     placeholderTextColor={colors.textTertiary}
@@ -112,12 +142,15 @@ export default function AuthScreen() {
                     onChangeText={setName}
                     autoCapitalize="words"
                     returnKeyType="next"
+                    onSubmitEditing={() => usernameRef.current?.focus()}
                   />
                 </View>
               )}
+
               <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                 <Feather name="at-sign" size={18} color={colors.textSecondary} />
                 <TextInput
+                  ref={usernameRef}
                   style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular" }]}
                   placeholder="Username"
                   placeholderTextColor={colors.textTertiary}
@@ -126,20 +159,66 @@ export default function AuthScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                 />
               </View>
-              <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-                <Feather name="lock" size={18} color={colors.textSecondary} />
-                <TextInput
-                  style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular" }]}
-                  placeholder="Password"
-                  placeholderTextColor={colors.textTertiary}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  returnKeyType="done"
-                  onSubmitEditing={handleSubmit}
-                />
+
+              <View>
+                <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                  <Feather name="lock" size={18} color={colors.textSecondary} />
+                  <TextInput
+                    ref={passwordRef}
+                    style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular" }]}
+                    placeholder="Password"
+                    placeholderTextColor={colors.textTertiary}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmit}
+                  />
+                  <Pressable
+                    onPress={() => setShowPassword((v) => !v)}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <Feather name={showPassword ? "eye-off" : "eye"} size={18} color={colors.textTertiary} />
+                  </Pressable>
+                </View>
+                {mode === "register" && password.length > 0 && (
+                  <View style={styles.strengthRow}>
+                    <View style={styles.strengthBars}>
+                      {["weak", "fair", "strong"].map((level, i) => {
+                        const levels = ["weak", "fair", "strong"];
+                        const idx = levels.indexOf(passwordStrength ?? "");
+                        const filled = i <= idx;
+                        return (
+                          <View
+                            key={level}
+                            style={[
+                              styles.strengthBar,
+                              {
+                                backgroundColor: filled
+                                  ? strengthColor[passwordStrength as keyof typeof strengthColor]
+                                  : colors.border,
+                              },
+                            ]}
+                          />
+                        );
+                      })}
+                    </View>
+                    <Text style={[styles.strengthLabel, {
+                      color: strengthColor[passwordStrength as keyof typeof strengthColor] ?? colors.textTertiary,
+                      fontFamily: "Inter_500Medium",
+                    }]}>
+                      {passwordStrength === "weak" ? "Too short" : passwordStrength === "fair" ? "Fair" : "Strong"}
+                    </Text>
+                  </View>
+                )}
+                {mode === "register" && (
+                  <Text style={[styles.passwordHint, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+                    Minimum 6 characters
+                  </Text>
+                )}
               </View>
 
               {error !== "" && (
@@ -227,6 +306,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   input: { flex: 1, fontSize: 15 },
+  strengthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+    paddingHorizontal: 2,
+  },
+  strengthBars: { flexDirection: "row", gap: 4, flex: 1 },
+  strengthBar: { flex: 1, height: 3, borderRadius: 2 },
+  strengthLabel: { fontSize: 11 },
+  passwordHint: { fontSize: 11, marginTop: 4, paddingHorizontal: 2 },
   primaryBtn: {
     borderRadius: 14,
     paddingVertical: 16,

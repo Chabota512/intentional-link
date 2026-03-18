@@ -16,17 +16,36 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
+import { useApi } from "@/hooks/useApi";
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, logout, updateUser } = useAuth();
+  const { get } = useApi();
   const [showEdit, setShowEdit] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editUsername, setEditUsername] = useState(user?.username ?? "");
   const [saving, setSaving] = useState(false);
+
+  const { data: sessions = [] } = useQuery<{ id: number; status: string }[]>({
+    queryKey: ["sessions"],
+    queryFn: () => get("/sessions"),
+    staleTime: 30000,
+  });
+
+  const { data: contacts = [] } = useQuery<{ id: number }[]>({
+    queryKey: ["contacts"],
+    queryFn: () => get("/contacts"),
+    staleTime: 30000,
+  });
+
+  const activeSessions = sessions.filter((s) => s.status === "active").length;
+  const totalSessions = sessions.length;
+  const totalContacts = contacts.length;
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
@@ -93,6 +112,22 @@ export default function ProfileScreen() {
           <Text style={[styles.username, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
             @{user?.username}
           </Text>
+          <View style={[styles.statsRow, { borderTopColor: colors.border }]}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.text, fontFamily: "Inter_700Bold" }]}>{totalSessions}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Sessions</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.text, fontFamily: "Inter_700Bold" }]}>{activeSessions}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Active</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.text, fontFamily: "Inter_700Bold" }]}>{totalContacts}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Contacts</Text>
+            </View>
+          </View>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -250,6 +285,18 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 32, color: "#fff" },
   name: { fontSize: 22 },
   username: { fontSize: 14 },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    width: "100%",
+  },
+  statItem: { flex: 1, alignItems: "center", gap: 3 },
+  statValue: { fontSize: 22 },
+  statLabel: { fontSize: 11 },
+  statDivider: { width: StyleSheet.hairlineWidth, height: 32 },
   section: {
     borderRadius: 16,
     borderWidth: 1,
