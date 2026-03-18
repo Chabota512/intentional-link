@@ -107,6 +107,21 @@ artifacts/mobile/
 └── utils/date.ts            # formatRelative, formatTime helpers
 ```
 
+## App Icon
+
+AI-generated icon: white geometric lightning bolt on an indigo-to-violet gradient background (#4F6EF7 → #7C5CFC). Stored as 1024×1024 master at `artifacts/mobile/assets/images/icon.png`. Resized copies for all target sizes live in `artifacts/mobile/public/icons/`.
+
+## PWA Setup
+
+The web landing page (served by `artifacts/mobile/server/serve.js`) is fully PWA-ready:
+
+- **Web App Manifest** — `artifacts/mobile/public/manifest.webmanifest` (name, short_name, theme_color, background_color, display: standalone, icons with `any` and `maskable` purpose)
+- **Service Worker** — `artifacts/mobile/public/sw.js` (stale-while-revalidate for static assets, network-first for everything else, skips `/api/` routes)
+- **Icon sizes** — 16, 32, 152, 167, 180, 192, 512px PNG + maskable 192 and 512 + favicon.ico (multi-size)
+- **HTML meta tags** — theme-color, apple-mobile-web-app-capable/title/status-bar-style, Open Graph, Twitter Card, manifest link, apple-touch-icon links
+- **Serve.js routes** — `/manifest.webmanifest` (no-cache), `/sw.js` (no-store + Service-Worker-Allowed: /), `/icons/*` (1-year immutable cache)
+- **app.json web** — name, shortName, description, themeColor, backgroundColor, lang, bundler: metro, output: static
+
 ## Color Palette
 
-Indigo accent (#4F6EF7 light, #6B85FF dark) on a cool grey background. Clean, minimal, professional feel inspired by Linear and Notion.
+Indigo accent (#4F6EF7 light, #6B85FF dark) on a cool grey background (#F0F2F8). Clean, minimal, professional feel inspired by Linear and Notion.

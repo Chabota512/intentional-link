@@ -11,14 +11,28 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F0F2F8"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "icon": "./assets/images/icon.png"
     },
-    "android": {},
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#4F6EF7"
+      }
+    },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/icon.png",
+      "name": "Focus",
+      "shortName": "Focus",
+      "description": "Intentional, distraction-free communication sessions",
+      "themeColor": "#4F6EF7",
+      "backgroundColor": "#F0F2F8",
+      "lang": "en",
+      "bundler": "metro",
+      "output": "static"
     },
     "plugins": [
       [

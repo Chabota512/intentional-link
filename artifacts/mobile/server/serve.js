@@ -4,6 +4,7 @@
  * Serves the output of build.js (static-build/) with two special routes:
  * - GET / or /manifest with expo-platform header → platform manifest JSON
  * - GET / without expo-platform → landing page HTML
+ * PWA assets (manifest.webmanifest, sw.js, /icons/*) → served from public/
  * Everything else falls through to static file serving from ./static-build/.
  *
  * Zero external dependencies — uses only Node.js built-ins (http, fs, path).
@@ -14,6 +15,7 @@ const fs = require("fs");
 const path = require("path");
 
 const STATIC_ROOT = path.resolve(__dirname, "..", "static-build");
+const PUBLIC_ROOT = path.resolve(__dirname, "..", "public");
 const TEMPLATE_PATH = path.resolve(__dirname, "templates", "landing-page.html");
 const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
 
@@ -21,6 +23,7 @@ const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -77,8 +80,33 @@ function serveLandingPage(req, res, landingPageTemplate, appName) {
     .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)
     .replace(/APP_NAME_PLACEHOLDER/g, appName);
 
-  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+  res.writeHead(200, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-cache",
+  });
   res.end(html);
+}
+
+function servePublicFile(urlPath, res, extraHeaders = {}) {
+  const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, "");
+  const filePath = path.join(PUBLIC_ROOT, safePath);
+
+  if (!filePath.startsWith(PUBLIC_ROOT)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return;
+  }
+
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    return false;
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = MIME_TYPES[ext] || "application/octet-stream";
+  const content = fs.readFileSync(filePath);
+  res.writeHead(200, { "content-type": contentType, ...extraHeaders });
+  res.end(content);
+  return true;
 }
 
 function serveStaticFile(urlPath, res) {
@@ -124,6 +152,40 @@ const server = http.createServer((req, res) => {
     if (pathname === "/") {
       return serveLandingPage(req, res, landingPageTemplate, appName);
     }
+  }
+
+  if (pathname === "/manifest.webmanifest") {
+    const served = servePublicFile("manifest.webmanifest", res, {
+      "cache-control": "no-cache",
+    });
+    if (!served) {
+      res.writeHead(404);
+      res.end("Not Found");
+    }
+    return;
+  }
+
+  if (pathname === "/sw.js") {
+    const served = servePublicFile("sw.js", res, {
+      "cache-control": "no-cache, no-store, must-revalidate",
+      "service-worker-allowed": "/",
+    });
+    if (!served) {
+      res.writeHead(404);
+      res.end("Not Found");
+    }
+    return;
+  }
+
+  if (pathname.startsWith("/icons/")) {
+    const served = servePublicFile(pathname, res, {
+      "cache-control": "public, max-age=31536000, immutable",
+    });
+    if (!served) {
+      res.writeHead(404);
+      res.end("Not Found");
+    }
+    return;
   }
 
   serveStaticFile(pathname, res);
