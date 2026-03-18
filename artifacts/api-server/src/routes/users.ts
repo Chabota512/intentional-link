@@ -28,7 +28,17 @@ router.post("/users/register", async (req, res): Promise<void> => {
   }
 
   const passwordHash = await hashPassword(password);
-  const [user] = await db.insert(usersTable).values({ username, name, passwordHash }).returning();
+
+  let user;
+  try {
+    [user] = await db.insert(usersTable).values({ username, name, passwordHash }).returning();
+  } catch (err: any) {
+    if (err.code === "23505") {
+      res.status(409).json({ error: "Username already taken" });
+      return;
+    }
+    throw err;
+  }
 
   const token = generateToken(user.id);
   res.status(201).json(LoginUserResponse.parse({

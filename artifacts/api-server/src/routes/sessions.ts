@@ -48,6 +48,19 @@ async function getSessionWithParticipants(sessionId: number) {
   return { ...parsed, creator: creator ?? null };
 }
 
+async function getSessionMembership(sessionId: number, userId: number) {
+  const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+  if (!session) return null;
+
+  const isCreator = session.creatorId === userId;
+
+  const [participant] = await db.select().from(sessionParticipantsTable)
+    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)))
+    .limit(1);
+
+  return { session, isCreator, participant: participant ?? null };
+}
+
 router.get("/sessions", async (req, res): Promise<void> => {
   const userIdStr = req.headers["x-user-id"] as string;
   const userId = parseInt(userIdStr, 10);
@@ -57,6 +70,10 @@ router.get("/sessions", async (req, res): Promise<void> => {
   }
 
   const statusFilter = req.query.status as string | undefined;
+  if (statusFilter !== undefined && statusFilter !== "active" && statusFilter !== "completed") {
+    res.status(400).json({ error: "Invalid status filter. Use 'active' or 'completed'" });
+    return;
+  }
 
   const participantRows = await db
     .select({ sessionId: sessionParticipantsTable.sessionId })
@@ -123,6 +140,17 @@ router.get("/sessions/:sessionId", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
   const sessionId = parseInt(raw, 10);
 
+  const membership = await getSessionMembership(sessionId, userId);
+  if (!membership) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (!membership.isCreator && !membership.participant) {
+    res.status(403).json({ error: "You are not a member of this session" });
+    return;
+  }
+
   const result = await getSessionWithParticipants(sessionId);
   if (!result) {
     res.status(404).json({ error: "Session not found" });
@@ -142,6 +170,17 @@ router.patch("/sessions/:sessionId", async (req, res): Promise<void> => {
 
   const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
   const sessionId = parseInt(raw, 10);
+
+  const membership = await getSessionMembership(sessionId, userId);
+  if (!membership) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (!membership.isCreator) {
+    res.status(403).json({ error: "Only the session creator can update this session" });
+    return;
+  }
 
   const parsed = UpdateSessionBody.safeParse(req.body);
   if (!parsed.success) {
@@ -182,6 +221,17 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
   const sessionId = parseInt(raw, 10);
 
+  const membership = await getSessionMembership(sessionId, userId);
+  if (!membership) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (!membership.isCreator) {
+    res.status(403).json({ error: "Only the session creator can invite participants" });
+    return;
+  }
+
   const parsed = InviteToSessionBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -215,16 +265,25 @@ router.post("/sessions/:sessionId/join", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
   const sessionId = parseInt(raw, 10);
 
-  const existing = await db.select().from(sessionParticipantsTable)
+  const [sessionRow] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+  if (!sessionRow) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  const [existing] = await db.select().from(sessionParticipantsTable)
     .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)))
     .limit(1);
 
-  if (existing.length > 0) {
+  if (!existing) {
+    res.status(403).json({ error: "You have not been invited to this session" });
+    return;
+  }
+
+  if (existing.status !== "joined") {
     await db.update(sessionParticipantsTable)
       .set({ status: "joined" })
       .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)));
-  } else {
-    await db.insert(sessionParticipantsTable).values({ sessionId, userId, status: "joined" });
   }
 
   const result = await getSessionWithParticipants(sessionId);
@@ -253,8 +312,14 @@ router.delete("/sessions/:sessionId/leave", async (req, res): Promise<void> => {
     return;
   }
 
-  await db.delete(sessionParticipantsTable)
-    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)));
+  const [deleted] = await db.delete(sessionParticipantsTable)
+    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)))
+    .returning();
+
+  if (!deleted) {
+    res.status(404).json({ error: "You are not a participant in this session" });
+    return;
+  }
 
   res.sendStatus(204);
 });

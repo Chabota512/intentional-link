@@ -7,6 +7,7 @@ import {
   Pressable,
   FlatList,
   ActivityIndicator,
+  Alert,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -38,6 +39,7 @@ export default function AddContactScreen() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -50,14 +52,19 @@ export default function AddContactScreen() {
 
   const search = (q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!q.trim()) { setResults([]); return; }
+    if (!q.trim()) { setResults([]); setSearchError(null); return; }
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
+      setSearchError(null);
       try {
         const data = await get(`/users/search?q=${encodeURIComponent(q)}`);
         setResults(data.filter((u: User) => u.id !== user?.id));
-      } catch {}
-      finally { setSearching(false); }
+      } catch (e: any) {
+        setSearchError(e.message || "Search failed. Please try again.");
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
     }, 350);
   };
 
@@ -74,6 +81,9 @@ export default function AddContactScreen() {
       setAddedIds(prev => new Set([...prev, contactUserId]));
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to add contact. Please try again.");
     },
   });
 
@@ -175,7 +185,14 @@ export default function AddContactScreen() {
         ]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          query.length > 0 && !searching ? (
+          searchError ? (
+            <View style={styles.emptyState}>
+              <Feather name="alert-circle" size={40} color={colors.danger} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                {searchError}
+              </Text>
+            </View>
+          ) : query.length > 0 && !searching ? (
             <View style={styles.emptyState}>
               <Feather name="user-x" size={40} color={colors.textTertiary} />
               <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>

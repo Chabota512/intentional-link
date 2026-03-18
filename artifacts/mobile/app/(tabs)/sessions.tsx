@@ -48,7 +48,7 @@ export default function SessionsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
 
-  const { data: sessions = [], isLoading, refetch } = useQuery<Session[]>({
+  const { data: sessions = [], isLoading, isError, isRefetching, refetch } = useQuery<Session[]>({
     queryKey: ["sessions"],
     queryFn: () => get("/sessions"),
     refetchInterval: 5000,
@@ -244,6 +244,23 @@ export default function SessionsScreen() {
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
         </View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <Feather name="wifi-off" size={36} color={colors.textTertiary} />
+          <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold", marginTop: 16 }]}>
+            Could not load sessions
+          </Text>
+          <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+            Check your connection and try again.
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1, marginTop: 8 }]}
+            onPress={() => refetch()}
+          >
+            <Feather name="refresh-cw" size={16} color="#fff" />
+            <Text style={[styles.emptyBtnText, { fontFamily: "Inter_600SemiBold" }]}>Retry</Text>
+          </Pressable>
+        </View>
       ) : (
         <FlatList
           data={filtered}
@@ -256,7 +273,7 @@ export default function SessionsScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={false} onRefresh={refetch} tintColor={colors.accent} />
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
           }
           ListEmptyComponent={
             searchQuery.trim() !== "" ? (

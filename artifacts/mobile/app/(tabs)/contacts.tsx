@@ -37,7 +37,7 @@ export default function ContactsScreen() {
   const { get, del } = useApi();
   const queryClient = useQueryClient();
 
-  const { data: contacts = [], isLoading, refetch } = useQuery<Contact[]>({
+  const { data: contacts = [], isLoading, isRefetching, refetch } = useQuery<Contact[]>({
     queryKey: ["contacts"],
     queryFn: () => get("/contacts"),
   });
@@ -46,6 +46,9 @@ export default function ContactsScreen() {
     mutationFn: (contactId: number) => del(`/contacts/${contactId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to remove contact. Please try again.");
     },
   });
 
@@ -128,7 +131,7 @@ export default function ContactsScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={false} onRefresh={refetch} tintColor={colors.accent} />
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>

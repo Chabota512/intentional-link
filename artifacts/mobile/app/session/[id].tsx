@@ -145,6 +145,8 @@ export default function SessionScreen() {
   const [sheetView, setSheetView] = useState<SheetView>("participants");
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
+  const [pollFailed, setPollFailed] = useState(false);
+  const consecutivePollErrors = useRef(0);
 
   const { data: session, isLoading: sessionLoading } = useQuery<Session>({
     queryKey: ["session", sessionId],
@@ -174,6 +176,8 @@ export default function SessionScreen() {
     const interval = setInterval(async () => {
       try {
         const newMsgs = await get(`/sessions/${sessionId}/messages/poll?since=${lastMsgId.current}`);
+        consecutivePollErrors.current = 0;
+        if (pollFailed) setPollFailed(false);
         if (newMsgs.length > 0) {
           lastMsgId.current = newMsgs[newMsgs.length - 1].id;
           queryClient.setQueryData(["messages", sessionId], (old: Message[] = []) => {
@@ -182,7 +186,10 @@ export default function SessionScreen() {
             return fresh.length > 0 ? [...old, ...fresh] : old;
           });
         }
-      } catch {}
+      } catch {
+        consecutivePollErrors.current += 1;
+        if (consecutivePollErrors.current >= 3) setPollFailed(true);
+      }
     }, 2000);
     return () => clearInterval(interval);
   }, [session, sessionId]);
@@ -193,11 +200,15 @@ export default function SessionScreen() {
     }
   }, [messages.length]);
 
+  const tempIdRef = useRef<number>(0);
+
   const sendMutation = useMutation({
     mutationFn: (content: string) => post(`/sessions/${sessionId}/messages`, { content }),
     onMutate: async (content) => {
+      const tempId = -(Date.now());
+      tempIdRef.current = tempId;
       const tempMsg: Message = {
-        id: Date.now(),
+        id: tempId,
         sessionId,
         senderId: user!.id,
         content,
@@ -210,8 +221,14 @@ export default function SessionScreen() {
     onSuccess: (newMsg) => {
       lastMsgId.current = newMsg.id;
       queryClient.setQueryData(["messages", sessionId], (old: Message[] = []) => {
-        return old.map((m) => m.id > 1000000000 ? newMsg : m);
+        return old.map((m) => m.id === tempIdRef.current ? newMsg : m);
       });
+    },
+    onError: () => {
+      queryClient.setQueryData(["messages", sessionId], (old: Message[] = []) => {
+        return old.filter((m) => m.id !== tempIdRef.current);
+      });
+      Alert.alert("Failed to send", "Your message could not be sent. Please try again.");
     },
   });
 
@@ -268,7 +285,9 @@ export default function SessionScreen() {
       } else {
         setHasOlder(false);
       }
-    } catch {}
+    } catch {
+      Alert.alert("Error", "Could not load older messages. Please try again.");
+    }
     setLoadingOlder(false);
   };
 
@@ -417,6 +436,15 @@ export default function SessionScreen() {
         keyboardVerticalOffset={0}
         style={{ flex: 1 }}
       >
+        {pollFailed && isActive && (
+          <View style={[styles.pollErrorBanner, { backgroundColor: "#FFF3CD", borderBottomColor: "#FFEAA7" }]}>
+            <Feather name="wifi-off" size={14} color="#856404" />
+            <Text style={[styles.pollErrorText, { color: "#856404", fontFamily: "Inter_500Medium" }]}>
+              Connection issues — trying to reconnect…
+            </Text>
+          </View>
+        )}
+
         {msgsLoading ? (
           <View style={styles.center}>
             <ActivityIndicator color={colors.accent} />
@@ -771,6 +799,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   inviteHintText: { fontSize: 14 },
+  pollErrorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pollErrorText: { fontSize: 13 },
   endedBar: {
     flexDirection: "row",
     alignItems: "center",
