@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -50,10 +52,18 @@ interface Session {
   title: string;
   description?: string;
   creatorId: number;
+  creator?: { id: number; name: string; username: string } | null;
   status: "active" | "completed";
   participants: Participant[];
   createdAt: string;
   endedAt?: string;
+}
+
+interface Contact {
+  id: number;
+  userId: number;
+  contactUser: User;
+  createdAt: string;
 }
 
 function MessageBubble({ message, isOwn, showSender, colors }: {
@@ -100,13 +110,24 @@ function MessageBubble({ message, isOwn, showSender, colors }: {
             {message.content}
           </Text>
         </View>
-        <Text style={[styles.bubbleTime, { color: colors.textTertiary, alignSelf: isOwn ? "flex-end" : "flex-start" }]}>
-          {formatTime(message.createdAt)}
-        </Text>
+        <View style={[styles.bubbleMeta, { alignSelf: isOwn ? "flex-end" : "flex-start" }]}>
+          <Text style={[styles.bubbleTime, { color: colors.textTertiary }]}>
+            {formatTime(message.createdAt)}
+          </Text>
+          {isOwn && (
+            <Feather
+              name={message.status === "sent" ? "check" : "check"}
+              size={10}
+              color={colors.textTertiary}
+            />
+          )}
+        </View>
       </View>
     </Animated.View>
   );
 }
+
+type SheetView = "participants" | "invite";
 
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -119,6 +140,8 @@ export default function SessionScreen() {
   const [text, setText] = useState("");
   const flatListRef = useRef<FlatList>(null);
   const lastMsgId = useRef(0);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetView, setSheetView] = useState<SheetView>("participants");
 
   const { data: session, isLoading: sessionLoading } = useQuery<Session>({
     queryKey: ["session", sessionId],
@@ -133,6 +156,12 @@ export default function SessionScreen() {
         lastMsgId.current = data[data.length - 1].id;
       }
     },
+  });
+
+  const { data: contacts = [] } = useQuery<Contact[]>({
+    queryKey: ["contacts"],
+    queryFn: () => get("/contacts"),
+    enabled: sheetVisible && sheetView === "invite",
   });
 
   useEffect(() => {
@@ -197,7 +226,13 @@ export default function SessionScreen() {
 
   const inviteMutation = useMutation({
     mutationFn: (userId: number) => post(`/sessions/${sessionId}/invite`, { userId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["session", sessionId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to invite");
+    },
   });
 
   const handleSend = () => {
@@ -215,11 +250,24 @@ export default function SessionScreen() {
     ]);
   };
 
+  const openParticipants = () => {
+    setSheetView("participants");
+    setSheetVisible(true);
+  };
+
+  const openInvite = () => {
+    setSheetView("invite");
+    setSheetVisible(true);
+  };
+
   const isParticipant = session?.participants.some((p) => p.userId === user?.id);
   const hasJoined = session?.participants.some((p) => p.userId === user?.id && p.status === "joined");
   const isActive = session?.status === "active";
   const isCreator = session?.creatorId === user?.id;
   const canSend = isActive && (isCreator || hasJoined);
+
+  const participantIds = new Set(session?.participants.map((p) => p.userId) ?? []);
+  const uninvitedContacts = contacts.filter((c) => !participantIds.has(c.contactUser.id));
 
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
@@ -240,6 +288,8 @@ export default function SessionScreen() {
     );
   }
 
+  const totalPeople = session.participants.length + 1;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.navBar, { paddingTop: topPad + 8, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -253,21 +303,38 @@ export default function SessionScreen() {
           <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
             {session.title}
           </Text>
-          <View style={styles.navMeta}>
+          <Pressable style={styles.navMeta} onPress={openParticipants}>
             <View style={[styles.statusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
             <Text style={[styles.navSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-              {isActive ? "Active" : "Completed"} · {session.participants.length + 1} participants
+              {isActive ? "Active" : "Completed"} · {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
             </Text>
-          </View>
-        </View>
-        {isActive && isCreator && (
-          <Pressable
-            style={({ pressed }) => [styles.endBtn, { backgroundColor: "#FFF0F0", opacity: pressed ? 0.7 : 1 }]}
-            onPress={handleEndSession}
-          >
-            <Text style={[styles.endBtnText, { color: colors.danger, fontFamily: "Inter_600SemiBold" }]}>End</Text>
+            <Feather name="chevron-right" size={12} color={colors.textTertiary} />
           </Pressable>
-        )}
+        </View>
+        <View style={styles.navActions}>
+          <Pressable
+            style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+            onPress={openParticipants}
+          >
+            <Feather name="users" size={20} color={colors.textSecondary} />
+          </Pressable>
+          {isActive && isCreator && (
+            <>
+              <Pressable
+                style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+                onPress={openInvite}
+              >
+                <Feather name="user-plus" size={20} color={colors.accent} />
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.endBtn, { backgroundColor: "#FFF0F0", opacity: pressed ? 0.7 : 1 }]}
+                onPress={handleEndSession}
+              >
+                <Text style={[styles.endBtnText, { color: colors.danger, fontFamily: "Inter_600SemiBold" }]}>End</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
       </View>
 
       {session.description && (
@@ -331,6 +398,17 @@ export default function SessionScreen() {
                 <Text style={[styles.emptyMessagesText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
                   {canSend ? "Start the conversation" : "No messages yet"}
                 </Text>
+                {isActive && isCreator && uninvitedContacts.length > 0 && (
+                  <Pressable
+                    style={({ pressed }) => [styles.inviteHint, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1 }]}
+                    onPress={openInvite}
+                  >
+                    <Feather name="user-plus" size={14} color={colors.accent} />
+                    <Text style={[styles.inviteHintText, { color: colors.accent, fontFamily: "Inter_500Medium" }]}>
+                      Invite contacts to join
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             }
           />
@@ -375,6 +453,140 @@ export default function SessionScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={sheetVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSheetVisible(false)}
+      >
+        <View style={[styles.sheetContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
+            {sheetView === "invite" && isCreator ? (
+              <>
+                <Pressable onPress={() => setSheetView("participants")} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                  <Feather name="arrow-left" size={22} color={colors.text} />
+                </Pressable>
+                <Text style={[styles.sheetTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Invite Contacts</Text>
+              </>
+            ) : (
+              <>
+                <View style={{ width: 22 }} />
+                <Text style={[styles.sheetTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Participants</Text>
+              </>
+            )}
+            <Pressable onPress={() => setSheetVisible(false)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+              <Feather name="x" size={22} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          {sheetView === "participants" ? (
+            <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+              <View style={[styles.participantRow, { borderBottomColor: colors.border }]}>
+                <View style={[styles.participantAvatar, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.participantAvatarText, { fontFamily: "Inter_700Bold" }]}>
+                    {(session.creator?.name ?? (isCreator ? user?.name : null) ?? "?").charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                    {session.creator?.name ?? (isCreator ? user?.name : "Unknown")}
+                  </Text>
+                  <Text style={[styles.participantUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    @{session.creator?.username ?? (isCreator ? user?.username : "unknown")}
+                  </Text>
+                </View>
+                <View style={[styles.rolePill, { backgroundColor: colors.accentSoft }]}>
+                  <Text style={[styles.rolePillText, { color: colors.accent, fontFamily: "Inter_500Medium" }]}>Creator</Text>
+                </View>
+              </View>
+
+              {session.participants.filter(p => p.userId !== session.creatorId).map((p) => (
+                <View key={p.id} style={[styles.participantRow, { borderBottomColor: colors.border }]}>
+                  <View style={[styles.participantAvatar, { backgroundColor: colors.accentSoft }]}>
+                    <Text style={[styles.participantAvatarText, { color: colors.accent, fontFamily: "Inter_700Bold" }]}>
+                      {p.user.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                      {p.user.name}
+                    </Text>
+                    <Text style={[styles.participantUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                      @{p.user.username}
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.statusChip,
+                    { backgroundColor: p.status === "joined" ? "#E8F5E9" : colors.surfaceAlt }
+                  ]}>
+                    <Text style={[
+                      styles.statusChipText,
+                      { color: p.status === "joined" ? "#388E3C" : colors.textSecondary, fontFamily: "Inter_500Medium" }
+                    ]}>
+                      {p.status === "joined" ? "Joined" : "Invited"}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+
+              {isActive && isCreator && (
+                <Pressable
+                  style={({ pressed }) => [styles.inviteMoreBtn, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1 }]}
+                  onPress={() => setSheetView("invite")}
+                >
+                  <Feather name="user-plus" size={18} color={colors.accent} />
+                  <Text style={[styles.inviteMoreText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
+                    Invite More Contacts
+                  </Text>
+                </Pressable>
+              )}
+            </ScrollView>
+          ) : (
+            <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+              {uninvitedContacts.length === 0 ? (
+                <View style={styles.emptySheet}>
+                  <Feather name="users" size={36} color={colors.textTertiary} />
+                  <Text style={[styles.emptySheetText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    All your contacts are already in this session
+                  </Text>
+                </View>
+              ) : (
+                uninvitedContacts.map((contact) => (
+                  <View key={contact.id} style={[styles.participantRow, { borderBottomColor: colors.border }]}>
+                    <View style={[styles.participantAvatar, { backgroundColor: colors.accentSoft }]}>
+                      <Text style={[styles.participantAvatarText, { color: colors.accent, fontFamily: "Inter_700Bold" }]}>
+                        {contact.contactUser.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                        {contact.contactUser.name}
+                      </Text>
+                      <Text style={[styles.participantUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                        @{contact.contactUser.username}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.inviteBtn,
+                        { backgroundColor: inviteMutation.isPending ? colors.surfaceAlt : colors.accent, opacity: pressed ? 0.8 : 1 }
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        inviteMutation.mutate(contact.contactUser.id);
+                      }}
+                      disabled={inviteMutation.isPending}
+                    >
+                      <Text style={[styles.inviteBtnText, { fontFamily: "Inter_600SemiBold" }]}>Invite</Text>
+                    </Pressable>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -393,10 +605,12 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   navCenter: { flex: 1, gap: 2 },
   navTitle: { fontSize: 16 },
-  navMeta: { flexDirection: "row", alignItems: "center", gap: 5 },
+  navMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   navSub: { fontSize: 12 },
-  endBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  navActions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  navIconBtn: { padding: 4 },
+  endBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginLeft: 4 },
   endBtnText: { fontSize: 13 },
   descBanner: {
     flexDirection: "row",
@@ -441,6 +655,7 @@ const styles = StyleSheet.create({
   bubbleOwn: { borderBottomRightRadius: 4 },
   bubbleOther: { borderBottomLeftRadius: 4, borderWidth: 1 },
   bubbleText: { fontSize: 15, lineHeight: 21 },
+  bubbleMeta: { flexDirection: "row", alignItems: "center", gap: 3 },
   bubbleTime: { fontSize: 10, fontFamily: "Inter_400Regular" },
   inputBar: {
     flexDirection: "row",
@@ -462,6 +677,16 @@ const styles = StyleSheet.create({
   sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
   emptyMessages: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 60 },
   emptyMessagesText: { fontSize: 14 },
+  inviteHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  inviteHintText: { fontSize: 14 },
   endedBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -471,4 +696,62 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   endedText: { fontSize: 13 },
+  sheetContainer: { flex: 1 },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sheetTitle: { fontSize: 16 },
+  sheetScroll: { padding: 16, gap: 0 },
+  participantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  participantAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  participantAvatarText: { fontSize: 18, color: "#fff" },
+  participantName: { fontSize: 15 },
+  participantUsername: { fontSize: 13, marginTop: 1 },
+  rolePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  rolePillText: { fontSize: 11 },
+  statusChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  statusChipText: { fontSize: 11 },
+  inviteBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  inviteBtnText: { color: "#fff", fontSize: 13 },
+  inviteMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 14,
+    borderRadius: 14,
+    marginTop: 16,
+  },
+  inviteMoreText: { fontSize: 15 },
+  emptySheet: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 60 },
+  emptySheetText: { fontSize: 14, textAlign: "center", paddingHorizontal: 40 },
 });

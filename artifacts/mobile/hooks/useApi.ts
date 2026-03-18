@@ -8,6 +8,7 @@ export function useApi() {
   const headers = () => ({
     "Content-Type": "application/json",
     "x-user-id": user ? String(user.id) : "",
+    ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
   });
 
   const get = async (path: string) => {
@@ -20,6 +21,17 @@ export function useApi() {
   const post = async (path: string, body?: unknown) => {
     const res = await fetch(`${BASE_URL}/api${path}`, {
       method: "POST",
+      headers: headers(),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Request failed");
+    return data;
+  };
+
+  const put = async (path: string, body?: unknown) => {
+    const res = await fetch(`${BASE_URL}/api${path}`, {
+      method: "PUT",
       headers: headers(),
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -47,5 +59,5 @@ export function useApi() {
     }
   };
 
-  return { get, post, patch, del };
+  return { get, post, put, patch, del };
 }

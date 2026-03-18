@@ -28,7 +28,13 @@ async function getSessionWithParticipants(sessionId: number) {
     .innerJoin(usersTable, eq(sessionParticipantsTable.userId, usersTable.id))
     .where(eq(sessionParticipantsTable.sessionId, sessionId));
 
-  return GetSessionResponse.parse({
+  const [creator] = await db.select({
+    id: usersTable.id,
+    name: usersTable.name,
+    username: usersTable.username,
+  }).from(usersTable).where(eq(usersTable.id, session.creatorId)).limit(1);
+
+  const parsed = GetSessionResponse.parse({
     ...session,
     participants: participants.map(p => ({
       id: p.id,
@@ -38,6 +44,8 @@ async function getSessionWithParticipants(sessionId: number) {
       user: { id: p.userId, name: p.userName, username: p.userUsername, createdAt: p.userCreatedAt },
     })),
   });
+
+  return { ...parsed, creator: creator ?? null };
 }
 
 router.get("/sessions", async (req, res): Promise<void> => {

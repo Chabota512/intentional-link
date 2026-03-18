@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike } from "drizzle-orm";
+import { eq, ilike, and, ne } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import {
   RegisterUserBody,
@@ -80,6 +80,51 @@ router.get("/users/me", async (req, res): Promise<void> => {
   }
 
   res.json(GetMeResponse.parse({ id: user.id, username: user.username, name: user.name, createdAt: user.createdAt }));
+});
+
+router.put("/users/me", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { name, username } = req.body ?? {};
+  if (name !== undefined && (typeof name !== "string" || name.trim().length === 0 || name.length > 100)) {
+    res.status(400).json({ error: "Invalid name" });
+    return;
+  }
+  if (username !== undefined && (typeof username !== "string" || username.trim().length < 2 || username.length > 50)) {
+    res.status(400).json({ error: "Invalid username (2–50 chars)" });
+    return;
+  }
+
+  const updates: Record<string, string> = {};
+  if (name) updates.name = name.trim();
+  if (username) {
+    const existing = await db.select().from(usersTable)
+      .where(and(eq(usersTable.username, username.trim()), ne(usersTable.id, userId)))
+      .limit(1);
+    if (existing.length > 0) {
+      res.status(409).json({ error: "Username already taken" });
+      return;
+    }
+    updates.username = username.trim();
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
+  }
+
+  const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, userId)).returning();
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  res.json({ id: user.id, username: user.username, name: user.name, createdAt: user.createdAt });
 });
 
 router.get("/users/search", async (req, res): Promise<void> => {

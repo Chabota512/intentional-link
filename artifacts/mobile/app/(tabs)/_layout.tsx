@@ -7,6 +7,7 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import Colors from "@/constants/colors";
+import { usePendingInvites } from "@/hooks/usePendingInvites";
 
 function NativeTabLayout() {
   return (
@@ -33,6 +34,7 @@ function ClassicTabLayout() {
   const colors = isDark ? Colors.dark : Colors.light;
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const pendingInvites = usePendingInvites();
 
   return (
     <Tabs
@@ -65,6 +67,8 @@ function ClassicTabLayout() {
         name="sessions"
         options={{
           title: "Sessions",
+          tabBarBadge: pendingInvites > 0 ? pendingInvites : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 10 },
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="bubble.left.and.bubble.right" tintColor={color} size={22} />
