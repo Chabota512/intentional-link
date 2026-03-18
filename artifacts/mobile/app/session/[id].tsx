@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   ScrollView,
+  Share,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,8 +20,10 @@ import { Feather } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 import { TextInput } from "react-native";
 import * as Haptics from "expo-haptics";
+import * as SMS from "expo-sms";
+import * as Linking from "expo-linking";
 import { useTheme } from "@/hooks/useTheme";
-import { useApi } from "@/hooks/useApi";
+import { useApi, ApiError } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import { formatTime, formatRelative } from "@/utils/date";
 
@@ -63,6 +66,15 @@ interface Contact {
   id: number;
   userId: number;
   contactUser: User;
+  createdAt: string;
+}
+
+interface SessionPreview {
+  id: number;
+  title: string;
+  status: "active" | "completed";
+  participantCount: number;
+  creatorName: string;
   createdAt: string;
 }
 
@@ -148,10 +160,50 @@ export default function SessionScreen() {
   const [pollFailed, setPollFailed] = useState(false);
   const consecutivePollErrors = useRef(0);
 
-  const { data: session, isLoading: sessionLoading } = useQuery<Session>({
+  const { data: session, isLoading: sessionLoading, error: sessionError } = useQuery<Session>({
     queryKey: ["session", sessionId],
     queryFn: () => get(`/sessions/${sessionId}`),
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && error.status === 403) return false;
+      return failureCount < 2;
+    },
   });
+
+  const isNotMember = sessionError instanceof ApiError && sessionError.status === 403;
+
+  const { data: sessionPreview, isLoading: previewLoading } = useQuery<SessionPreview>({
+    queryKey: ["session-preview", sessionId],
+    queryFn: () => get(`/sessions/${sessionId}/preview`),
+    enabled: isNotMember,
+    retry: false,
+  });
+
+  const joinByLinkMutation = useMutation({
+    mutationFn: () => post(`/sessions/${sessionId}/join-link`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (e: any) => {
+      Alert.alert("Could not join", e.message || "Unable to join this session.");
+    },
+  });
+
+  const shareSessionLink = async () => {
+    const link = Linking.createURL(`session/${sessionId}`);
+    const message = `Join my Focus session "${session?.title ?? "Focus Session"}": ${link}`;
+    try {
+      const smsAvailable = await SMS.isAvailableAsync();
+      if (smsAvailable) {
+        await SMS.sendSMSAsync([], message);
+      } else {
+        await Share.share({ message, url: link });
+      }
+    } catch {
+      await Share.share({ message, url: link });
+    }
+  };
 
   const { data: messages = [], isLoading: msgsLoading } = useQuery<Message[]>({
     queryKey: ["messages", sessionId],
@@ -177,7 +229,7 @@ export default function SessionScreen() {
       try {
         const newMsgs = await get(`/sessions/${sessionId}/messages/poll?since=${lastMsgId.current}`);
         consecutivePollErrors.current = 0;
-        if (pollFailed) setPollFailed(false);
+        setPollFailed(false);
         if (newMsgs.length > 0) {
           lastMsgId.current = newMsgs[newMsgs.length - 1].id;
           queryClient.setQueryData(["messages", sessionId], (old: Message[] = []) => {
@@ -339,6 +391,63 @@ export default function SessionScreen() {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (isNotMember) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.navBar, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 8, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Pressable style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]} onPress={() => router.back()}>
+            <Feather name="arrow-left" size={22} color={colors.text} />
+          </Pressable>
+          <View style={styles.navCenter}>
+            <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
+              {sessionPreview?.title ?? "Focus Session"}
+            </Text>
+          </View>
+          <View style={{ width: 30 }} />
+        </View>
+        <View style={[styles.center, { padding: 32, gap: 16 }]}>
+          {previewLoading ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : (
+            <>
+              <View style={[styles.joinLinkIcon, { backgroundColor: colors.accentSoft }]}>
+                <Feather name="link" size={32} color={colors.accent} />
+              </View>
+              <Text style={[styles.joinLinkTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>
+                You've been invited
+              </Text>
+              {sessionPreview ? (
+                <>
+                  <Text style={[styles.joinLinkSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    {sessionPreview.creatorName} invited you to join "{sessionPreview.title}"
+                    {sessionPreview.participantCount > 1 ? ` · ${sessionPreview.participantCount} participant${sessionPreview.participantCount !== 1 ? "s" : ""}` : ""}
+                  </Text>
+                  {sessionPreview.status !== "active" && (
+                    <Text style={[styles.joinLinkSub, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>
+                      This session has already ended.
+                    </Text>
+                  )}
+                </>
+              ) : null}
+              {(!sessionPreview || sessionPreview.status === "active") && (
+                <Pressable
+                  style={({ pressed }) => [styles.joinLinkBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
+                  onPress={() => joinByLinkMutation.mutate()}
+                  disabled={joinByLinkMutation.isPending}
+                >
+                  {joinByLinkMutation.isPending
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={[styles.joinLinkBtnText, { fontFamily: "Inter_600SemiBold" }]}>Join Session</Text>
+                  }
+                </Pressable>
+              )}
+            </>
+          )}
+        </View>
       </View>
     );
   }
@@ -643,6 +752,28 @@ export default function SessionScreen() {
             </ScrollView>
           ) : (
             <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+              <Pressable
+                style={({ pressed }) => [styles.shareTextBtn, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.8 : 1 }]}
+                onPress={shareSessionLink}
+              >
+                <View style={[styles.shareTextIcon, { backgroundColor: "#E8F5E9" }]}>
+                  <Feather name="message-circle" size={20} color="#388E3C" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.shareTextLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                    Share via Text Message
+                  </Text>
+                  <Text style={[styles.shareTextSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    Send an invite link to any phone contact
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.textTertiary} />
+              </Pressable>
+
+              <Text style={[styles.orDivider, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+                — or invite from your contacts —
+              </Text>
+
               {uninvitedContacts.length === 0 ? (
                 <View style={styles.emptySheet}>
                   <Feather name="users" size={36} color={colors.textTertiary} />
@@ -808,6 +939,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   pollErrorText: { fontSize: 13 },
+  joinLinkIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  joinLinkTitle: { fontSize: 22, textAlign: "center" },
+  joinLinkSub: { fontSize: 14, textAlign: "center", lineHeight: 20, paddingHorizontal: 8 },
+  joinLinkBtn: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+    minWidth: 180,
+  },
+  joinLinkBtnText: { color: "#fff", fontSize: 16 },
+  shareTextBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  shareTextIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shareTextLabel: { fontSize: 15 },
+  shareTextSub: { fontSize: 12, marginTop: 2 },
+  orDivider: { textAlign: "center", fontSize: 12, marginVertical: 14 },
   endedBar: {
     flexDirection: "row",
     alignItems: "center",

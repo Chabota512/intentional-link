@@ -2,6 +2,15 @@ import { useAuth } from "@/context/AuthContext";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+    this.name = "ApiError";
+  }
+}
+
 export function useApi() {
   const { user } = useAuth();
 
@@ -14,7 +23,7 @@ export function useApi() {
   const get = async (path: string) => {
     const res = await fetch(`${BASE_URL}/api${path}`, { headers: headers() });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
+    if (!res.ok) throw new ApiError(data.error || "Request failed", res.status);
     return data;
   };
 
@@ -25,7 +34,7 @@ export function useApi() {
       body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
+    if (!res.ok) throw new ApiError(data.error || "Request failed", res.status);
     return data;
   };
 
@@ -36,7 +45,7 @@ export function useApi() {
       body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
+    if (!res.ok) throw new ApiError(data.error || "Request failed", res.status);
     return data;
   };
 
@@ -47,7 +56,7 @@ export function useApi() {
       body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
+    if (!res.ok) throw new ApiError(data.error || "Request failed", res.status);
     return data;
   };
 
@@ -55,7 +64,7 @@ export function useApi() {
     const res = await fetch(`${BASE_URL}/api${path}`, { method: "DELETE", headers: headers() });
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.error || "Request failed");
+      throw new ApiError(data.error || "Request failed", res.status);
     }
   };
 

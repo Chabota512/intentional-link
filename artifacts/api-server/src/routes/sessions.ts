@@ -290,6 +290,96 @@ router.post("/sessions/:sessionId/join", async (req, res): Promise<void> => {
   res.json(result);
 });
 
+router.get("/sessions/:sessionId/preview", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
+  const sessionId = parseInt(raw, 10);
+
+  const [session] = await db.select({
+    id: sessionsTable.id,
+    title: sessionsTable.title,
+    status: sessionsTable.status,
+    createdAt: sessionsTable.createdAt,
+  }).from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  const participantCount = await db
+    .select({ count: sessionParticipantsTable.id })
+    .from(sessionParticipantsTable)
+    .where(eq(sessionParticipantsTable.sessionId, sessionId));
+
+  const [creatorRow] = await db.select({ name: usersTable.name, username: usersTable.username })
+    .from(sessionsTable)
+    .innerJoin(usersTable, eq(sessionsTable.creatorId, usersTable.id))
+    .where(eq(sessionsTable.id, sessionId))
+    .limit(1);
+
+  res.json({
+    id: session.id,
+    title: session.title,
+    status: session.status,
+    createdAt: session.createdAt,
+    participantCount: participantCount.length + 1,
+    creatorName: creatorRow?.name ?? "Unknown",
+  });
+});
+
+router.post("/sessions/:sessionId/join-link", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
+  const sessionId = parseInt(raw, 10);
+
+  const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.status !== "active") {
+    res.status(400).json({ error: "This session has already ended" });
+    return;
+  }
+
+  if (session.creatorId === userId) {
+    const result = await getSessionWithParticipants(sessionId);
+    res.json(result);
+    return;
+  }
+
+  const [existing] = await db.select().from(sessionParticipantsTable)
+    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)))
+    .limit(1);
+
+  if (existing) {
+    if (existing.status !== "joined") {
+      await db.update(sessionParticipantsTable)
+        .set({ status: "joined" })
+        .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)));
+    }
+  } else {
+    await db.insert(sessionParticipantsTable).values({ sessionId, userId, status: "joined" });
+  }
+
+  const result = await getSessionWithParticipants(sessionId);
+  res.json(result);
+});
+
 router.delete("/sessions/:sessionId/leave", async (req, res): Promise<void> => {
   const userIdStr = req.headers["x-user-id"] as string;
   const userId = parseInt(userIdStr, 10);
