@@ -27,7 +27,7 @@ router.post("/users/register", async (req, res): Promise<void> => {
     return;
   }
 
-  const passwordHash = hashPassword(password);
+  const passwordHash = await hashPassword(password);
   const [user] = await db.insert(usersTable).values({ username, name, passwordHash }).returning();
 
   const token = generateToken(user.id);
@@ -50,7 +50,7 @@ router.post("/users/login", async (req, res): Promise<void> => {
   const { username, password } = parsed.data;
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }

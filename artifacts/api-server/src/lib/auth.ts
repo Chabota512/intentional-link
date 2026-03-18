@@ -1,13 +1,19 @@
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "focus_token_secret_2024";
+const BCRYPT_ROUNDS = 10;
 
-export function hashPassword(password: string): string {
-  return crypto.createHash("sha256").update(password + "focus_salt_2024").digest("hex");
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
-export function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash;
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  if (hash.startsWith("$2")) {
+    return bcrypt.compare(password, hash);
+  }
+  const sha256 = crypto.createHash("sha256").update(password + "focus_salt_2024").digest("hex");
+  return sha256 === hash;
 }
 
 export function generateToken(userId: number): string {

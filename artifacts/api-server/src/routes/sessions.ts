@@ -231,4 +231,32 @@ router.post("/sessions/:sessionId/join", async (req, res): Promise<void> => {
   res.json(result);
 });
 
+router.delete("/sessions/:sessionId/leave", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
+  const sessionId = parseInt(raw, 10);
+
+  const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.creatorId === userId) {
+    res.status(400).json({ error: "Creator cannot leave — end the session instead" });
+    return;
+  }
+
+  await db.delete(sessionParticipantsTable)
+    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)));
+
+  res.sendStatus(204);
+});
+
 export default router;

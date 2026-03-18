@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -114,13 +114,14 @@ function MessageBubble({ message, isOwn, showSender, colors }: {
           <Text style={[styles.bubbleTime, { color: colors.textTertiary }]}>
             {formatTime(message.createdAt)}
           </Text>
-          {isOwn && (
-            <Feather
-              name={message.status === "sent" ? "check" : "check"}
-              size={10}
-              color={colors.textTertiary}
-            />
-          )}
+          {isOwn && message.status === "delivered" ? (
+            <View style={{ flexDirection: "row" }}>
+              <Feather name="check" size={10} color={colors.accent} style={{ marginRight: -4 }} />
+              <Feather name="check" size={10} color={colors.accent} />
+            </View>
+          ) : isOwn ? (
+            <Feather name="check" size={10} color={colors.textTertiary} />
+          ) : null}
         </View>
       </View>
     </Animated.View>
@@ -134,7 +135,7 @@ export default function SessionScreen() {
   const sessionId = parseInt(id, 10);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { get, post, patch } = useApi();
+  const { get, post, patch, del } = useApi();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
@@ -142,6 +143,8 @@ export default function SessionScreen() {
   const lastMsgId = useRef(0);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetView, setSheetView] = useState<SheetView>("participants");
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasOlder, setHasOlder] = useState(false);
 
   const { data: session, isLoading: sessionLoading } = useQuery<Session>({
     queryKey: ["session", sessionId],
@@ -150,11 +153,13 @@ export default function SessionScreen() {
 
   const { data: messages = [], isLoading: msgsLoading } = useQuery<Message[]>({
     queryKey: ["messages", sessionId],
-    queryFn: () => get(`/sessions/${sessionId}/messages`),
-    onSuccess: (data) => {
+    queryFn: async () => {
+      const data: Message[] = await get(`/sessions/${sessionId}/messages?limit=50`);
       if (data.length > 0) {
         lastMsgId.current = data[data.length - 1].id;
+        setHasOlder(data.length === 50);
       }
+      return data;
     },
   });
 
@@ -235,6 +240,38 @@ export default function SessionScreen() {
     },
   });
 
+  const leaveMutation = useMutation({
+    mutationFn: () => del(`/sessions/${sessionId}/leave`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to leave session");
+    },
+  });
+
+  const loadOlderMessages = async () => {
+    if (loadingOlder || messages.length === 0) return;
+    setLoadingOlder(true);
+    try {
+      const oldest = messages[0];
+      const older: Message[] = await get(`/sessions/${sessionId}/messages?limit=50&before=${oldest.id}`);
+      if (older.length > 0) {
+        setHasOlder(older.length === 50);
+        queryClient.setQueryData(["messages", sessionId], (prev: Message[] = []) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const fresh = older.filter((m) => !existingIds.has(m.id));
+          return [...fresh, ...prev];
+        });
+      } else {
+        setHasOlder(false);
+      }
+    } catch {}
+    setLoadingOlder(false);
+  };
+
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -247,6 +284,13 @@ export default function SessionScreen() {
     Alert.alert("End Session", "Are you sure you want to end this focus session?", [
       { text: "Cancel", style: "cancel" },
       { text: "End Session", style: "destructive", onPress: () => endMutation.mutate() },
+    ]);
+  };
+
+  const handleLeaveSession = () => {
+    Alert.alert("Leave Session", "Are you sure you want to leave this session?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Leave", style: "destructive", onPress: () => leaveMutation.mutate() },
     ]);
   };
 
@@ -334,6 +378,14 @@ export default function SessionScreen() {
               </Pressable>
             </>
           )}
+          {isActive && !isCreator && hasJoined && (
+            <Pressable
+              style={({ pressed }) => [styles.endBtn, { backgroundColor: "#FFF0F0", opacity: pressed ? 0.7 : 1 }]}
+              onPress={handleLeaveSession}
+            >
+              <Text style={[styles.endBtnText, { color: colors.danger, fontFamily: "Inter_600SemiBold" }]}>Leave</Text>
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -392,6 +444,25 @@ export default function SessionScreen() {
               { paddingBottom: canSend ? 0 : bottomPad + 20 },
             ]}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              hasOlder ? (
+                <Pressable
+                  style={({ pressed }) => [styles.loadOlderBtn, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
+                  onPress={loadOlderMessages}
+                  disabled={loadingOlder}
+                >
+                  {loadingOlder
+                    ? <ActivityIndicator size="small" color={colors.accent} />
+                    : <>
+                        <Feather name="chevron-up" size={14} color={colors.textSecondary} />
+                        <Text style={[styles.loadOlderText, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
+                          Load older messages
+                        </Text>
+                      </>
+                  }
+                </Pressable>
+              ) : null
+            }
             ListEmptyComponent={
               <View style={styles.emptyMessages}>
                 <Feather name="message-circle" size={40} color={colors.textTertiary} />
@@ -675,6 +746,19 @@ const styles = StyleSheet.create({
   },
   input: { fontSize: 15, lineHeight: 21 },
   sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
+  loadOlderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    padding: 10,
+    borderRadius: 20,
+    alignSelf: "center",
+    marginBottom: 8,
+    minHeight: 36,
+    paddingHorizontal: 16,
+  },
+  loadOlderText: { fontSize: 13 },
   emptyMessages: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 60 },
   emptyMessagesText: { fontSize: 14 },
   inviteHint: {

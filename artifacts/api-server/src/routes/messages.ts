@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, lt, gt, desc } from "drizzle-orm";
+import { eq, and, lt, gt, ne, desc } from "drizzle-orm";
 import { db, messagesTable, usersTable } from "@workspace/db";
 import { SendMessageBody, GetMessagesResponseItem } from "@workspace/api-zod";
 
@@ -45,6 +45,16 @@ router.get("/sessions/:sessionId/messages", async (req, res): Promise<void> => {
       .limit(limit);
   }
   msgs.reverse();
+
+  await db.update(messagesTable)
+    .set({ status: "delivered" })
+    .where(
+      and(
+        eq(messagesTable.sessionId, sessionId),
+        ne(messagesTable.senderId, userId),
+        eq(messagesTable.status, "sent")
+      )
+    );
 
   const formatted = await Promise.all(msgs.map(formatMessage));
   res.json(formatted);
@@ -93,6 +103,16 @@ router.get("/sessions/:sessionId/messages/poll", async (req, res): Promise<void>
   const msgs = await db.select().from(messagesTable)
     .where(and(eq(messagesTable.sessionId, sessionId), gt(messagesTable.id, since)))
     .orderBy(messagesTable.createdAt);
+
+  await db.update(messagesTable)
+    .set({ status: "delivered" })
+    .where(
+      and(
+        eq(messagesTable.sessionId, sessionId),
+        ne(messagesTable.senderId, userId),
+        eq(messagesTable.status, "sent")
+      )
+    );
 
   const formatted = await Promise.all(msgs.map(formatMessage));
   res.json(formatted);
