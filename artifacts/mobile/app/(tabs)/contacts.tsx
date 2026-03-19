@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
 import { isOnline, formatLastSeen } from "@/utils/lastSeen";
+import { confirmAction } from "@/utils/confirm";
 
 interface ContactUser {
   id: number;
@@ -57,17 +58,11 @@ export default function ContactsScreen() {
 
   const handleRemove = (contact: Contact) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
+    confirmAction(
       "Remove Contact",
       `Remove ${contact.contactUser.name} from your contacts?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => removeMutation.mutate(contact.id),
-        },
-      ]
+      "Remove",
+      () => removeMutation.mutate(contact.id)
     );
   };
 

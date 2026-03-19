@@ -30,6 +30,7 @@ import { Audio } from "expo-av";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
+import { confirmAction } from "@/utils/confirm";
 import { formatTime, formatRelative } from "@/utils/date";
 import { isOnline, formatLastSeen } from "@/utils/lastSeen";
 
@@ -641,17 +642,21 @@ export default function SessionScreen() {
   };
 
   const handleEndSession = () => {
-    Alert.alert("End Session", "Are you sure you want to end this focus session?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "End Session", style: "destructive", onPress: () => endMutation.mutate() },
-    ]);
+    confirmAction(
+      "End Session",
+      "Are you sure you want to end this focus session?",
+      "End Session",
+      () => endMutation.mutate()
+    );
   };
 
   const handleLeaveSession = () => {
-    Alert.alert("Leave Session", "Are you sure you want to leave this session?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Leave", style: "destructive", onPress: () => leaveMutation.mutate() },
-    ]);
+    confirmAction(
+      "Leave Session",
+      "Are you sure you want to leave this session?",
+      "Leave",
+      () => leaveMutation.mutate()
+    );
   };
 
   const openParticipants = () => {

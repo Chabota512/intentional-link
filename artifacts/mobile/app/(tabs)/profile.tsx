@@ -22,6 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
 import { useApi } from "@/hooks/useApi";
+import { confirmAction } from "@/utils/confirm";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -57,17 +58,15 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/auth");
-        },
-      },
-    ]);
+    confirmAction(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      "Sign Out",
+      async () => {
+        await logout();
+        router.replace("/auth");
+      }
+    );
   };
 
   const openEdit = () => {
