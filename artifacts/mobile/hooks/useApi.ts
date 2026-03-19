@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
@@ -97,12 +98,18 @@ export function useApi() {
   ): Promise<UploadedFile> => {
     const formData = new FormData();
 
-    const fileBlob = {
-      uri: fileUri,
-      name: fileName,
-      type: contentType,
-    } as any;
-    formData.append("file", fileBlob);
+    if (Platform.OS === "web") {
+      const response = await fetch(fileUri);
+      const blob = await response.blob();
+      formData.append("file", blob, fileName);
+    } else {
+      const fileBlob = {
+        uri: fileUri,
+        name: fileName,
+        type: contentType,
+      } as any;
+      formData.append("file", fileBlob);
+    }
 
     const authHeaders: Record<string, string> = {
       "x-user-id": user ? String(user.id) : "",
