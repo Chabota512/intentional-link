@@ -1,0 +1,51 @@
+fin out how far these have been implemented
+
+Let me dig through the codebase and check the status of every feature.
+
+Here's the full implementation status across all 14 features:
+
+GROUP A — Avatars & Presence
+
+#	Feature	Status
+A1	Avatar online dot (green/grey)	✅ Done — UserAvatar has isOnline and showDot props, renders coloured dot bottom-right
+A2	Online/last seen shown everywhere	⚠️ Partial — The component supports it, but needs verifying every screen actually passes isOnline data
+A3	Profile pic next to grouped chat messages	✅ Done — Full grouping logic exists; avatar shown on last message per group, placeholder spacing for others
+A4	Profile pic in voice note UI	❌ Not done — No avatar in the recording bar or VoicePlayer component
+GROUP B — Voice Notes
+
+#	Feature	Status
+B5	Pause/resume voice recording	✅ Done — pauseAsync / startAsync implemented with UI toggle and timer
+B6	Raise-to-ear (proximity → earpiece)	❌ Not done — Playback is hardcoded to speaker, no proximity sensor logic at all
+B7	Blue tick when voice note is played	✅ Done — POST /messages/:id/play endpoint marks as read, blue ticks render accordingly
+GROUP C — Messaging & Read Receipts
+
+#	Feature	Status
+C8	Full read receipt ticks (sent/delivered/read)	✅ Done — DB has status enum, API updates on fetch/poll, UI renders single grey / double grey / double blue ticks
+GROUP D — Notifications
+
+#	Feature	Status
+D9	Push notifications (messages + contact requests)	✅ Done — Token registration on launch, stored in DB, server sends on new message and contact request
+D10	Contact tab number badges	⚠️ Partial — Internal sub-tab badges exist inside the contacts screen, but the main tab bar icon has no badge for the contacts tab
+GROUP E — Sessions
+
+#	Feature	Status
+E11	Session logo/image upload	✅ Done — Image picker on new session screen, upload to storage, imageUrl saved to DB
+E12	Delete session completely	✅ Done — DELETE /sessions/:id endpoint exists (creator-only, cascades messages/participants), but it's missing from the OpenAPI spec and there's no UI button for it yet
+GROUP F — Profile & Account
+
+#	Feature	Status
+F13	Expanded profile/settings page	⚠️ Partial — Account, Privacy, Sessions, Danger Zone sections exist; Notifications toggle section is missing
+F14	Delete account (data only or full)	✅ Done — Both DELETE /users/me (full) and DELETE /users/me/data (data only) implemented with confirmation dialogs
+Summary: 8 fully done, 3 partial, 2 not started
+
+The gaps to close are:
+
+A4 — Avatars in voice note UI
+B6 — Raise-to-ear proximity sensor
+A2 — Verify isOnline data flows to every screen
+D10 — Badge on the contacts tab bar icon
+E12 — "Delete Session" button in the session UI
+F13 — Notifications toggle section in settings
+Would you like me to start building the missing pieces? I can tackle them group by group or all at once.
+
+do it. work on all

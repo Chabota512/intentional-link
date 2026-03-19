@@ -8,6 +8,7 @@ import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import Colors from "@/constants/colors";
 import { usePendingInvites } from "@/hooks/usePendingInvites";
+import { usePendingContacts } from "@/hooks/usePendingContacts";
 
 function NativeTabLayout() {
   return (
@@ -35,6 +36,7 @@ function ClassicTabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const pendingInvites = usePendingInvites();
+  const pendingContacts = usePendingContacts();
 
   return (
     <Tabs
@@ -81,6 +83,8 @@ function ClassicTabLayout() {
         name="contacts"
         options={{
           title: "Contacts",
+          tabBarBadge: pendingContacts > 0 ? pendingContacts : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.danger, fontSize: 10 },
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="person.2" tintColor={color} size={22} />

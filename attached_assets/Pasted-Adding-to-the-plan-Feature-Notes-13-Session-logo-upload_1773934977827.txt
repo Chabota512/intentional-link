@@ -1,0 +1,142 @@
+Adding to the plan:
+
+#	Feature	Notes
+13	Session logo upload — tap the icon area when creating a session to pick an image from camera roll; shows as the session's avatar everywhere	Replaces the default lightning bolt; image stored on server; shown in session lists, headers, and chat
+Full final plan — 13 features:
+
+Avatar online dot (green/grey) on every profile circle
+Profile pic shown next to grouped chat messages
+Profile pic in voice note UI (recording + playback)
+Verify pause/resume voice recording works correctly
+Raise-to-ear — switches to earpiece via proximity sensor when listening to voice notes
+Read receipts — single grey tick, double grey, double blue (+ blue on voice note play)
+Online/last seen shown consistently everywhere
+Expanded profile/settings page with more options
+Delete account (data only or full) in settings
+Delete session completely (not just end it)
+Contact tab number badges on both tabs
+Push notifications for new messages + connection requests
+Session logo/image upload when creating a session
+That's a solid, well-defined list. Ready to start building all of this?
+
+group these tasks
+
+Here are all 13 features grouped by theme:
+
+GROUP A — Avatars & Presence
+
+Avatar online dot (green/grey) on every profile circle
+Online/last seen shown consistently everywhere in the app
+Profile pic shown next to grouped chat messages
+Profile pic in voice note UI (recording + playback)
+GROUP B — Voice Notes
+5. Verify pause/resume voice recording works correctly
+
+Raise-to-ear — switches to earpiece via proximity sensor
+Blue tick when a voice note has been played
+GROUP C — Messaging & Read Receipts
+8. Read receipts — single grey tick (sent), double grey (delivered), double blue (read)
+
+GROUP D — Notifications
+9. Push notifications for new messages + connection requests
+
+Contact tab number badges on both tabs
+GROUP E — Sessions
+11. Session logo/image upload when creating a session
+
+Delete session completely (not just end it)
+GROUP F — Profile & Account
+13. Expanded profile/settings page with more options
+
+Delete account (data only or full) in settings
+Want me to tackle these one group at a time, or is there a specific group you want done first?
+
+tell me the exact things you will do in each of these tasks
+
+Here's exactly what I'll do in each task:
+
+GROUP A — Avatars & Presence
+
+A1. Avatar online dot everywhere
+
+Update the UserAvatar component to accept an isOnline prop
+Render a small circle (green = online, grey = offline) positioned at the bottom-right of the avatar circle with a white border ring so it stands out
+Add an optional showDot prop so screens that don't need it can turn it off
+A2. Online/last seen consistently everywhere
+
+Find every screen that lists users (contacts list, session participant list, chat header, search results) and ensure each passes the user's lastSeenAt to UserAvatar so the dot reflects real status
+A3. Profile pic next to grouped chat messages
+
+In the chat screen, group consecutive messages from the same sender
+Show the sender's avatar to the left of the first message in each group (like WhatsApp)
+Hide the avatar for subsequent messages in the same group, leaving spacing so bubbles stay aligned
+A4. Profile pic in voice note UI
+
+In the voice recorder bar, show the current user's avatar next to the recording controls
+In the VoicePlayer component, show the sender's avatar next to the playback bar
+GROUP B — Voice Notes
+
+B5. Verify pause/resume recording
+
+Read through the recording logic and test the full flow: start → pause → resume → send
+Fix any bugs found (e.g. timer not pausing, audio file being corrupted on resume)
+B6. Raise-to-ear (earpiece playback)
+
+Use the device's proximity sensor via expo-sensors to detect when the phone is held to the ear
+When proximity is detected during voice note playback, switch the audio output from speaker to earpiece
+When the phone is moved away, switch back to speaker automatically
+B7. Blue tick on voice note played
+
+Track a playedAt timestamp on voice note messages in the database
+When a recipient presses play on a voice note, send a request to mark it as played
+In the sender's chat, the double tick turns blue once playedAt is set
+GROUP C — Messaging & Read Receipts
+
+C8. Full read receipt ticks
+
+Add a readAt timestamp to the messages table in the database
+Create an API endpoint that marks messages as read when a user opens/scrolls through a conversation
+In the chat screen, call that endpoint when the screen comes into focus
+Update the tick display: one grey tick = sent to server, two grey ticks = delivered to recipient's device, two blue ticks = recipient has opened the chat and seen the message
+GROUP D — Notifications
+
+D9. Push notifications
+
+Register for push notification permissions on app launch using Expo Notifications
+Save each device's push token to the server linked to the user's account
+On the server, when a new message is created → send a push notification to all recipient devices
+On the server, when a contact request is received → send a push notification to the target user
+Notification taps open the app directly to the relevant chat or contacts/requests tab
+D10. Contact tab number badges
+
+In the contacts screen, count pending incoming requests → show as a badge on the "Requests" tab
+Count total accepted contacts → show as a badge on the "Contacts" tab
+Badges update in real time as the counts change
+GROUP E — Sessions
+
+E11. Session logo upload
+
+On the new session screen, make the icon area tappable to open the image picker
+Upload the chosen image to the server's storage endpoint
+Save the image URL with the session record in the database
+Display the session image in the sessions list, session header, and chat screen instead of the default icon
+E12. Delete session completely
+
+Add a DELETE /sessions/:id endpoint on the server that removes the session and all its messages, participants, and files
+In the session screen, add a "Delete Session" option (separate from "End Session") only visible to the creator
+Confirm with an alert before deleting — warn that all messages will be lost permanently
+GROUP F — Profile & Account
+
+F13. Expanded profile/settings page
+
+Restructure the profile tab into proper settings sections:
+Account — display name, username, profile photo, bio
+Privacy — who can see your last seen, who can see your profile photo
+Notifications — toggle push notifications on/off
+Sessions — list of active device sessions with ability to end or delete each one
+Danger Zone — delete account data or full account deletion
+F14. Delete account
+
+Add two server endpoints: one to wipe all user data (messages, sessions, contacts) while keeping the account, and one to fully delete the account
+In the Danger Zone section of settings, show two clearly labelled buttons with confirmation dialogs explaining exactly what each action does before proceeding
+That's the full breakdown. 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,9 @@ import {
   KeyboardAvoidingView,
   Image,
   Switch,
+  Linking,
 } from "react-native";
+import * as Notifications from "expo-notifications";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -94,6 +96,14 @@ export default function ProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [deletingData, setDeletingData] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      setNotificationsEnabled(status === "granted");
+    });
+  }, []);
 
   const { data: sessions = [] } = useQuery<{ id: number; status: string }[]>({
     queryKey: ["sessions"],
@@ -113,6 +123,21 @@ export default function ProfileScreen() {
 
   const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
+
+  const handleToggleNotifications = async () => {
+    if (Platform.OS === "web") return;
+    if (notificationsEnabled) {
+      Linking.openSettings();
+    } else {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === "granted") {
+        setNotificationsEnabled(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Linking.openSettings();
+      }
+    }
+  };
 
   const handleLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -327,6 +352,28 @@ export default function ProfileScreen() {
             label="Read Receipts"
             sublabel="Others can see when you read messages"
             colors={colors}
+            last
+          />
+        </View>
+
+        <SectionHeader title="NOTIFICATIONS" colors={colors} />
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SettingsRow
+            icon="bell"
+            label="Push Notifications"
+            sublabel={notificationsEnabled ? "Enabled — tap to manage in Settings" : "Disabled — tap to enable"}
+            onPress={Platform.OS !== "web" ? handleToggleNotifications : undefined}
+            colors={colors}
+            rightElement={
+              Platform.OS !== "web" ? (
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={handleToggleNotifications}
+                  trackColor={{ false: colors.border, true: colors.accent + "88" }}
+                  thumbColor={notificationsEnabled ? colors.accent : colors.textTertiary}
+                />
+              ) : undefined
+            }
             last
           />
         </View>

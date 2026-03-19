@@ -27,6 +27,7 @@ import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
+import { LightSensor } from "expo-sensors";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
@@ -119,6 +120,47 @@ function VoicePlayer({
   const [hasPlayed, setHasPlayed] = useState(false);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
+  const [useEarpiece, setUseEarpiece] = useState(false);
+  const lightSubRef = useRef<{ remove: () => void } | null>(null);
+
+  const applyAudioMode = async (earpiece: boolean) => {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: earpiece,
+      playsInSilentModeIOS: true,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      playThroughEarpieceAndroid: earpiece,
+    });
+  };
+
+  const startLightSensor = () => {
+    if (Platform.OS !== "android") return;
+    LightSensor.isAvailableAsync().then((available) => {
+      if (!available) return;
+      LightSensor.setUpdateInterval(300);
+      lightSubRef.current = LightSensor.addListener(({ illuminance }) => {
+        const nearEar = illuminance < 5;
+        setUseEarpiece((prev) => {
+          if (prev !== nearEar) {
+            applyAudioMode(nearEar);
+          }
+          return nearEar;
+        });
+      });
+    });
+  };
+
+  const stopLightSensor = () => {
+    lightSubRef.current?.remove();
+    lightSubRef.current = null;
+  };
+
+  const toggleEarpiece = async () => {
+    const next = !useEarpiece;
+    setUseEarpiece(next);
+    await applyAudioMode(next);
+  };
 
   const togglePlay = async () => {
     if (loading) return;
@@ -127,15 +169,9 @@ function VoicePlayer({
       if (playing && soundRef.current) {
         await soundRef.current.pauseAsync();
         setPlaying(false);
+        stopLightSensor();
       } else {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-          shouldDuckAndroid: true,
-          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-          playThroughEarpieceAndroid: false,
-        });
+        await applyAudioMode(useEarpiece);
         if (!soundRef.current) {
           const { sound } = await Audio.Sound.createAsync(
             { uri: url },
@@ -150,11 +186,13 @@ function VoicePlayer({
             if (status.didJustFinish) {
               setPlaying(false);
               setPosition(0);
+              stopLightSensor();
             }
           });
         }
         await soundRef.current.playAsync();
         setPlaying(true);
+        startLightSensor();
         if (!hasPlayed) {
           setHasPlayed(true);
           onPlayed?.();
@@ -169,6 +207,7 @@ function VoicePlayer({
   useEffect(() => {
     return () => {
       soundRef.current?.unloadAsync();
+      stopLightSensor();
     };
   }, []);
 
@@ -215,8 +254,18 @@ function VoicePlayer({
             {displayTime}
           </Text>
         </View>
-        {!isOwn && (
-          <Feather name="headphones" size={12} color={colors.textTertiary} style={{ opacity: 0.6 }} />
+        {Platform.OS !== "web" && (
+          <Pressable
+            onPress={(e) => { e.stopPropagation(); toggleEarpiece(); }}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Feather
+              name={useEarpiece ? "phone" : "volume-2"}
+              size={13}
+              color={isOwn ? "rgba(255,255,255,0.7)" : colors.textTertiary}
+            />
+          </Pressable>
         )}
       </Pressable>
       {isOwn && senderName && (
@@ -985,6 +1034,14 @@ export default function SessionScreen() {
               </Pressable>
             </>
           )}
+          {!isActive && isCreator && (
+            <Pressable
+              style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+              onPress={handleDeleteSession}
+            >
+              <Feather name="trash-2" size={18} color={colors.danger} />
+            </Pressable>
+          )}
           {isActive && !isCreator && hasJoined && (
             <Pressable
               style={({ pressed }) => [styles.endBtn, { backgroundColor: "#FFF0F0", opacity: pressed ? 0.7 : 1 }]}
@@ -1139,6 +1196,7 @@ export default function SessionScreen() {
           }]}>
             {isRecording ? (
               <View style={styles.recordingRow}>
+                <UserAvatar name={user?.name ?? "?"} avatarUrl={user?.avatarUrl} size={30} />
                 <Pressable
                   style={({ pressed }) => [styles.recordingCancelBtn, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
                   onPress={handleCancelRecording}
