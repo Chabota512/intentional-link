@@ -28,6 +28,3 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.shared]
-DATABASE_URL = "postgresql://neondb_owner:npg_t8nMwPcDYRr5@ep-sparkling-queen-admhi4ox-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-NEON_DATABASE_URL = "postgresql://neondb_owner:npg_t8nMwPcDYRr5@ep-sparkling-queen-admhi4ox-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-TOKEN_SECRET = "focus_token_secret_2024"
