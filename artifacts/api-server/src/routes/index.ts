@@ -4,6 +4,7 @@ import usersRouter from "./users";
 import contactsRouter from "./contacts";
 import sessionsRouter from "./sessions";
 import messagesRouter from "./messages";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(usersRouter);
 router.use(contactsRouter);
 router.use(sessionsRouter);
 router.use(messagesRouter);
+router.use(storageRouter);
 
 export default router;

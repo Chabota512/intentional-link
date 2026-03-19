@@ -9,13 +9,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
     "drizzle-orm": "catalog:",
-    "express": "^5"
+    "express": "^5",
+    "google-auth-library": "^10.6.2"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",

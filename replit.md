@@ -11,7 +11,8 @@ pnpm workspace monorepo using TypeScript. The main artifact is Intentional Link 
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
+- **Database**: Neon PostgreSQL + Drizzle ORM (NEON_DATABASE_URL env var)
+- **File storage**: Replit Object Storage (GCS-backed, presigned URL uploads)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
@@ -40,87 +41,88 @@ artifacts-monorepo/
 
 - **Auth**: Register/login with username + password (hashed with SHA-256). Login returns an HMAC-signed token.
 - **Token validation**: API middleware validates `Authorization: Bearer <token>` header on protected routes
-- **Contacts**: Add/remove trusted contacts by searching username
+- **Contacts**: Add/remove trusted contacts by searching username. Shows online/last seen status.
 - **Sessions**: Create focus sessions, invite contacts, join sessions
 - **Messaging**: Real-time polling every 2s for new messages within a session
+- **Media messages**: Send images (photo picker), files (document picker), voice notes (recorded audio)
+- **Online/last seen**: Heartbeat every 30s updates `lastSeenAt`; contacts show "Online" or "Xm ago"
 - **Archive**: Past completed sessions are retained for review
 - **Tab navigation**: Sessions, Contacts, Profile
 - **Invite UI**: Creator can invite contacts from inside a session via a People sheet
-- **Participants panel**: Tap participant count in session header to see all participants and their status (invited/joined)
+- **Participants panel**: Tap participant count to see all participants, their status and online presence
 - **Profile editing**: Users can edit their name and username from the Profile tab
-- **Tab badge**: Sessions tab shows a badge count for pending invites (sessions where user is invited but hasn't joined)
-- **Message status**: Own messages show a read tick indicator
+- **Tab badge**: Sessions tab shows a badge count for pending invites
+- **Message status**: Own messages show delivery tick indicator
 
 ## Database Schema (Drizzle ORM)
 
-- `users` — id, username, name, passwordHash, createdAt
+- `users` — id, username, name, passwordHash, createdAt, **lastSeenAt**
 - `contacts` — id, userId, contactUserId, createdAt
 - `sessions` — id, title, description, creatorId, status, createdAt, endedAt
 - `session_participants` — id, sessionId, userId, status (invited|joined)
-- `messages` — id, sessionId, senderId, content, status, createdAt
+- `messages` — id, sessionId, senderId, content, **type** (text|image|file|voice), **attachmentUrl**, **attachmentName**, **attachmentSize**, status, createdAt
 
 ## API Routes
 
 All at `/api/*`:
 
 - `POST /users/register` — register
-- `POST /users/login` — login
+- `POST /users/login` — login (updates lastSeenAt)
 - `GET /users/me` — get current user
 - `PUT /users/me` — update name/username
+- `POST /users/heartbeat` — update lastSeenAt (called every 30s by client)
 - `GET /users/search?q=` — search users
-- `GET/POST /contacts` — list/add contacts
+- `GET/POST /contacts` — list/add contacts (includes lastSeenAt)
 - `DELETE /contacts/:id` — remove contact
 - `GET/POST /sessions` — list/create sessions
-- `GET/PATCH /sessions/:id` — get/update session (includes `creator` object with name/username)
+- `GET/PATCH /sessions/:id` — get/update session (includes creator + participant lastSeenAt)
 - `POST /sessions/:id/invite` — invite participant
 - `POST /sessions/:id/join` — join session
-- `GET/POST /sessions/:id/messages` — list/send messages
+- `GET/POST /sessions/:id/messages` — list/send messages (supports type + attachment fields)
 - `GET /sessions/:id/messages/poll?since=` — poll for new messages
+- `POST /storage/uploads/request-url` — get presigned upload URL for media files
+- `GET /storage/objects/*` — serve uploaded media files
+- `GET /storage/public-objects/*` — serve public assets
 
 ## Auth mechanism
 
-HMAC-signed token: `${userId}:${timestamp}.${hmac_signature}`. Token is generated on login/register and sent by the mobile client as `Authorization: Bearer <token>`. The API middleware validates the token, extracts userId, and sets `x-user-id` header for the routes. The old `x-user-id` header also continues to work as a fallback.
+HMAC-signed token: `${userId}:${timestamp}.${hmac_signature}`. Token is generated on login/register and sent by the mobile client as `Authorization: Bearer <token>`. The API middleware validates the token, extracts userId, and sets `x-user-id` header for the routes.
 
 ## Mobile App Structure
 
 ```text
 artifacts/mobile/
 ├── app/
-│   ├── _layout.tsx          # Root layout (Auth + QueryClient providers)
+│   ├── _layout.tsx          # Root layout (Auth + QueryClient + HeartbeatProvider)
 │   ├── index.tsx            # Redirect based on auth state
 │   ├── auth.tsx             # Login / Register screen
 │   ├── (tabs)/
 │   │   ├── _layout.tsx      # Tab navigation with pending invite badge
 │   │   ├── sessions.tsx     # Sessions list with filter
-│   │   ├── contacts.tsx     # Contacts management
+│   │   ├── contacts.tsx     # Contacts with online/last seen indicators
 │   │   └── profile.tsx      # User profile + edit modal + logout
 │   ├── session/
 │   │   ├── new.tsx          # Create session modal
-│   │   └── [id].tsx         # Chat screen + participants sheet + invite sheet
+│   │   └── [id].tsx         # Chat screen with media support + participants sheet
 │   └── contacts/
 │       └── add.tsx          # Add contact modal
 ├── context/AuthContext.tsx  # Auth state (user, login, register, logout, updateUser)
-├── hooks/useApi.ts          # Fetch wrapper with x-user-id + Authorization headers
+├── hooks/useApi.ts          # Fetch wrapper with auth headers + uploadFile helper
 ├── hooks/useTheme.ts        # Theme from constants/colors.ts
-├── hooks/usePendingInvites.ts # Returns count of pending session invites for badge
+├── hooks/useHeartbeat.ts    # Sends POST /users/heartbeat every 30s
+├── hooks/usePendingInvites.ts
 ├── constants/colors.ts      # Light + dark color palette
-└── utils/date.ts            # formatRelative, formatTime helpers
+└── utils/
+    ├── date.ts              # formatRelative, formatTime helpers
+    └── lastSeen.ts          # isOnline(), formatLastSeen() helpers
 ```
 
-## App Icon
+## Object Storage
 
-AI-generated icon: two interlocking chain link rings in white on a deep indigo-to-violet gradient background (#4F6EF7 → #7C5CFC). Represents intentional connection. Stored as 1024×1024 master at `artifacts/mobile/assets/images/icon.png`. Resized copies for all target sizes live in `artifacts/mobile/public/icons/`.
-
-## PWA Setup
-
-The web landing page (served by `artifacts/mobile/server/serve.js`) is fully PWA-ready:
-
-- **Web App Manifest** — `artifacts/mobile/public/manifest.webmanifest` (name, short_name, theme_color, background_color, display: standalone, icons with `any` and `maskable` purpose)
-- **Service Worker** — `artifacts/mobile/public/sw.js` (stale-while-revalidate for static assets, network-first for everything else, skips `/api/` routes)
-- **Icon sizes** — 16, 32, 152, 167, 180, 192, 512px PNG + maskable 192 and 512 + favicon.ico (multi-size)
-- **HTML meta tags** — theme-color, apple-mobile-web-app-capable/title/status-bar-style, Open Graph, Twitter Card, manifest link, apple-touch-icon links
-- **Serve.js routes** — `/manifest.webmanifest` (no-cache), `/sw.js` (no-store + Service-Worker-Allowed: /), `/icons/*` (1-year immutable cache)
-- **app.json web** — name, shortName, description, themeColor, backgroundColor, lang, bundler: metro, output: static
+- Bucket provisioned via Replit Object Storage
+- Upload flow: client requests presigned URL → uploads file directly to GCS → sends objectPath in message
+- Server files: `artifacts/api-server/src/lib/objectStorage.ts`, `objectAcl.ts`, `routes/storage.ts`
+- Serving: `GET /api/storage/objects/<path>` streams file from GCS
 
 ## Color Palette
 

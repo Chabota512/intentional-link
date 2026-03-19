@@ -12,6 +12,11 @@ import { hashPassword, verifyPassword, generateToken } from "../lib/auth";
 
 const router: IRouter = Router();
 
+function isOnline(lastSeenAt: Date | null | undefined): boolean {
+  if (!lastSeenAt) return false;
+  return Date.now() - new Date(lastSeenAt).getTime() < 3 * 60 * 1000;
+}
+
 router.post("/users/register", async (req, res): Promise<void> => {
   const parsed = RegisterUserBody.safeParse(req.body);
   if (!parsed.success) {
@@ -47,6 +52,7 @@ router.post("/users/register", async (req, res): Promise<void> => {
     name: user.name,
     token,
     createdAt: user.createdAt,
+    lastSeenAt: user.lastSeenAt,
   }));
 });
 
@@ -65,6 +71,9 @@ router.post("/users/login", async (req, res): Promise<void> => {
     return;
   }
 
+  const now = new Date();
+  await db.update(usersTable).set({ lastSeenAt: now }).where(eq(usersTable.id, user.id));
+
   const token = generateToken(user.id);
   res.json(LoginUserResponse.parse({
     id: user.id,
@@ -72,6 +81,7 @@ router.post("/users/login", async (req, res): Promise<void> => {
     name: user.name,
     token,
     createdAt: user.createdAt,
+    lastSeenAt: now,
   }));
 });
 
@@ -89,7 +99,13 @@ router.get("/users/me", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetMeResponse.parse({ id: user.id, username: user.username, name: user.name, createdAt: user.createdAt }));
+  res.json(GetMeResponse.parse({
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    createdAt: user.createdAt,
+    lastSeenAt: user.lastSeenAt,
+  }));
 });
 
 router.put("/users/me", async (req, res): Promise<void> => {
@@ -134,7 +150,20 @@ router.put("/users/me", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({ id: user.id, username: user.username, name: user.name, createdAt: user.createdAt });
+  res.json({ id: user.id, username: user.username, name: user.name, createdAt: user.createdAt, lastSeenAt: user.lastSeenAt });
+});
+
+router.post("/users/heartbeat", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const now = new Date();
+  await db.update(usersTable).set({ lastSeenAt: now }).where(eq(usersTable.id, userId));
+  res.json({ ok: true, lastSeenAt: now });
 });
 
 router.get("/users/search", async (req, res): Promise<void> => {
@@ -156,6 +185,7 @@ router.get("/users/search", async (req, res): Promise<void> => {
     username: usersTable.username,
     name: usersTable.name,
     createdAt: usersTable.createdAt,
+    lastSeenAt: usersTable.lastSeenAt,
   }).from(usersTable)
     .where(and(ilike(usersTable.username, `%${q}%`), ne(usersTable.id, userId)))
     .limit(20);
@@ -163,4 +193,5 @@ router.get("/users/search", async (req, res): Promise<void> => {
   res.json(users.map(u => SearchUsersResponseItem.parse(u)));
 });
 
+export { isOnline };
 export default router;

@@ -24,6 +24,13 @@ async function safeJson(res: Response): Promise<unknown> {
   }
 }
 
+export interface UploadedFile {
+  objectPath: string;
+  name: string;
+  size: number;
+  contentType: string;
+}
+
 export function useApi() {
   const { user } = useAuth();
 
@@ -81,5 +88,33 @@ export function useApi() {
     }
   };
 
-  return { get, post, put, patch, del };
+  const uploadFile = async (fileUri: string, fileName: string, fileSize: number, contentType: string): Promise<UploadedFile> => {
+    const urlRes = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ name: fileName, size: fileSize, contentType }),
+    });
+    const urlData = await urlRes.json() as any;
+    if (!urlRes.ok) throw new ApiError(urlData?.error || "Failed to get upload URL", urlRes.status);
+
+    const { uploadURL, objectPath } = urlData;
+
+    const fileRes = await fetch(fileUri);
+    const blob = await fileRes.blob();
+
+    const uploadRes = await fetch(uploadURL, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: blob,
+    });
+    if (!uploadRes.ok) throw new ApiError("Upload failed", uploadRes.status);
+
+    return { objectPath, name: fileName, size: fileSize, contentType };
+  };
+
+  const getFileUrl = (objectPath: string): string => {
+    return `${BASE_URL}/api/storage${objectPath}`;
+  };
+
+  return { get, post, put, patch, del, uploadFile, getFileUrl };
 }

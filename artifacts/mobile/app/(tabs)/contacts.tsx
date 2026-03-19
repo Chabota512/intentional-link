@@ -17,11 +17,13 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
+import { isOnline, formatLastSeen } from "@/utils/lastSeen";
 
 interface ContactUser {
   id: number;
   name: string;
   username: string;
+  lastSeenAt?: string | null;
 }
 
 interface Contact {
@@ -40,6 +42,7 @@ export default function ContactsScreen() {
   const { data: contacts = [], isLoading, isRefetching, refetch } = useQuery<Contact[]>({
     queryKey: ["contacts"],
     queryFn: () => get("/contacts"),
+    refetchInterval: 30_000,
   });
 
   const removeMutation = useMutation({
@@ -71,29 +74,45 @@ export default function ContactsScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
-  const renderItem = ({ item }: { item: Contact }) => (
-    <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
-        <Text style={[styles.avatarText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-          {item.contactUser.name.charAt(0).toUpperCase()}
-        </Text>
+  const onlineCount = contacts.filter(c => isOnline(c.contactUser.lastSeenAt)).length;
+
+  const renderItem = ({ item }: { item: Contact }) => {
+    const online = isOnline(item.contactUser.lastSeenAt);
+    return (
+      <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={{ position: "relative" }}>
+          <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
+            <Text style={[styles.avatarText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
+              {item.contactUser.name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          {online && (
+            <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+            {item.contactUser.name}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+            <Text style={[styles.contactUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+              @{item.contactUser.username}
+            </Text>
+            <Text style={[styles.contactUsername, { color: colors.textTertiary }]}>·</Text>
+            <Text style={[styles.contactUsername, { color: online ? colors.success : colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+              {online ? "Online" : formatLastSeen(item.contactUser.lastSeenAt)}
+            </Text>
+          </View>
+        </View>
+        <Pressable
+          onPress={() => handleRemove(item)}
+          style={({ pressed }) => [styles.removeBtn, { opacity: pressed ? 0.6 : 1 }]}
+        >
+          <Feather name="user-minus" size={18} color={colors.danger} />
+        </Pressable>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-          {item.contactUser.name}
-        </Text>
-        <Text style={[styles.contactUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-          @{item.contactUser.username}
-        </Text>
-      </View>
-      <Pressable
-        onPress={() => handleRemove(item)}
-        style={({ pressed }) => [styles.removeBtn, { opacity: pressed ? 0.6 : 1 }]}
-      >
-        <Feather name="user-minus" size={18} color={colors.danger} />
-      </Pressable>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -101,7 +120,7 @@ export default function ContactsScreen() {
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Contacts</Text>
           <Text style={[styles.headerSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-            {contacts.length} trusted contacts
+            {contacts.length} contacts{onlineCount > 0 ? ` · ${onlineCount} online` : ""}
           </Text>
         </View>
         <Pressable
@@ -200,9 +219,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  onlineDot: {
+    position: "absolute",
+    bottom: 1,
+    right: 1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+  },
   avatarText: { fontSize: 18 },
   contactName: { fontSize: 15 },
-  contactUsername: { fontSize: 13, marginTop: 2 },
+  contactUsername: { fontSize: 13 },
   removeBtn: { padding: 8 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 40 },

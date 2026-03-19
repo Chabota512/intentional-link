@@ -18,6 +18,7 @@ import { Feather } from "@expo/vector-icons";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,6 +36,11 @@ function OfflineBanner() {
       <Text style={styles.offlineText}>No internet connection</Text>
     </View>
   );
+}
+
+function HeartbeatProvider({ children }: { children: React.ReactNode }) {
+  useHeartbeat();
+  return <>{children}</>;
 }
 
 function RootLayoutNav() {
@@ -76,7 +82,9 @@ export default function RootLayout() {
           <AuthProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
               <KeyboardProvider>
-                <RootLayoutNav />
+                <HeartbeatProvider>
+                  <RootLayoutNav />
+                </HeartbeatProvider>
               </KeyboardProvider>
             </GestureHandlerRootView>
           </AuthProvider>

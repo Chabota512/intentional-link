@@ -38,6 +38,7 @@ export const LoginUserResponse = zod.object({
   name: zod.string(),
   token: zod.string(),
   createdAt: zod.date(),
+  lastSeenAt: zod.date().nullable().optional(),
 });
 
 /**
@@ -52,6 +53,7 @@ export const GetMeResponse = zod.object({
   username: zod.string(),
   name: zod.string(),
   createdAt: zod.date(),
+  lastSeenAt: zod.date().nullable().optional(),
 });
 
 /**
@@ -70,6 +72,7 @@ export const SearchUsersResponseItem = zod.object({
   username: zod.string(),
   name: zod.string(),
   createdAt: zod.date(),
+  lastSeenAt: zod.date().nullable().optional(),
 });
 export const SearchUsersResponse = zod.array(SearchUsersResponseItem);
 
@@ -88,6 +91,7 @@ export const GetContactsResponseItem = zod.object({
     username: zod.string(),
     name: zod.string(),
     createdAt: zod.date(),
+    lastSeenAt: zod.date().nullable().optional(),
   }),
   createdAt: zod.date(),
 });
@@ -143,6 +147,7 @@ export const GetSessionsResponseItem = zod.object({
         username: zod.string(),
         name: zod.string(),
         createdAt: zod.date(),
+        lastSeenAt: zod.date().nullable().optional(),
       }),
     }),
   ),
@@ -191,6 +196,7 @@ export const GetSessionResponse = zod.object({
         username: zod.string(),
         name: zod.string(),
         createdAt: zod.date(),
+        lastSeenAt: zod.date().nullable().optional(),
       }),
     }),
   ),
@@ -232,6 +238,7 @@ export const UpdateSessionResponse = zod.object({
         username: zod.string(),
         name: zod.string(),
         createdAt: zod.date(),
+        lastSeenAt: zod.date().nullable().optional(),
       }),
     }),
   ),
@@ -271,6 +278,7 @@ export const InviteToSessionResponse = zod.object({
         username: zod.string(),
         name: zod.string(),
         createdAt: zod.date(),
+        lastSeenAt: zod.date().nullable().optional(),
       }),
     }),
   ),
@@ -306,6 +314,7 @@ export const JoinSessionResponse = zod.object({
         username: zod.string(),
         name: zod.string(),
         createdAt: zod.date(),
+        lastSeenAt: zod.date().nullable().optional(),
       }),
     }),
   ),
@@ -334,6 +343,10 @@ export const GetMessagesResponseItem = zod.object({
   sessionId: zod.number(),
   senderId: zod.number(),
   content: zod.string(),
+  type: zod.enum(["text", "image", "file", "voice"]).default("text"),
+  attachmentUrl: zod.string().nullable().optional(),
+  attachmentName: zod.string().nullable().optional(),
+  attachmentSize: zod.number().nullable().optional(),
   status: zod.enum(["sent", "delivered", "read"]),
   createdAt: zod.date(),
   sender: zod.object({
@@ -341,6 +354,7 @@ export const GetMessagesResponseItem = zod.object({
     username: zod.string(),
     name: zod.string(),
     createdAt: zod.date(),
+    lastSeenAt: zod.date().nullable().optional(),
   }),
 });
 export const GetMessagesResponse = zod.array(GetMessagesResponseItem);
@@ -357,7 +371,11 @@ export const SendMessageHeader = zod.object({
 });
 
 export const SendMessageBody = zod.object({
-  content: zod.string(),
+  content: zod.string().optional().default(""),
+  type: zod.enum(["text", "image", "file", "voice"]).optional().default("text"),
+  attachmentUrl: zod.string().optional(),
+  attachmentName: zod.string().optional(),
+  attachmentSize: zod.number().optional(),
 });
 
 /**
@@ -380,6 +398,10 @@ export const PollMessagesResponseItem = zod.object({
   sessionId: zod.number(),
   senderId: zod.number(),
   content: zod.string(),
+  type: zod.enum(["text", "image", "file", "voice"]).default("text"),
+  attachmentUrl: zod.string().nullable().optional(),
+  attachmentName: zod.string().nullable().optional(),
+  attachmentSize: zod.number().nullable().optional(),
   status: zod.enum(["sent", "delivered", "read"]),
   createdAt: zod.date(),
   sender: zod.object({
@@ -387,6 +409,26 @@ export const PollMessagesResponseItem = zod.object({
     username: zod.string(),
     name: zod.string(),
     createdAt: zod.date(),
+    lastSeenAt: zod.date().nullable().optional(),
   }),
 });
 export const PollMessagesResponse = zod.array(PollMessagesResponseItem);
+
+/**
+ * @summary Request a presigned upload URL
+ */
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string(),
+  size: zod.number(),
+  contentType: zod.string(),
+});
+
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string(),
+  objectPath: zod.string(),
+  metadata: zod.object({
+    name: zod.string(),
+    size: zod.number(),
+    contentType: zod.string(),
+  }),
+});

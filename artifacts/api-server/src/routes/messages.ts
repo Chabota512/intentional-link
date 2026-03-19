@@ -35,13 +35,14 @@ async function formatMessages(msgs: (typeof messagesTable.$inferSelect)[]) {
     name: usersTable.name,
     username: usersTable.username,
     createdAt: usersTable.createdAt,
+    lastSeenAt: usersTable.lastSeenAt,
   }).from(usersTable).where(inArray(usersTable.id, senderIds));
 
   const senderMap = new Map(senders.map(s => [s.id, s]));
 
   return msgs.map(m => GetMessagesResponseItem.parse({
     ...m,
-    sender: senderMap.get(m.senderId) ?? { id: m.senderId, name: "Unknown", username: "unknown", createdAt: new Date() },
+    sender: senderMap.get(m.senderId) ?? { id: m.senderId, name: "Unknown", username: "unknown", createdAt: new Date(), lastSeenAt: null },
   }));
 }
 
@@ -114,10 +115,26 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
     return;
   }
 
+  const { content, type, attachmentUrl, attachmentName, attachmentSize } = parsed.data;
+
+  if (type === "text" && !content?.trim()) {
+    res.status(400).json({ error: "Message content cannot be empty" });
+    return;
+  }
+
+  if ((type === "image" || type === "file" || type === "voice") && !attachmentUrl) {
+    res.status(400).json({ error: "attachmentUrl is required for media messages" });
+    return;
+  }
+
   const [msg] = await db.insert(messagesTable).values({
     sessionId,
     senderId: userId,
-    content: parsed.data.content,
+    content: content || "",
+    type: type || "text",
+    attachmentUrl: attachmentUrl || null,
+    attachmentName: attachmentName || null,
+    attachmentSize: attachmentSize || null,
     status: "sent",
   }).returning();
 

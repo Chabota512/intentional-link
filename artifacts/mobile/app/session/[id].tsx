@@ -11,6 +11,8 @@ import {
   Modal,
   ScrollView,
   Share,
+  Image,
+  Linking,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,16 +23,21 @@ import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 import { TextInput } from "react-native";
 import * as Haptics from "expo-haptics";
 import * as SMS from "expo-sms";
-import * as Linking from "expo-linking";
+import * as ExpoLinking from "expo-linking";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import { Audio } from "expo-av";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import { formatTime, formatRelative } from "@/utils/date";
+import { isOnline, formatLastSeen } from "@/utils/lastSeen";
 
 interface User {
   id: number;
   name: string;
   username: string;
+  lastSeenAt?: string | null;
 }
 
 interface Message {
@@ -38,6 +45,10 @@ interface Message {
   sessionId: number;
   senderId: number;
   content: string;
+  type: "text" | "image" | "file" | "voice";
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
+  attachmentSize?: number | null;
   status: string;
   createdAt: string;
   sender: User;
@@ -55,7 +66,7 @@ interface Session {
   title: string;
   description?: string;
   creatorId: number;
-  creator?: { id: number; name: string; username: string } | null;
+  creator?: { id: number; name: string; username: string; lastSeenAt?: string | null } | null;
   status: "active" | "completed";
   participants: Participant[];
   createdAt: string;
@@ -78,12 +89,125 @@ interface SessionPreview {
   createdAt: string;
 }
 
-function MessageBubble({ message, isOwn, showSender, colors }: {
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function VoicePlayer({ url, colors }: { url: string; colors: any }) {
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const togglePlay = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      if (playing && soundRef.current) {
+        await soundRef.current.pauseAsync();
+        setPlaying(false);
+      } else {
+        if (!soundRef.current) {
+          const { sound } = await Audio.Sound.createAsync({ uri: url });
+          soundRef.current = sound;
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.didJustFinish) {
+              setPlaying(false);
+              soundRef.current = null;
+            }
+          });
+        }
+        await soundRef.current.playAsync();
+        setPlaying(true);
+      }
+    } catch {
+      Alert.alert("Error", "Could not play voice note.");
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      soundRef.current?.unloadAsync();
+    };
+  }, []);
+
+  return (
+    <Pressable onPress={togglePlay} style={[styles.voicePlayer, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
+      {loading ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <Feather name={playing ? "pause" : "play"} size={16} color="#fff" />
+      )}
+      <Feather name="mic" size={14} color="rgba(255,255,255,0.8)" />
+      <Text style={[styles.voiceLabel, { color: "rgba(255,255,255,0.9)", fontFamily: "Inter_500Medium" }]}>
+        Voice note
+      </Text>
+    </Pressable>
+  );
+}
+
+function MessageBubble({ message, isOwn, showSender, colors, getFileUrl }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
   colors: ReturnType<typeof import("@/hooks/useTheme").useTheme>["colors"];
+  getFileUrl: (path: string) => string;
 }) {
+  const renderContent = () => {
+    if (message.type === "image" && message.attachmentUrl) {
+      const url = getFileUrl(message.attachmentUrl);
+      return (
+        <Pressable onPress={() => Linking.openURL(url)}>
+          <Image
+            source={{ uri: url }}
+            style={styles.imageBubble}
+            resizeMode="cover"
+          />
+          {message.content ? (
+            <Text style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text, fontFamily: "Inter_400Regular", marginTop: 4 }]}>
+              {message.content}
+            </Text>
+          ) : null}
+        </Pressable>
+      );
+    }
+
+    if (message.type === "file" && message.attachmentUrl) {
+      const url = getFileUrl(message.attachmentUrl);
+      return (
+        <Pressable onPress={() => Linking.openURL(url)} style={styles.fileCard}>
+          <View style={[styles.fileIcon, { backgroundColor: isOwn ? "rgba(255,255,255,0.2)" : colors.accentSoft }]}>
+            <Feather name="file" size={18} color={isOwn ? "#fff" : colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.fileName, { color: isOwn ? "#fff" : colors.text, fontFamily: "Inter_500Medium" }]} numberOfLines={1}>
+              {message.attachmentName || "File"}
+            </Text>
+            {message.attachmentSize ? (
+              <Text style={[styles.fileSize, { color: isOwn ? "rgba(255,255,255,0.7)" : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                {formatFileSize(message.attachmentSize)}
+              </Text>
+            ) : null}
+          </View>
+          <Feather name="download" size={16} color={isOwn ? "rgba(255,255,255,0.8)" : colors.accent} />
+        </Pressable>
+      );
+    }
+
+    if (message.type === "voice" && message.attachmentUrl) {
+      const url = getFileUrl(message.attachmentUrl);
+      return <VoicePlayer url={url} colors={colors} />;
+    }
+
+    return (
+      <Text style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text, fontFamily: "Inter_400Regular" }]}>
+        {message.content}
+      </Text>
+    );
+  };
+
   return (
     <Animated.View
       entering={FadeInDown.duration(200)}
@@ -101,26 +225,25 @@ function MessageBubble({ message, isOwn, showSender, colors }: {
       )}
       <View style={{ maxWidth: "75%", gap: 3 }}>
         {showSender && !isOwn && (
-          <Text style={[styles.senderName, { color: colors.textSecondary }]}>
-            {message.sender.name}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginLeft: 4 }}>
+            <Text style={[styles.senderName, { color: colors.textSecondary }]}>
+              {message.sender.name}
+            </Text>
+            {isOnline(message.sender.lastSeenAt) && (
+              <View style={[styles.onlineDotSmall, { backgroundColor: colors.success }]} />
+            )}
+          </View>
         )}
         <View
           style={[
             styles.bubble,
+            message.type === "image" ? styles.bubbleImage : null,
             isOwn
               ? [styles.bubbleOwn, { backgroundColor: colors.messageBubbleOwn }]
               : [styles.bubbleOther, { backgroundColor: colors.messageBubbleOther, borderColor: colors.border }],
           ]}
         >
-          <Text
-            style={[
-              styles.bubbleText,
-              { color: isOwn ? "#fff" : colors.text, fontFamily: "Inter_400Regular" },
-            ]}
-          >
-            {message.content}
-          </Text>
+          {renderContent()}
         </View>
         <View style={[styles.bubbleMeta, { alignSelf: isOwn ? "flex-end" : "flex-start" }]}>
           <Text style={[styles.bubbleTime, { color: colors.textTertiary }]}>
@@ -141,13 +264,14 @@ function MessageBubble({ message, isOwn, showSender, colors }: {
 }
 
 type SheetView = "participants" | "invite";
+type AttachMenuOption = "image" | "file" | "voice" | null;
 
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const sessionId = parseInt(id, 10);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { get, post, patch, del } = useApi();
+  const { get, post, patch, del, uploadFile, getFileUrl } = useApi();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
@@ -159,6 +283,11 @@ export default function SessionScreen() {
   const [hasOlder, setHasOlder] = useState(false);
   const [pollFailed, setPollFailed] = useState(false);
   const consecutivePollErrors = useRef(0);
+  const [attachMenuVisible, setAttachMenuVisible] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   const { data: session, isLoading: sessionLoading, error: sessionError } = useQuery<Session>({
     queryKey: ["session", sessionId],
@@ -191,7 +320,7 @@ export default function SessionScreen() {
   });
 
   const shareSessionLink = async () => {
-    const link = Linking.createURL(`session/${sessionId}`);
+    const link = ExpoLinking.createURL(`session/${sessionId}`);
     const message = `Join my Intentional Link session "${session?.title ?? "Session"}": ${link}`;
     try {
       const smsAvailable = await SMS.isAvailableAsync();
@@ -255,15 +384,20 @@ export default function SessionScreen() {
   const tempIdRef = useRef<number>(0);
 
   const sendMutation = useMutation({
-    mutationFn: (content: string) => post(`/sessions/${sessionId}/messages`, { content }),
-    onMutate: async (content) => {
+    mutationFn: (payload: { content?: string; type?: string; attachmentUrl?: string; attachmentName?: string; attachmentSize?: number }) =>
+      post(`/sessions/${sessionId}/messages`, payload),
+    onMutate: async (payload) => {
       const tempId = -(Date.now());
       tempIdRef.current = tempId;
       const tempMsg: Message = {
         id: tempId,
         sessionId,
         senderId: user!.id,
-        content,
+        content: payload.content || "",
+        type: (payload.type as any) || "text",
+        attachmentUrl: payload.attachmentUrl || null,
+        attachmentName: payload.attachmentName || null,
+        attachmentSize: payload.attachmentSize || null,
         status: "sent",
         createdAt: new Date().toISOString(),
         sender: { id: user!.id, name: user!.name, username: user!.username },
@@ -348,7 +482,128 @@ export default function SessionScreen() {
     if (!trimmed) return;
     setText("");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    sendMutation.mutate(trimmed);
+    sendMutation.mutate({ content: trimmed, type: "text" });
+  };
+
+  const handlePickImage = async () => {
+    setAttachMenuVisible(false);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Allow access to your photo library to send images.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const fileName = asset.fileName || `image_${Date.now()}.jpg`;
+    const fileSize = asset.fileSize || 0;
+    const contentType = asset.mimeType || "image/jpeg";
+
+    setUploading(true);
+    try {
+      const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      sendMutation.mutate({
+        content: "",
+        type: "image",
+        attachmentUrl: uploaded.objectPath,
+        attachmentName: fileName,
+        attachmentSize: fileSize,
+      });
+    } catch (e: any) {
+      Alert.alert("Upload failed", e.message || "Could not upload image.");
+    }
+    setUploading(false);
+  };
+
+  const handlePickFile = async () => {
+    setAttachMenuVisible(false);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      const fileName = asset.name;
+      const fileSize = asset.size || 0;
+      const contentType = asset.mimeType || "application/octet-stream";
+
+      setUploading(true);
+      try {
+        const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        sendMutation.mutate({
+          content: "",
+          type: "file",
+          attachmentUrl: uploaded.objectPath,
+          attachmentName: fileName,
+          attachmentSize: fileSize,
+        });
+      } catch (e: any) {
+        Alert.alert("Upload failed", e.message || "Could not upload file.");
+      }
+      setUploading(false);
+    } catch {
+      setUploading(false);
+    }
+  };
+
+  const handleStartRecording = async () => {
+    setAttachMenuVisible(false);
+    const { status } = await Audio.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Allow microphone access to send voice notes.");
+      return;
+    }
+    try {
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording: rec } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(rec);
+      setIsRecording(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (e: any) {
+      Alert.alert("Error", "Could not start recording.");
+    }
+  };
+
+  const handleStopRecording = async () => {
+    if (!recording) return;
+    setIsRecording(false);
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+      if (!uri) return;
+
+      const fileName = `voice_${Date.now()}.m4a`;
+      const fileSize = 0;
+      const contentType = "audio/m4a";
+
+      setUploading(true);
+      try {
+        const uploaded = await uploadFile(uri, fileName, fileSize, contentType);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        sendMutation.mutate({
+          content: "",
+          type: "voice",
+          attachmentUrl: uploaded.objectPath,
+          attachmentName: fileName,
+          attachmentSize: fileSize,
+        });
+      } catch (e: any) {
+        Alert.alert("Upload failed", e.message || "Could not upload voice note.");
+      }
+      setUploading(false);
+    } catch {
+      setRecording(null);
+      setUploading(false);
+    }
   };
 
   const handleEndSession = () => {
@@ -386,6 +641,8 @@ export default function SessionScreen() {
 
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+
+  const onlineParticipants = session?.participants.filter(p => isOnline(p.user.lastSeenAt)) ?? [];
 
   if (sessionLoading) {
     return (
@@ -478,7 +735,7 @@ export default function SessionScreen() {
           <Pressable style={styles.navMeta} onPress={openParticipants}>
             <View style={[styles.statusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
             <Text style={[styles.navSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-              {isActive ? "Active" : "Completed"} · {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
+              {isActive ? (onlineParticipants.length > 0 ? `${onlineParticipants.length} online` : "Active") : "Completed"} · {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
             </Text>
             <Feather name="chevron-right" size={12} color={colors.textTertiary} />
           </Pressable>
@@ -554,6 +811,15 @@ export default function SessionScreen() {
           </View>
         )}
 
+        {uploading && (
+          <View style={[styles.uploadingBanner, { backgroundColor: colors.accentSoft, borderBottomColor: colors.border }]}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={[styles.uploadingText, { color: colors.accent, fontFamily: "Inter_500Medium" }]}>
+              Uploading…
+            </Text>
+          </View>
+        )}
+
         {msgsLoading ? (
           <View style={styles.center}>
             <ActivityIndicator color={colors.accent} />
@@ -573,6 +839,7 @@ export default function SessionScreen() {
                   isOwn={isOwn}
                   showSender={showSender}
                   colors={colors}
+                  getFileUrl={getFileUrl}
                 />
               );
             }}
@@ -628,27 +895,46 @@ export default function SessionScreen() {
             borderTopColor: colors.border,
             paddingBottom: bottomPad + 8,
           }]}>
-            <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-              <TextInput
-                style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular" }]}
-                placeholder="Type a message…"
-                placeholderTextColor={colors.textTertiary}
-                value={text}
-                onChangeText={setText}
-                multiline
-                maxLength={2000}
-              />
-            </View>
-            <Pressable
-              style={({ pressed }) => [
-                styles.sendBtn,
-                { backgroundColor: text.trim() ? colors.accent : colors.surfaceAlt, opacity: pressed ? 0.85 : 1 },
-              ]}
-              onPress={handleSend}
-              disabled={!text.trim() || sendMutation.isPending}
-            >
-              <Feather name="send" size={18} color={text.trim() ? "#fff" : colors.textTertiary} />
-            </Pressable>
+            {isRecording ? (
+              <Pressable
+                style={({ pressed }) => [styles.recordingBar, { backgroundColor: colors.danger, opacity: pressed ? 0.85 : 1 }]}
+                onPress={handleStopRecording}
+              >
+                <View style={styles.recordingDot} />
+                <Text style={[styles.recordingText, { fontFamily: "Inter_600SemiBold" }]}>Recording… tap to stop</Text>
+              </Pressable>
+            ) : (
+              <>
+                <Pressable
+                  style={({ pressed }) => [styles.attachBtn, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => setAttachMenuVisible(true)}
+                  disabled={uploading}
+                >
+                  <Feather name="plus" size={20} color={colors.accent} />
+                </Pressable>
+                <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular" }]}
+                    placeholder="Type a message…"
+                    placeholderTextColor={colors.textTertiary}
+                    value={text}
+                    onChangeText={setText}
+                    multiline
+                    maxLength={2000}
+                  />
+                </View>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sendBtn,
+                    { backgroundColor: text.trim() ? colors.accent : colors.surfaceAlt, opacity: pressed ? 0.85 : 1 },
+                  ]}
+                  onPress={handleSend}
+                  disabled={!text.trim() || sendMutation.isPending || uploading}
+                >
+                  <Feather name="send" size={18} color={text.trim() ? "#fff" : colors.textTertiary} />
+                </Pressable>
+              </>
+            )}
           </View>
         )}
 
@@ -661,6 +947,63 @@ export default function SessionScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={attachMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAttachMenuVisible(false)}
+      >
+        <Pressable style={styles.attachOverlay} onPress={() => setAttachMenuVisible(false)}>
+          <View style={[styles.attachSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.attachTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+              Send attachment
+            </Text>
+            <Pressable
+              style={({ pressed }) => [styles.attachOption, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
+              onPress={handlePickImage}
+            >
+              <View style={[styles.attachOptionIcon, { backgroundColor: "#E3F2FD" }]}>
+                <Feather name="image" size={22} color="#1976D2" />
+              </View>
+              <View>
+                <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Photo</Text>
+                <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Choose from library</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.attachOption, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
+              onPress={handlePickFile}
+            >
+              <View style={[styles.attachOptionIcon, { backgroundColor: "#F3E5F5" }]}>
+                <Feather name="file-text" size={22} color="#7B1FA2" />
+              </View>
+              <View>
+                <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>File</Text>
+                <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Any document or file</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.attachOption, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
+              onPress={handleStartRecording}
+            >
+              <View style={[styles.attachOptionIcon, { backgroundColor: "#FFEBEE" }]}>
+                <Feather name="mic" size={22} color="#C62828" />
+              </View>
+              <View>
+                <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Voice Note</Text>
+                <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Record and send audio</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.attachCancelBtn, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
+              onPress={() => setAttachMenuVisible(false)}
+            >
+              <Text style={[styles.attachCancelText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={sheetVisible}
@@ -691,17 +1034,26 @@ export default function SessionScreen() {
           {sheetView === "participants" ? (
             <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
               <View style={[styles.participantRow, { borderBottomColor: colors.border }]}>
-                <View style={[styles.participantAvatar, { backgroundColor: colors.accent }]}>
-                  <Text style={[styles.participantAvatarText, { fontFamily: "Inter_700Bold" }]}>
-                    {(session.creator?.name ?? (isCreator ? user?.name : null) ?? "?").charAt(0).toUpperCase()}
-                  </Text>
+                <View style={{ position: "relative" }}>
+                  <View style={[styles.participantAvatar, { backgroundColor: colors.accent }]}>
+                    <Text style={[styles.participantAvatarText, { fontFamily: "Inter_700Bold" }]}>
+                      {(session.creator?.name ?? (isCreator ? user?.name : null) ?? "?").charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  {isOnline(session.creator?.lastSeenAt) && (
+                    <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
+                  )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
                     {session.creator?.name ?? (isCreator ? user?.name : "Unknown")}
                   </Text>
                   <Text style={[styles.participantUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                    @{session.creator?.username ?? (isCreator ? user?.username : "unknown")}
+                    {isOnline(session.creator?.lastSeenAt) ? (
+                      <Text style={{ color: colors.success }}>Online</Text>
+                    ) : (
+                      `Last seen ${formatLastSeen(session.creator?.lastSeenAt)}`
+                    )}
                   </Text>
                 </View>
                 <View style={[styles.rolePill, { backgroundColor: colors.accentSoft }]}>
@@ -711,17 +1063,26 @@ export default function SessionScreen() {
 
               {session.participants.filter(p => p.userId !== session.creatorId).map((p) => (
                 <View key={p.id} style={[styles.participantRow, { borderBottomColor: colors.border }]}>
-                  <View style={[styles.participantAvatar, { backgroundColor: colors.accentSoft }]}>
-                    <Text style={[styles.participantAvatarText, { color: colors.accent, fontFamily: "Inter_700Bold" }]}>
-                      {p.user.name.charAt(0).toUpperCase()}
-                    </Text>
+                  <View style={{ position: "relative" }}>
+                    <View style={[styles.participantAvatar, { backgroundColor: colors.accentSoft }]}>
+                      <Text style={[styles.participantAvatarText, { color: colors.accent, fontFamily: "Inter_700Bold" }]}>
+                        {p.user.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    {isOnline(p.user.lastSeenAt) && (
+                      <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
+                    )}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
                       {p.user.name}
                     </Text>
                     <Text style={[styles.participantUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                      @{p.user.username}
+                      {isOnline(p.user.lastSeenAt) ? (
+                        <Text style={{ color: colors.success }}>Online</Text>
+                      ) : (
+                        `Last seen ${formatLastSeen(p.user.lastSeenAt)}`
+                      )}
                     </Text>
                   </View>
                   <View style={[
@@ -875,25 +1236,68 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
   },
   senderAvatarText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  senderName: { fontSize: 11, marginLeft: 4, fontFamily: "Inter_400Regular" },
+  senderName: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  onlineDotSmall: { width: 7, height: 7, borderRadius: 4 },
   bubble: {
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
     maxWidth: "100%",
   },
+  bubbleImage: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
   bubbleOwn: { borderBottomRightRadius: 4 },
   bubbleOther: { borderBottomLeftRadius: 4, borderWidth: 1 },
   bubbleText: { fontSize: 15, lineHeight: 21 },
+  imageBubble: {
+    width: 200,
+    height: 150,
+    borderRadius: 14,
+  },
+  fileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minWidth: 160,
+  },
+  fileIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fileName: { fontSize: 14, maxWidth: 110 },
+  fileSize: { fontSize: 11, marginTop: 1 },
+  voicePlayer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 140,
+  },
+  voiceLabel: { fontSize: 13 },
   bubbleMeta: { flexDirection: "row", alignItems: "center", gap: 3 },
   bubbleTime: { fontSize: 10, fontFamily: "Inter_400Regular" },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 12,
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  attachBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
   inputWrapper: {
     flex: 1,
@@ -905,6 +1309,22 @@ const styles = StyleSheet.create({
   },
   input: { fontSize: 15, lineHeight: 21 },
   sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
+  recordingBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderRadius: 22,
+  },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#fff",
+  },
+  recordingText: { color: "#fff", fontSize: 15 },
   loadOlderBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -939,6 +1359,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   pollErrorText: { fontSize: 13 },
+  uploadingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  uploadingText: { fontSize: 13 },
   joinLinkIcon: {
     width: 72,
     height: 72,
@@ -987,6 +1416,56 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   endedText: { fontSize: 13 },
+  attachOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+    paddingHorizontal: 12,
+    paddingBottom: 24,
+  },
+  attachSheet: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    gap: 10,
+  },
+  attachTitle: {
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  attachOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+    borderRadius: 14,
+  },
+  attachOptionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  attachOptionLabel: { fontSize: 15 },
+  attachOptionSub: { fontSize: 12, marginTop: 1 },
+  attachCancelBtn: {
+    padding: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  attachCancelText: { fontSize: 15 },
+  onlineDot: {
+    position: "absolute",
+    bottom: 1,
+    right: 1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+  },
   sheetContainer: { flex: 1 },
   sheetHeader: {
     flexDirection: "row",

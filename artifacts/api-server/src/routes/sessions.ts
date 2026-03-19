@@ -23,6 +23,7 @@ async function getSessionWithParticipants(sessionId: number) {
       userName: usersTable.name,
       userUsername: usersTable.username,
       userCreatedAt: usersTable.createdAt,
+      userLastSeenAt: usersTable.lastSeenAt,
     })
     .from(sessionParticipantsTable)
     .innerJoin(usersTable, eq(sessionParticipantsTable.userId, usersTable.id))
@@ -32,6 +33,7 @@ async function getSessionWithParticipants(sessionId: number) {
     id: usersTable.id,
     name: usersTable.name,
     username: usersTable.username,
+    lastSeenAt: usersTable.lastSeenAt,
   }).from(usersTable).where(eq(usersTable.id, session.creatorId)).limit(1);
 
   const parsed = GetSessionResponse.parse({
@@ -41,7 +43,7 @@ async function getSessionWithParticipants(sessionId: number) {
       userId: p.userId,
       sessionId: p.sessionId,
       status: p.status,
-      user: { id: p.userId, name: p.userName, username: p.userUsername, createdAt: p.userCreatedAt },
+      user: { id: p.userId, name: p.userName, username: p.userUsername, createdAt: p.userCreatedAt, lastSeenAt: p.userLastSeenAt },
     })),
   });
 

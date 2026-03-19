@@ -22,6 +22,7 @@ router.get("/contacts", async (req, res): Promise<void> => {
       contactName: usersTable.name,
       contactUsername: usersTable.username,
       contactCreatedAt: usersTable.createdAt,
+      contactLastSeenAt: usersTable.lastSeenAt,
     })
     .from(contactsTable)
     .innerJoin(usersTable, eq(contactsTable.contactUserId, usersTable.id))
@@ -36,6 +37,7 @@ router.get("/contacts", async (req, res): Promise<void> => {
       name: r.contactName,
       username: r.contactUsername,
       createdAt: r.contactCreatedAt,
+      lastSeenAt: r.contactLastSeenAt,
     },
   }));
 
@@ -88,6 +90,7 @@ router.post("/contacts", async (req, res): Promise<void> => {
       name: contactUser.name,
       username: contactUser.username,
       createdAt: contactUser.createdAt,
+      lastSeenAt: contactUser.lastSeenAt,
     },
   }));
 });
