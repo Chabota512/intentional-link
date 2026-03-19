@@ -169,12 +169,12 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
 
   (async () => {
     try {
-      const [sender] = await db.select({ displayName: usersTable.displayName })
+      const [sender] = await db.select({ name: usersTable.name })
         .from(usersTable)
         .where(eq(usersTable.id, userId))
         .limit(1);
 
-      const [session] = await db.select({ name: sessionsTable.name, creatorId: sessionsTable.creatorId })
+      const [session] = await db.select({ name: sessionsTable.title, creatorId: sessionsTable.creatorId })
         .from(sessionsTable)
         .where(eq(sessionsTable.id, sessionId))
         .limit(1);
@@ -200,7 +200,7 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
       const tokens = others.map(u => u.pushToken).filter(Boolean) as string[];
       if (tokens.length === 0) return;
 
-      const senderName = sender?.displayName || "Someone";
+      const senderName = sender?.name || "Someone";
       const sessionName = session?.name || "a session";
       const notifBody = type === "voice"
         ? `${senderName} sent a voice note`

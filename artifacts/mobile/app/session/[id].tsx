@@ -686,6 +686,14 @@ export default function SessionScreen() {
     },
   });
 
+  const reactMutation = useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: number; emoji: string }) =>
+      post(`/sessions/${sessionId}/messages/${messageId}/react`, { emoji }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", sessionId] });
+    },
+  });
+
   const loadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
     setLoadingOlder(true);
@@ -1195,6 +1203,8 @@ export default function SessionScreen() {
                   colors={colors}
                   getFileUrl={getFileUrl}
                   onPlayed={item.type === "voice" && !isOwn ? () => markPlayedMutation.mutate(item.id) : undefined}
+                  onLongPress={() => setReactionPickerMessage(item)}
+                  onReact={(emoji) => reactMutation.mutate({ messageId: item.id, emoji })}
                 />
               );
             }}
@@ -1385,6 +1395,38 @@ export default function SessionScreen() {
             >
               <Text style={[styles.attachCancelText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>Cancel</Text>
             </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={reactionPickerMessage !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReactionPickerMessage(null)}
+      >
+        <Pressable style={styles.attachOverlay} onPress={() => setReactionPickerMessage(null)}>
+          <View style={[styles.reactionPickerSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.attachTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+              React to message
+            </Text>
+            <View style={styles.reactionPickerRow}>
+              {REACTION_EMOJIS.map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  style={({ pressed }) => [styles.reactionPickerEmoji, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => {
+                    if (reactionPickerMessage) {
+                      reactMutation.mutate({ messageId: reactionPickerMessage.id, emoji });
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                    setReactionPickerMessage(null);
+                  }}
+                >
+                  <Text style={{ fontSize: 30 }}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         </Pressable>
       </Modal>
@@ -1946,4 +1988,18 @@ const styles = StyleSheet.create({
   inviteMoreText: { fontSize: 15 },
   emptySheet: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 60 },
   emptySheetText: { fontSize: 14, textAlign: "center", paddingHorizontal: 40 },
+  reactionPickerSheet: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  reactionPickerRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 4,
+  },
+  reactionPickerEmoji: {
+    padding: 8,
+  },
 });
