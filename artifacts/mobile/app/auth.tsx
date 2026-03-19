@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
@@ -16,6 +17,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
+
+const appIcon = require("../assets/images/icon.png");
 
 export default function AuthScreen() {
   const { colors } = useTheme();
@@ -100,8 +103,8 @@ export default function AuthScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View style={[styles.logoContainer, { backgroundColor: colors.accent }]}>
-              <Feather name="link-2" size={32} color="#FFFFFF" />
+            <View style={styles.logoContainer}>
+              <Image source={appIcon} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={[styles.appName, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Intentional Link</Text>
             <Text style={[styles.tagline, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
@@ -257,16 +260,20 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 24, flexGrow: 1 },
   header: { alignItems: "center", marginBottom: 40, gap: 12 },
   logoContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 88,
+    height: 88,
+    borderRadius: 22,
+    overflow: "hidden",
     shadowColor: "#4F6EF7",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
     elevation: 8,
+  },
+  logoImage: {
+    width: 88,
+    height: 88,
+    borderRadius: 22,
   },
   appName: { fontSize: 32 },
   tagline: { fontSize: 15, letterSpacing: 0.3 },
