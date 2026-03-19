@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -34,16 +35,82 @@ interface Contact {
   createdAt: string;
 }
 
+interface IncomingRequest {
+  id: number;
+  senderId: number;
+  senderName: string;
+  senderUsername: string;
+  createdAt: string;
+}
+
+interface OutgoingRequest {
+  id: number;
+  recipientId: number;
+  recipientName: string;
+  recipientUsername: string;
+  createdAt: string;
+}
+
+interface ContactRequests {
+  incoming: IncomingRequest[];
+  outgoing: OutgoingRequest[];
+}
+
+type Tab = "contacts" | "requests";
+
 export default function ContactsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { get, del } = useApi();
+  const { get, post, del } = useApi();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<Tab>("contacts");
 
-  const { data: contacts = [], isLoading, isRefetching, refetch } = useQuery<Contact[]>({
+  const { data: contacts = [], isLoading: contactsLoading, isRefetching, refetch } = useQuery<Contact[]>({
     queryKey: ["contacts"],
     queryFn: () => get("/contacts"),
     refetchInterval: 30_000,
+  });
+
+  const { data: requests, isLoading: requestsLoading, refetch: refetchRequests } = useQuery<ContactRequests>({
+    queryKey: ["contactRequests"],
+    queryFn: () => get("/contacts/requests"),
+    refetchInterval: 15_000,
+  });
+
+  const incomingCount = requests?.incoming.length ?? 0;
+
+  const acceptMutation = useMutation({
+    mutationFn: (requestId: number) => post(`/contacts/requests/${requestId}/accept`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["contactRequests"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to accept request.");
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: (requestId: number) => post(`/contacts/requests/${requestId}/decline`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contactRequests"] });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to decline request.");
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (requestId: number) => del(`/contacts/${requestId}/cancel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contactRequests"] });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to cancel request.");
+    },
   });
 
   const removeMutation = useMutation({
@@ -71,10 +138,10 @@ export default function ContactsScreen() {
 
   const onlineCount = contacts.filter(c => isOnline(c.contactUser.lastSeenAt)).length;
 
-  const renderItem = ({ item }: { item: Contact }) => {
+  const renderContact = ({ item }: { item: Contact }) => {
     const online = isOnline(item.contactUser.lastSeenAt);
     return (
-      <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={{ position: "relative" }}>
           <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
             <Text style={[styles.avatarText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
@@ -90,24 +157,90 @@ export default function ContactsScreen() {
             {item.contactUser.name}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-            <Text style={[styles.contactUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+            <Text style={[styles.contactSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
               @{item.contactUser.username}
             </Text>
-            <Text style={[styles.contactUsername, { color: colors.textTertiary }]}>·</Text>
-            <Text style={[styles.contactUsername, { color: online ? colors.success : colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+            <Text style={[styles.contactSub, { color: colors.textTertiary }]}>·</Text>
+            <Text style={[styles.contactSub, { color: online ? colors.success : colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
               {online ? "Online" : formatLastSeen(item.contactUser.lastSeenAt)}
             </Text>
           </View>
         </View>
         <Pressable
           onPress={() => handleRemove(item)}
-          style={({ pressed }) => [styles.removeBtn, { opacity: pressed ? 0.6 : 1 }]}
+          style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.6 : 1 }]}
         >
           <Feather name="user-minus" size={18} color={colors.danger} />
         </Pressable>
       </View>
     );
   };
+
+  const renderIncoming = ({ item }: { item: IncomingRequest }) => (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.accent + "44", borderWidth: 1.5 }]}>
+      <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
+        <Text style={[styles.avatarText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
+          {item.senderName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+          {item.senderName}
+        </Text>
+        <Text style={[styles.contactSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+          @{item.senderUsername} wants to connect
+        </Text>
+      </View>
+      <View style={styles.requestActions}>
+        <Pressable
+          style={({ pressed }) => [styles.declineBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+          onPress={() => declineMutation.mutate(item.id)}
+          disabled={declineMutation.isPending}
+        >
+          <Text style={[styles.declineBtnText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+            Decline
+          </Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.acceptBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
+          onPress={() => acceptMutation.mutate(item.id)}
+          disabled={acceptMutation.isPending}
+        >
+          {acceptMutation.isPending
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={[styles.acceptBtnText, { fontFamily: "Inter_600SemiBold" }]}>Accept</Text>
+          }
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderOutgoing = ({ item }: { item: OutgoingRequest }) => (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.avatar, { backgroundColor: colors.surfaceAlt }]}>
+        <Text style={[styles.avatarText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+          {item.recipientName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+          {item.recipientName}
+        </Text>
+        <Text style={[styles.contactSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+          @{item.recipientUsername} · Awaiting response
+        </Text>
+      </View>
+      <Pressable
+        style={({ pressed }) => [styles.cancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+        onPress={() => cancelMutation.mutate(item.id)}
+        disabled={cancelMutation.isPending}
+      >
+        <Text style={[styles.cancelBtnText, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
+          Cancel
+        </Text>
+      </Pressable>
+    </View>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -129,45 +262,131 @@ export default function ContactsScreen() {
         </Pressable>
       </View>
 
-      {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
-      ) : (
-        <FlatList
-          data={contacts}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={[
-            styles.list,
-            { paddingBottom: bottomPad + 80 },
-            contacts.length === 0 && styles.listEmpty,
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
-                <Feather name="users" size={36} color={colors.textTertiary} />
+      <View style={[styles.tabRow, { borderBottomColor: colors.border }]}>
+        <Pressable
+          style={[styles.tab, activeTab === "contacts" && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
+          onPress={() => setActiveTab("contacts")}
+        >
+          <Text style={[styles.tabText, { color: activeTab === "contacts" ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+            Contacts
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, activeTab === "requests" && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
+          onPress={() => setActiveTab("requests")}
+        >
+          <View style={styles.tabInner}>
+            <Text style={[styles.tabText, { color: activeTab === "requests" ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+              Requests
+            </Text>
+            {incomingCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.badgeText, { fontFamily: "Inter_700Bold" }]}>{incomingCount}</Text>
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-                No contacts yet
-              </Text>
-              <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                Add trusted contacts to invite them to focus sessions.
-              </Text>
-              <Pressable
-                style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
-                onPress={() => router.push("/contacts/add")}
-              >
-                <Feather name="user-plus" size={16} color="#fff" />
-                <Text style={[styles.emptyBtnText, { fontFamily: "Inter_600SemiBold" }]}>Add Contact</Text>
-              </Pressable>
-            </View>
-          }
-        />
+            )}
+          </View>
+        </Pressable>
+      </View>
+
+      {activeTab === "contacts" ? (
+        contactsLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : (
+          <FlatList
+            data={contacts}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={renderContact}
+            contentContainerStyle={[
+              styles.list,
+              { paddingBottom: bottomPad + 80 },
+              contacts.length === 0 && styles.listEmpty,
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
+                  <Feather name="users" size={36} color={colors.textTertiary} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                  No contacts yet
+                </Text>
+                <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  Send a request to someone — they'll need to accept before you're connected.
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
+                  onPress={() => router.push("/contacts/add")}
+                >
+                  <Feather name="user-plus" size={16} color="#fff" />
+                  <Text style={[styles.emptyBtnText, { fontFamily: "Inter_600SemiBold" }]}>Find People</Text>
+                </Pressable>
+              </View>
+            }
+          />
+        )
+      ) : (
+        requestsLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={[styles.list, { paddingBottom: bottomPad + 80 }]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={false}
+                onRefresh={() => refetchRequests()}
+                tintColor={colors.accent}
+              />
+            }
+          >
+            {(requests?.incoming.length ?? 0) > 0 && (
+              <>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+                  INCOMING
+                </Text>
+                {(requests?.incoming ?? []).map((item) => (
+                  <View key={item.id} style={{ marginBottom: 8 }}>
+                    {renderIncoming({ item })}
+                  </View>
+                ))}
+              </>
+            )}
+
+            {(requests?.outgoing.length ?? 0) > 0 && (
+              <>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", marginTop: 16 }]}>
+                  SENT
+                </Text>
+                {(requests?.outgoing ?? []).map((item) => (
+                  <View key={item.id} style={{ marginBottom: 8 }}>
+                    {renderOutgoing({ item })}
+                  </View>
+                ))}
+              </>
+            )}
+
+            {(requests?.incoming.length ?? 0) === 0 && (requests?.outgoing.length ?? 0) === 0 && (
+              <View style={[styles.emptyState, { marginTop: 60 }]}>
+                <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
+                  <Feather name="bell" size={36} color={colors.textTertiary} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                  No pending requests
+                </Text>
+                <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  Contact requests you send or receive will appear here.
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        )
       )}
     </View>
   );
@@ -197,15 +416,41 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  list: { padding: 12, gap: 8 },
+  tabRow: {
+    flexDirection: "row",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  tabInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  tabText: { fontSize: 14 },
+  badge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: { color: "#fff", fontSize: 11 },
+  sectionLabel: { fontSize: 11, letterSpacing: 0.8, marginBottom: 8, paddingHorizontal: 2 },
+  list: { padding: 12, gap: 0 },
   listEmpty: { flex: 1 },
-  contactCard: {
+  card: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
+    marginBottom: 8,
   },
   avatar: {
     width: 44,
@@ -225,8 +470,33 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 18 },
   contactName: { fontSize: 15 },
-  contactUsername: { fontSize: 13 },
-  removeBtn: { padding: 8 },
+  contactSub: { fontSize: 13 },
+  actionBtn: { padding: 8 },
+  requestActions: { flexDirection: "row", gap: 8 },
+  acceptBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 72,
+    alignItems: "center",
+  },
+  acceptBtnText: { color: "#fff", fontSize: 13 },
+  declineBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    minWidth: 72,
+    alignItems: "center",
+  },
+  declineBtnText: { fontSize: 13 },
+  cancelBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  cancelBtnText: { fontSize: 13 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 40 },
   emptyIcon: { width: 80, height: 80, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 8 },

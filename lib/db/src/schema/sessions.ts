@@ -17,7 +17,7 @@ export const sessionParticipantsTable = pgTable("session_participants", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").notNull().references(() => sessionsTable.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  status: text("status", { enum: ["invited", "joined"] }).notNull().default("invited"),
+  status: text("status", { enum: ["invited", "joined", "declined"] }).notNull().default("invited"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -427,6 +427,18 @@ export default function SessionScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["session", sessionId] }),
   });
 
+  const declineInviteMutation = useMutation({
+    mutationFn: () => post(`/sessions/${sessionId}/decline`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.back();
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Could not decline invite.");
+    },
+  });
+
   const endMutation = useMutation({
     mutationFn: () => patch(`/sessions/${sessionId}`, { status: "completed" }),
     onSuccess: () => {
@@ -827,12 +839,27 @@ export default function SessionScreen() {
           <Text style={[styles.joinText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>
             You've been invited to this session
           </Text>
-          <Pressable
-            style={({ pressed }) => [styles.joinBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
-            onPress={() => joinMutation.mutate()}
-          >
-            <Text style={[styles.joinBtnText, { fontFamily: "Inter_600SemiBold" }]}>Join</Text>
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable
+              style={({ pressed }) => [styles.declineInviteBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+              onPress={() => declineInviteMutation.mutate()}
+              disabled={declineInviteMutation.isPending}
+            >
+              <Text style={[styles.declineInviteBtnText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+                Decline
+              </Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.joinBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
+              onPress={() => joinMutation.mutate()}
+              disabled={joinMutation.isPending}
+            >
+              {joinMutation.isPending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={[styles.joinBtnText, { fontFamily: "Inter_600SemiBold" }]}>Join</Text>
+              }
+            </Pressable>
+          </View>
         </Animated.View>
       )}
 
@@ -1279,8 +1306,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   joinText: { flex: 1, fontSize: 14 },
-  joinBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginLeft: 12 },
+  joinBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, alignItems: "center", minWidth: 60 },
   joinBtnText: { color: "#fff", fontSize: 14 },
+  declineInviteBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  declineInviteBtnText: { fontSize: 14 },
   messageList: { padding: 12, gap: 4, flexGrow: 1 },
   bubbleRow: { flexDirection: "row", marginVertical: 3, gap: 8 },
   bubbleRowLeft: { justifyContent: "flex-start" },

@@ -30,17 +30,24 @@ interface Contact {
   contactUser: User;
 }
 
+interface OutgoingRequest {
+  id: number;
+  recipientId: number;
+  recipientName: string;
+  recipientUsername: string;
+}
+
 export default function AddContactScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { get, post } = useApi();
+  const { get, post, del } = useApi();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
+  const [requestedIds, setRequestedIds] = useState<Set<number>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: existingContacts = [] } = useQuery<Contact[]>({
@@ -48,7 +55,13 @@ export default function AddContactScreen() {
     queryFn: () => get("/contacts"),
   });
 
+  const { data: contactRequests } = useQuery<{ incoming: any[]; outgoing: OutgoingRequest[] }>({
+    queryKey: ["contactRequests"],
+    queryFn: () => get("/contacts/requests"),
+  });
+
   const existingContactUserIds = new Set(existingContacts.map((c) => c.contactUser.id));
+  const outgoingRequestIds = new Set((contactRequests?.outgoing ?? []).map((r) => r.recipientId));
 
   const search = (q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -75,20 +88,43 @@ export default function AddContactScreen() {
     };
   }, [query]);
 
-  const addMutation = useMutation({
+  const sendRequestMutation = useMutation({
     mutationFn: (contactUserId: number) => post("/contacts", { contactUserId }),
     onSuccess: (_, contactUserId) => {
-      setAddedIds(prev => new Set([...prev, contactUserId]));
-      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      setRequestedIds(prev => new Set([...prev, contactUserId]));
+      queryClient.invalidateQueries({ queryKey: ["contactRequests"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
     onError: (e: any) => {
-      Alert.alert("Error", e.message || "Failed to add contact. Please try again.");
+      Alert.alert("Error", e.message || "Failed to send request. Please try again.");
+    },
+  });
+
+  const cancelRequestMutation = useMutation({
+    mutationFn: (requestId: number) => del(`/contacts/${requestId}/cancel`),
+    onSuccess: (_, requestId) => {
+      queryClient.invalidateQueries({ queryKey: ["contactRequests"] });
+      const outgoingReq = contactRequests?.outgoing.find(r => r.id === requestId);
+      if (outgoingReq) {
+        setRequestedIds(prev => {
+          const next = new Set(prev);
+          next.delete(outgoingReq.recipientId);
+          return next;
+        });
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to cancel request.");
     },
   });
 
   const renderUser = ({ item }: { item: User }) => {
-    const isAdded = addedIds.has(item.id) || existingContactUserIds.has(item.id);
+    const isContact = existingContactUserIds.has(item.id);
+    const outgoingReq = (contactRequests?.outgoing ?? []).find(r => r.recipientId === item.id);
+    const hasPendingRequest = outgoingRequestIds.has(item.id) || requestedIds.has(item.id);
+    const justRequested = requestedIds.has(item.id) && !outgoingReq;
+
     return (
       <View style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
@@ -102,32 +138,39 @@ export default function AddContactScreen() {
             @{item.username}
           </Text>
         </View>
-        {existingContactUserIds.has(item.id) && !addedIds.has(item.id) ? (
-          <View style={[styles.alreadyTag, { backgroundColor: colors.surfaceAlt }]}>
+
+        {isContact ? (
+          <View style={[styles.statusTag, { backgroundColor: colors.surfaceAlt }]}>
             <Feather name="check" size={13} color={colors.textSecondary} />
-            <Text style={[styles.alreadyTagText, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
+            <Text style={[styles.statusTagText, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
               Contact
             </Text>
           </View>
+        ) : hasPendingRequest || justRequested ? (
+          <Pressable
+            style={({ pressed }) => [styles.pendingBtn, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => {
+              if (outgoingReq) {
+                cancelRequestMutation.mutate(outgoingReq.id);
+              }
+            }}
+            disabled={justRequested || cancelRequestMutation.isPending}
+          >
+            <Feather name="clock" size={13} color={colors.textSecondary} />
+            <Text style={[styles.statusTagText, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
+              {outgoingReq ? "Pending · Cancel" : "Requested"}
+            </Text>
+          </Pressable>
         ) : (
           <Pressable
             style={({ pressed }) => [
               styles.addBtn,
-              {
-                backgroundColor: isAdded ? "#E8F5E9" : colors.accent,
-                opacity: pressed ? 0.85 : 1,
-              },
+              { backgroundColor: colors.accent, opacity: pressed || sendRequestMutation.isPending ? 0.7 : 1 },
             ]}
-            onPress={() => {
-              if (!isAdded) addMutation.mutate(item.id);
-            }}
-            disabled={isAdded || addMutation.isPending}
+            onPress={() => sendRequestMutation.mutate(item.id)}
+            disabled={sendRequestMutation.isPending}
           >
-            <Feather
-              name={isAdded ? "check" : "user-plus"}
-              size={16}
-              color={isAdded ? "#388E3C" : "#fff"}
-            />
+            <Feather name="user-plus" size={16} color="#fff" />
           </Pressable>
         )}
       </View>
@@ -142,7 +185,7 @@ export default function AddContactScreen() {
           <Feather name="x" size={24} color={colors.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-          Add Contact
+          Send Contact Request
         </Text>
         <View style={{ width: 24 }} />
       </View>
@@ -152,7 +195,7 @@ export default function AddContactScreen() {
           <Feather name="search" size={18} color={colors.textSecondary} />
           <TextInput
             style={[styles.searchInput, { color: colors.text, fontFamily: "Inter_400Regular" }]}
-            placeholder="Search by username…"
+            placeholder="Search by username or name…"
             placeholderTextColor={colors.textTertiary}
             value={query}
             onChangeText={setQuery}
@@ -172,6 +215,13 @@ export default function AddContactScreen() {
             : null
           }
         </View>
+      </View>
+
+      <View style={[styles.hintBanner, { backgroundColor: colors.accentSoft }]}>
+        <Feather name="info" size={14} color={colors.accent} />
+        <Text style={[styles.hintText, { color: colors.accent, fontFamily: "Inter_400Regular" }]}>
+          They must accept your request before becoming a contact.
+        </Text>
       </View>
 
       <FlatList
@@ -203,7 +253,7 @@ export default function AddContactScreen() {
             <View style={styles.emptyState}>
               <Feather name="users" size={40} color={colors.textTertiary} />
               <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                Search for people by their username
+                Search for people by username or name
               </Text>
             </View>
           ) : null
@@ -235,6 +285,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   searchInput: { flex: 1, fontSize: 15 },
+  hintBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  hintText: { flex: 1, fontSize: 13, lineHeight: 18 },
   list: { padding: 16, gap: 10 },
   listEmpty: { flex: 1 },
   userCard: {
@@ -250,7 +308,7 @@ const styles = StyleSheet.create({
   userName: { fontSize: 15 },
   userUsername: { fontSize: 13, marginTop: 2 },
   addBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  alreadyTag: {
+  statusTag: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
@@ -258,7 +316,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
-  alreadyTagText: { fontSize: 12 },
+  pendingBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusTagText: { fontSize: 12 },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingTop: 60 },
   emptyText: { fontSize: 14, textAlign: "center", paddingHorizontal: 30 },
 });

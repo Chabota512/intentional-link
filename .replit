@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-24", "postgresql-16"]
 
 [[artifacts]]
 id = "artifacts/api-server"
@@ -31,3 +31,6 @@ timeoutMs = 20000
 TOKEN_SECRET = "focus_token_secret_2024"
 DAILY_API_KEY = "9009d6f514544929a93c31950d239bfb2c9169314a5458ef670b4e86ce152997"
 NEON_DATABASE_URL = "postgresql://neondb_owner:npg_t8nMwPcDYRr5@ep-sparkling-queen-admhi4ox-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+[nix]
+channel = "stable-25_05"

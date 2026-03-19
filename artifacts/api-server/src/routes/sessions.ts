@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, ne } from "drizzle-orm";
 import { db, sessionsTable, sessionParticipantsTable, usersTable } from "@workspace/db";
 import {
   CreateSessionBody,
@@ -80,7 +80,7 @@ router.get("/sessions", async (req, res): Promise<void> => {
   const participantRows = await db
     .select({ sessionId: sessionParticipantsTable.sessionId })
     .from(sessionParticipantsTable)
-    .where(eq(sessionParticipantsTable.userId, userId));
+    .where(and(eq(sessionParticipantsTable.userId, userId), ne(sessionParticipantsTable.status, "declined")));
 
   const participantSessionIds = participantRows.map(r => r.sessionId);
 
@@ -380,6 +380,38 @@ router.post("/sessions/:sessionId/join-link", async (req, res): Promise<void> =>
 
   const result = await getSessionWithParticipants(sessionId);
   res.json(result);
+});
+
+router.post("/sessions/:sessionId/decline", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
+  const sessionId = parseInt(raw, 10);
+
+  const [participant] = await db.select().from(sessionParticipantsTable)
+    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)))
+    .limit(1);
+
+  if (!participant) {
+    res.status(404).json({ error: "You are not invited to this session" });
+    return;
+  }
+
+  if (participant.status === "joined") {
+    res.status(400).json({ error: "You have already joined this session. Use leave instead." });
+    return;
+  }
+
+  await db.update(sessionParticipantsTable)
+    .set({ status: "declined" })
+    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)));
+
+  res.sendStatus(204);
 });
 
 router.delete("/sessions/:sessionId/leave", async (req, res): Promise<void> => {
