@@ -20,13 +20,19 @@ function isOnline(lastSeenAt: Date | null | undefined): boolean {
 router.post("/users/register", async (req, res): Promise<void> => {
   const parsed = RegisterUserBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+    res.status(400).json({ error: "Invalid registration details" });
     return;
   }
 
   const { username, name, password } = parsed.data;
 
-  const existing = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+  let existing: (typeof usersTable.$inferSelect)[];
+  try {
+    existing = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+  } catch {
+    res.status(503).json({ error: "Service temporarily unavailable. Please try again." });
+    return;
+  }
   if (existing.length > 0) {
     res.status(409).json({ error: "Username already taken" });
     return;
@@ -42,7 +48,8 @@ router.post("/users/register", async (req, res): Promise<void> => {
       res.status(409).json({ error: "Username already taken" });
       return;
     }
-    throw err;
+    res.status(503).json({ error: "Service temporarily unavailable. Please try again." });
+    return;
   }
 
   const token = generateToken(user.id);
@@ -60,22 +67,34 @@ router.post("/users/register", async (req, res): Promise<void> => {
 router.post("/users/login", async (req, res): Promise<void> => {
   const parsed = LoginUserBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+    res.status(400).json({ error: "Invalid request" });
     return;
   }
 
   const { username, password } = parsed.data;
 
-  const [user] = await db.select().from(usersTable)
-    .where(or(eq(usersTable.username, username), ilike(usersTable.name, username)))
-    .limit(1);
+  let user: typeof usersTable.$inferSelect | undefined;
+  try {
+    [user] = await db.select().from(usersTable)
+      .where(or(eq(usersTable.username, username), ilike(usersTable.name, username)))
+      .limit(1);
+  } catch {
+    res.status(503).json({ error: "Service temporarily unavailable. Please try again." });
+    return;
+  }
+
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
 
   const now = new Date();
-  await db.update(usersTable).set({ lastSeenAt: now }).where(eq(usersTable.id, user.id));
+  try {
+    await db.update(usersTable).set({ lastSeenAt: now }).where(eq(usersTable.id, user.id));
+  } catch {
+    // non-critical — log but don't fail login
+    console.error("Failed to update lastSeenAt");
+  }
 
   const token = generateToken(user.id);
   res.json(LoginUserResponse.parse({
@@ -198,16 +217,22 @@ router.get("/users/search", async (req, res): Promise<void> => {
     return;
   }
 
-  const users = await db.select({
-    id: usersTable.id,
-    username: usersTable.username,
-    name: usersTable.name,
-    avatarUrl: usersTable.avatarUrl,
-    createdAt: usersTable.createdAt,
-    lastSeenAt: usersTable.lastSeenAt,
-  }).from(usersTable)
-    .where(and(ilike(usersTable.username, `%${q}%`), ne(usersTable.id, userId)))
-    .limit(20);
+  let users;
+  try {
+    users = await db.select({
+      id: usersTable.id,
+      username: usersTable.username,
+      name: usersTable.name,
+      avatarUrl: usersTable.avatarUrl,
+      createdAt: usersTable.createdAt,
+      lastSeenAt: usersTable.lastSeenAt,
+    }).from(usersTable)
+      .where(and(ilike(usersTable.username, `%${q}%`), ne(usersTable.id, userId)))
+      .limit(20);
+  } catch {
+    res.status(503).json({ error: "Search unavailable. Please try again." });
+    return;
+  }
 
   res.json(users.map(u => SearchUsersResponseItem.parse(u)));
 });

@@ -33,9 +33,8 @@ app.use("/api", (_req: Request, res: Response) => {
 });
 
 app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
-  console.error(err);
-  const message = err instanceof Error ? err.message : "Internal server error";
-  res.status(500).json({ error: message });
+  console.error("[API Error]", err);
+  res.status(500).json({ error: "Something went wrong. Please try again." });
 });
 
 export default app;
