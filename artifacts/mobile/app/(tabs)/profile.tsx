@@ -47,7 +47,7 @@ export default function ProfileScreen() {
   const totalSessions = sessions.length;
   const totalContacts = contacts.length;
 
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
   const handleLogout = () => {
@@ -89,7 +89,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 20, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: topPad + 10, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Profile</Text>
         <Pressable
           onPress={openEdit}
@@ -132,7 +132,7 @@ export default function ProfileScreen() {
 
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-            ABOUT FOCUS
+            ABOUT INTENTIONAL LINK
           </Text>
           <View style={styles.infoItem}>
             <Feather name="zap" size={16} color={colors.accent} />
@@ -242,11 +242,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 28, lineHeight: 34 },
+  headerTitle: { fontSize: 24, lineHeight: 30 },
   editBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -256,13 +256,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   editBtnText: { fontSize: 13 },
-  scroll: { padding: 20, gap: 16 },
+  scroll: { padding: 16, gap: 12 },
   profileCard: {
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 28,
+    padding: 20,
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -288,8 +288,8 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
-    paddingTop: 20,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
     width: "100%",
   },

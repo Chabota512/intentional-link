@@ -164,12 +164,12 @@ export default function SessionsScreen() {
     );
   };
 
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 20, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: topPad + 10, borderBottomColor: colors.border }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Sessions</Text>
           <Text style={[styles.headerSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
@@ -321,12 +321,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 28, lineHeight: 34 },
-  headerSub: { fontSize: 13, marginTop: 2 },
+  headerTitle: { fontSize: 24, lineHeight: 30 },
+  headerSub: { fontSize: 12, marginTop: 1 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconBtn: {
     width: 38,
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
   },
   filterText: { fontSize: 13 },
   searchResultCount: { marginLeft: "auto", fontSize: 12 },
-  list: { padding: 16, gap: 12 },
+  list: { padding: 12, gap: 10 },
   listEmpty: { flex: 1 },
   sessionCard: {
     borderRadius: 16,
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   invitedBannerText: { color: "#fff", fontSize: 12 },
-  sessionCardTop: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, paddingBottom: 8 },
+  sessionCardTop: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, paddingBottom: 6 },
   sessionIconBg: {
     width: 40,
     height: 40,
@@ -408,8 +408,8 @@ const styles = StyleSheet.create({
   sessionParticipants: { fontSize: 13 },
   sessionTime: { fontSize: 11 },
   activeDot: { width: 8, height: 8, borderRadius: 4 },
-  sessionDesc: { fontSize: 13, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 8 },
-  sessionFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 14 },
+  sessionDesc: { fontSize: 13, lineHeight: 18, paddingHorizontal: 12, paddingBottom: 6 },
+  sessionFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingBottom: 10 },
   statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusPillText: { fontSize: 11 },
   participantCount: { fontSize: 12 },

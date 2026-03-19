@@ -68,7 +68,7 @@ export default function ContactsScreen() {
     );
   };
 
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
   const renderItem = ({ item }: { item: Contact }) => (
@@ -97,7 +97,7 @@ export default function ContactsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 20, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: topPad + 10, borderBottomColor: colors.border }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Contacts</Text>
           <Text style={[styles.headerSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
@@ -165,12 +165,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 28, lineHeight: 34 },
-  headerSub: { fontSize: 13, marginTop: 2 },
+  headerTitle: { fontSize: 24, lineHeight: 30 },
+  headerSub: { fontSize: 12, marginTop: 1 },
   addBtn: {
     width: 44,
     height: 44,
@@ -183,14 +183,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  list: { padding: 16, gap: 10 },
+  list: { padding: 12, gap: 8 },
   listEmpty: { flex: 1 },
   contactCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    padding: 14,
-    borderRadius: 14,
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
   },
   avatar: {
