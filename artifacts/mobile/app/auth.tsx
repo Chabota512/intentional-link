@@ -101,9 +101,9 @@ export default function AuthScreen() {
         >
           <View style={styles.header}>
             <View style={[styles.logoContainer, { backgroundColor: colors.accent }]}>
-              <Feather name="zap" size={32} color="#FFFFFF" />
+              <Feather name="link-2" size={32} color="#FFFFFF" />
             </View>
-            <Text style={[styles.appName, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Focus</Text>
+            <Text style={[styles.appName, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Intentional Link</Text>
             <Text style={[styles.tagline, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
               Intentional communication
             </Text>

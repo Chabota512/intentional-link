@@ -192,7 +192,7 @@ export default function SessionScreen() {
 
   const shareSessionLink = async () => {
     const link = Linking.createURL(`session/${sessionId}`);
-    const message = `Join my Focus session "${session?.title ?? "Focus Session"}": ${link}`;
+    const message = `Join my Intentional Link session "${session?.title ?? "Session"}": ${link}`;
     try {
       const smsAvailable = await SMS.isAvailableAsync();
       if (smsAvailable) {
@@ -404,7 +404,7 @@ export default function SessionScreen() {
           </Pressable>
           <View style={styles.navCenter}>
             <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
-              {sessionPreview?.title ?? "Focus Session"}
+              {sessionPreview?.title ?? "Session"}
             </Text>
           </View>
           <View style={{ width: 30 }} />

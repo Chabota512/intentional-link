@@ -51,7 +51,7 @@ export default function NewSessionScreen() {
             <Feather name="x" size={24} color={colors.text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-            New Focus Session
+            New Session
           </Text>
           <Pressable
             style={({ pressed }) => [

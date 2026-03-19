@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. The main artifact is the Focus Communication System — a mobile-first app for intentional, distraction-free communication via structured focus sessions.
+pnpm workspace monorepo using TypeScript. The main artifact is Intentional Link — a mobile-first app for intentional, distraction-free communication via structured focus sessions.
 
 ## Stack
 
@@ -109,7 +109,7 @@ artifacts/mobile/
 
 ## App Icon
 
-AI-generated icon: white geometric lightning bolt on an indigo-to-violet gradient background (#4F6EF7 → #7C5CFC). Stored as 1024×1024 master at `artifacts/mobile/assets/images/icon.png`. Resized copies for all target sizes live in `artifacts/mobile/public/icons/`.
+AI-generated icon: two interlocking chain link rings in white on a deep indigo-to-violet gradient background (#4F6EF7 → #7C5CFC). Represents intentional connection. Stored as 1024×1024 master at `artifacts/mobile/assets/images/icon.png`. Resized copies for all target sizes live in `artifacts/mobile/public/icons/`.
 
 ## PWA Setup
 

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Focus",
+    "name": "Intentional Link",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -25,9 +25,9 @@
     },
     "web": {
       "favicon": "./assets/images/icon.png",
-      "name": "Focus",
-      "shortName": "Focus",
-      "description": "Intentional, distraction-free communication sessions",
+      "name": "Intentional Link",
+      "shortName": "Intl. Link",
+      "description": "Meaningful, intentional communication sessions",
       "themeColor": "#4F6EF7",
       "backgroundColor": "#F0F2F8",
       "lang": "en",
@@ -42,8 +42,7 @@
         }
       ],
       "expo-font",
-      "expo-web-browser",
-      "expo-sms"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
