@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, ne } from "drizzle-orm";
+import { eq, ilike, and, ne, or } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import {
   RegisterUserBody,
@@ -66,7 +66,9 @@ router.post("/users/login", async (req, res): Promise<void> => {
 
   const { username, password } = parsed.data;
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+  const [user] = await db.select().from(usersTable)
+    .where(or(eq(usersTable.username, username), ilike(usersTable.name, username)))
+    .limit(1);
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     res.status(401).json({ error: "Invalid credentials" });
     return;

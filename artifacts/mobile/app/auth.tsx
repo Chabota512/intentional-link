@@ -155,7 +155,7 @@ export default function AuthScreen() {
                 <TextInput
                   ref={usernameRef}
                   style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular" }]}
-                  placeholder="Username"
+                  placeholder="Username or name"
                   placeholderTextColor={colors.textTertiary}
                   value={username}
                   onChangeText={setUsername}
