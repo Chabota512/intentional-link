@@ -288,6 +288,8 @@ export default function SessionScreen() {
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: session, isLoading: sessionLoading, error: sessionError } = useQuery<Session>({
     queryKey: ["session", sessionId],
@@ -560,41 +562,71 @@ export default function SessionScreen() {
       return;
     }
     try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+      });
       const { recording: rec } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
       setRecording(rec);
       setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e: any) {
-      Alert.alert("Error", "Could not start recording.");
+    } catch {
+      Alert.alert("Error", "Could not start recording. Make sure microphone access is allowed.");
     }
+  };
+
+  const handleCancelRecording = async () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingSeconds(0);
+    if (recording) {
+      try {
+        await recording.stopAndUnloadAsync();
+      } catch {}
+      setRecording(null);
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
   };
 
   const handleStopRecording = async () => {
     if (!recording) return;
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
     setIsRecording(false);
+    setRecordingSeconds(0);
     try {
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       setRecording(null);
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       if (!uri) return;
 
       const fileName = `voice_${Date.now()}.m4a`;
-      const fileSize = 0;
       const contentType = "audio/m4a";
 
       setUploading(true);
       try {
-        const uploaded = await uploadFile(uri, fileName, fileSize, contentType);
+        const uploaded = await uploadFile(uri, fileName, 0, contentType);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         sendMutation.mutate({
           content: "",
           type: "voice",
           attachmentUrl: uploaded.objectPath,
           attachmentName: fileName,
-          attachmentSize: fileSize,
+          attachmentSize: 0,
         });
       } catch (e: any) {
         Alert.alert("Upload failed", e.message || "Could not upload voice note.");
@@ -896,13 +928,29 @@ export default function SessionScreen() {
             paddingBottom: bottomPad + 8,
           }]}>
             {isRecording ? (
-              <Pressable
-                style={({ pressed }) => [styles.recordingBar, { backgroundColor: colors.danger, opacity: pressed ? 0.85 : 1 }]}
-                onPress={handleStopRecording}
-              >
-                <View style={styles.recordingDot} />
-                <Text style={[styles.recordingText, { fontFamily: "Inter_600SemiBold" }]}>Recording… tap to stop</Text>
-              </Pressable>
+              <View style={styles.recordingRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.recordingCancelBtn, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+                  onPress={handleCancelRecording}
+                >
+                  <Feather name="x" size={18} color={colors.textSecondary} />
+                </Pressable>
+                <View style={[styles.recordingBar, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                  <View style={[styles.recordingDot, { backgroundColor: colors.danger }]} />
+                  <Text style={[styles.recordingText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>
+                    {`${Math.floor(recordingSeconds / 60).toString().padStart(2, "0")}:${(recordingSeconds % 60).toString().padStart(2, "0")}`}
+                  </Text>
+                  <Text style={[styles.recordingLabel, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    Recording…
+                  </Text>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [styles.sendBtn, { backgroundColor: colors.danger, opacity: pressed ? 0.85 : 1 }]}
+                  onPress={handleStopRecording}
+                >
+                  <Feather name="send" size={18} color="#fff" />
+                </Pressable>
+              </View>
             ) : (
               <>
                 <Pressable
@@ -923,16 +971,29 @@ export default function SessionScreen() {
                     maxLength={2000}
                   />
                 </View>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.sendBtn,
-                    { backgroundColor: text.trim() ? colors.accent : colors.surfaceAlt, opacity: pressed ? 0.85 : 1 },
-                  ]}
-                  onPress={handleSend}
-                  disabled={!text.trim() || sendMutation.isPending || uploading}
-                >
-                  <Feather name="send" size={18} color={text.trim() ? "#fff" : colors.textTertiary} />
-                </Pressable>
+                {text.trim() ? (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sendBtn,
+                      { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 },
+                    ]}
+                    onPress={handleSend}
+                    disabled={sendMutation.isPending || uploading}
+                  >
+                    <Feather name="send" size={18} color="#fff" />
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sendBtn,
+                      { backgroundColor: colors.surfaceAlt, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+                    ]}
+                    onPress={handleStartRecording}
+                    disabled={uploading}
+                  >
+                    <Feather name="mic" size={18} color={colors.accent} />
+                  </Pressable>
+                )}
               </>
             )}
           </View>
@@ -981,18 +1042,6 @@ export default function SessionScreen() {
               <View>
                 <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>File</Text>
                 <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Any document or file</Text>
-              </View>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.attachOption, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
-              onPress={handleStartRecording}
-            >
-              <View style={[styles.attachOptionIcon, { backgroundColor: "#FFEBEE" }]}>
-                <Feather name="mic" size={22} color="#C62828" />
-              </View>
-              <View>
-                <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Voice Note</Text>
-                <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Record and send audio</Text>
               </View>
             </Pressable>
             <Pressable
@@ -1308,23 +1357,46 @@ const styles = StyleSheet.create({
     maxHeight: 120,
   },
   input: { fontSize: 15, lineHeight: 21 },
-  sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
+  sendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  recordingRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  recordingCancelBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
   recordingBar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 12,
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 22,
+    borderWidth: 1,
   },
   recordingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#fff",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  recordingText: { color: "#fff", fontSize: 15 },
+  recordingText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  recordingLabel: { fontSize: 13, flex: 1 },
   loadOlderBtn: {
     flexDirection: "row",
     alignItems: "center",
