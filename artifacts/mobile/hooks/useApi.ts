@@ -26,6 +26,7 @@ async function safeJson(res: Response): Promise<unknown> {
 
 export interface UploadedFile {
   objectPath: string;
+  url: string;
   name: string;
   size: number;
   contentType: string;
@@ -88,31 +89,46 @@ export function useApi() {
     }
   };
 
-  const uploadFile = async (fileUri: string, fileName: string, fileSize: number, contentType: string): Promise<UploadedFile> => {
-    const urlRes = await fetch(`${BASE_URL}/api/storage/uploads/request-url`, {
+  const uploadFile = async (
+    fileUri: string,
+    fileName: string,
+    fileSize: number,
+    contentType: string
+  ): Promise<UploadedFile> => {
+    const formData = new FormData();
+
+    const fileBlob = {
+      uri: fileUri,
+      name: fileName,
+      type: contentType,
+    } as any;
+    formData.append("file", fileBlob);
+
+    const authHeaders: Record<string, string> = {
+      "x-user-id": user ? String(user.id) : "",
+      ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+    };
+
+    const res = await fetch(`${BASE_URL}/api/storage/upload`, {
       method: "POST",
-      headers: headers(),
-      body: JSON.stringify({ name: fileName, size: fileSize, contentType }),
+      headers: authHeaders,
+      body: formData,
     });
-    const urlData = await urlRes.json() as any;
-    if (!urlRes.ok) throw new ApiError(urlData?.error || "Failed to get upload URL", urlRes.status);
+    const data = await safeJson(res) as any;
+    if (!res.ok) throw new ApiError(data?.error || "Upload failed", res.status);
 
-    const { uploadURL, objectPath } = urlData;
-
-    const fileRes = await fetch(fileUri);
-    const blob = await fileRes.blob();
-
-    const uploadRes = await fetch(uploadURL, {
-      method: "PUT",
-      headers: { "Content-Type": contentType },
-      body: blob,
-    });
-    if (!uploadRes.ok) throw new ApiError("Upload failed", uploadRes.status);
-
-    return { objectPath, name: fileName, size: fileSize, contentType };
+    return {
+      objectPath: data.url,
+      url: data.url,
+      name: fileName,
+      size: fileSize,
+      contentType,
+    };
   };
 
   const getFileUrl = (objectPath: string): string => {
+    if (objectPath.startsWith("http")) return objectPath;
+    if (objectPath.startsWith("/api")) return `${BASE_URL}${objectPath}`;
     return `${BASE_URL}/api/storage${objectPath}`;
   };
 

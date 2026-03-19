@@ -50,6 +50,7 @@ router.post("/users/register", async (req, res): Promise<void> => {
     id: user.id,
     username: user.username,
     name: user.name,
+    avatarUrl: user.avatarUrl ?? null,
     token,
     createdAt: user.createdAt,
     lastSeenAt: user.lastSeenAt,
@@ -79,6 +80,7 @@ router.post("/users/login", async (req, res): Promise<void> => {
     id: user.id,
     username: user.username,
     name: user.name,
+    avatarUrl: user.avatarUrl ?? null,
     token,
     createdAt: user.createdAt,
     lastSeenAt: now,
@@ -103,6 +105,7 @@ router.get("/users/me", async (req, res): Promise<void> => {
     id: user.id,
     username: user.username,
     name: user.name,
+    avatarUrl: user.avatarUrl ?? null,
     createdAt: user.createdAt,
     lastSeenAt: user.lastSeenAt,
   }));
@@ -116,7 +119,7 @@ router.put("/users/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, username } = req.body ?? {};
+  const { name, username, avatarUrl } = req.body ?? {};
   if (name !== undefined && (typeof name !== "string" || name.trim().length === 0 || name.length > 100)) {
     res.status(400).json({ error: "Invalid name" });
     return;
@@ -125,8 +128,12 @@ router.put("/users/me", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid username (2–50 chars)" });
     return;
   }
+  if (avatarUrl !== undefined && avatarUrl !== null && typeof avatarUrl !== "string") {
+    res.status(400).json({ error: "Invalid avatarUrl" });
+    return;
+  }
 
-  const updates: Record<string, string> = {};
+  const updates: Record<string, string | null> = {};
   if (name) updates.name = name.trim();
   if (username) {
     const existing = await db.select().from(usersTable)
@@ -138,6 +145,7 @@ router.put("/users/me", async (req, res): Promise<void> => {
     }
     updates.username = username.trim();
   }
+  if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No fields to update" });
@@ -150,7 +158,14 @@ router.put("/users/me", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({ id: user.id, username: user.username, name: user.name, createdAt: user.createdAt, lastSeenAt: user.lastSeenAt });
+  res.json({
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    avatarUrl: user.avatarUrl ?? null,
+    createdAt: user.createdAt,
+    lastSeenAt: user.lastSeenAt,
+  });
 });
 
 router.post("/users/heartbeat", async (req, res): Promise<void> => {
@@ -184,6 +199,7 @@ router.get("/users/search", async (req, res): Promise<void> => {
     id: usersTable.id,
     username: usersTable.username,
     name: usersTable.name,
+    avatarUrl: usersTable.avatarUrl,
     createdAt: usersTable.createdAt,
     lastSeenAt: usersTable.lastSeenAt,
   }).from(usersTable)

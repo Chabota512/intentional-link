@@ -15,6 +15,7 @@ export interface AuthUser {
   username: string;
   name: string;
   token: string;
+  avatarUrl?: string | null;
 }
 
 interface AuthContextValue {
@@ -23,7 +24,7 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, name: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (updates: { name?: string; username?: string }) => Promise<void>;
+  updateUser: (updates: { name?: string; username?: string; avatarUrl?: string | null }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: data.username,
       name: data.name,
       token: data.token,
+      avatarUrl: data.avatarUrl ?? null,
     };
     await AsyncStorage.setItem("focus_user", JSON.stringify(authUser));
     setUser(authUser);
@@ -74,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: data.username,
       name: data.name,
       token: data.token,
+      avatarUrl: data.avatarUrl ?? null,
     };
     await AsyncStorage.setItem("focus_user", JSON.stringify(authUser));
     setUser(authUser);
@@ -84,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const updateUser = async (updates: { name?: string; username?: string }) => {
+  const updateUser = async (updates: { name?: string; username?: string; avatarUrl?: string | null }) => {
     if (!user) throw new Error("Not logged in");
     const res = await fetch(`${BASE_URL}/api/users/me`, {
       method: "PUT",
@@ -101,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...user,
       name: data.name ?? user.name,
       username: data.username ?? user.username,
+      avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl : user.avatarUrl,
     };
     await AsyncStorage.setItem("focus_user", JSON.stringify(updated));
     setUser(updated);

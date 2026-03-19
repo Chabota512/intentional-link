@@ -11,25 +11,30 @@ import {
   Modal,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
 import { useApi } from "@/hooks/useApi";
 
+const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, logout, updateUser } = useAuth();
-  const { get } = useApi();
+  const { get, uploadFile } = useApi();
   const [showEdit, setShowEdit] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editUsername, setEditUsername] = useState(user?.username ?? "");
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const { data: sessions = [] } = useQuery<{ id: number; status: string }[]>({
     queryKey: ["sessions"],
@@ -85,6 +90,46 @@ export default function ProfileScreen() {
     }
   };
 
+  const handlePickAvatar = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow access to your photo library.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    setUploadingAvatar(true);
+    try {
+      const ext = asset.uri.split(".").pop() ?? "jpg";
+      const contentType = `image/${ext === "jpg" ? "jpeg" : ext}`;
+      const fileName = `avatar.${ext}`;
+      const fileSize = asset.fileSize ?? 0;
+
+      const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
+      await updateUser({ avatarUrl: uploaded.url });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to upload avatar");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const avatarUrl = user?.avatarUrl
+    ? user.avatarUrl.startsWith("http")
+      ? user.avatarUrl
+      : `${BASE_URL}${user.avatarUrl}`
+    : null;
+
   const initial = user?.name?.charAt(0).toUpperCase() ?? "?";
 
   return (
@@ -105,9 +150,21 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.avatarText, { fontFamily: "Inter_700Bold" }]}>{initial}</Text>
-          </View>
+          <Pressable onPress={handlePickAvatar} disabled={uploadingAvatar} style={styles.avatarWrapper}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={[styles.avatar, styles.avatarImage]} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.avatarText, { fontFamily: "Inter_700Bold" }]}>{initial}</Text>
+              </View>
+            )}
+            <View style={[styles.avatarEditBadge, { backgroundColor: colors.accent }]}>
+              {uploadingAvatar
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Feather name="camera" size={12} color="#fff" />
+              }
+            </View>
+          </Pressable>
           <Text style={[styles.name, { color: colors.text, fontFamily: "Inter_700Bold" }]}>{user?.name}</Text>
           <Text style={[styles.username, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
             @{user?.username}
@@ -187,11 +244,22 @@ export default function ProfileScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
-              <View style={[styles.modalAvatarWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={[styles.modalAvatar, { backgroundColor: colors.accent }]}>
-                  <Text style={[styles.avatarText, { fontFamily: "Inter_700Bold" }]}>{editName.charAt(0).toUpperCase() || "?"}</Text>
-                </View>
-              </View>
+              <Pressable
+                onPress={handlePickAvatar}
+                disabled={uploadingAvatar}
+                style={[styles.modalAvatarWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={[styles.modalAvatar, styles.avatarImage]} />
+                ) : (
+                  <View style={[styles.modalAvatar, { backgroundColor: colors.accent }]}>
+                    <Text style={[styles.avatarText, { fontFamily: "Inter_700Bold" }]}>{editName.charAt(0).toUpperCase() || "?"}</Text>
+                  </View>
+                )}
+                <Text style={[styles.changePhotoText, { color: colors.accent, fontFamily: "Inter_500Medium" }]}>
+                  {uploadingAvatar ? "Uploading..." : "Change Photo"}
+                </Text>
+              </Pressable>
 
               <View style={styles.fieldGroup}>
                 <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>Display Name</Text>
@@ -269,18 +337,38 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  avatarWrapper: {
+    position: "relative",
+    marginBottom: 8,
+  },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
     shadowColor: "#4F6EF7",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 5,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarEditBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   avatarText: { fontSize: 32, color: "#fff" },
   name: { fontSize: 22 },
@@ -335,6 +423,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 24,
     alignItems: "center",
+    gap: 12,
   },
   modalAvatar: {
     width: 72,
@@ -343,6 +432,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  changePhotoText: { fontSize: 14 },
   fieldGroup: { gap: 6 },
   fieldLabel: { fontSize: 12, letterSpacing: 0.5, textTransform: "uppercase" },
   fieldInput: {

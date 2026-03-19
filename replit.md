@@ -12,7 +12,7 @@ pnpm workspace monorepo using TypeScript. The main artifact is Intentional Link 
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
 - **Database**: Neon PostgreSQL + Drizzle ORM (NEON_DATABASE_URL env var)
-- **File storage**: Replit Object Storage (GCS-backed, presigned URL uploads)
+- **File storage**: PostgreSQL bytea (uploads stored directly in Neon DB, fully independent of Replit)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
@@ -50,17 +50,18 @@ artifacts-monorepo/
 - **Tab navigation**: Sessions, Contacts, Profile
 - **Invite UI**: Creator can invite contacts from inside a session via a People sheet
 - **Participants panel**: Tap participant count to see all participants, their status and online presence
-- **Profile editing**: Users can edit their name and username from the Profile tab
+- **Profile editing**: Users can edit their name, username, and profile picture from the Profile tab
 - **Tab badge**: Sessions tab shows a badge count for pending invites
 - **Message status**: Own messages show delivery tick indicator
 
 ## Database Schema (Drizzle ORM)
 
-- `users` — id, username, name, passwordHash, createdAt, **lastSeenAt**
+- `users` — id, username, name, passwordHash, **avatarUrl**, createdAt, **lastSeenAt**
 - `contacts` — id, userId, contactUserId, createdAt
 - `sessions` — id, title, description, creatorId, status, createdAt, endedAt
 - `session_participants` — id, sessionId, userId, status (invited|joined)
 - `messages` — id, sessionId, senderId, content, **type** (text|image|file|voice), **attachmentUrl**, **attachmentName**, **attachmentSize**, status, createdAt
+- `uploads` — id (uuid), data (bytea), contentType, filename, fileSize, uploadedBy (FK→users), createdAt
 
 ## API Routes
 
@@ -80,9 +81,8 @@ All at `/api/*`:
 - `POST /sessions/:id/join` — join session
 - `GET/POST /sessions/:id/messages` — list/send messages (supports type + attachment fields)
 - `GET /sessions/:id/messages/poll?since=` — poll for new messages
-- `POST /storage/uploads/request-url` — get presigned upload URL for media files
-- `GET /storage/objects/*` — serve uploaded media files
-- `GET /storage/public-objects/*` — serve public assets
+- `POST /storage/upload` — multipart upload; stores file as bytea in DB, returns `{ uploadId, url }`
+- `GET /storage/uploads/:id` — stream file from DB by upload UUID
 
 ## Auth mechanism
 
@@ -117,12 +117,15 @@ artifacts/mobile/
     └── lastSeen.ts          # isOnline(), formatLastSeen() helpers
 ```
 
-## Object Storage
+## File Storage (Database-backed)
 
-- Bucket provisioned via Replit Object Storage
-- Upload flow: client requests presigned URL → uploads file directly to GCS → sends objectPath in message
-- Server files: `artifacts/api-server/src/lib/objectStorage.ts`, `objectAcl.ts`, `routes/storage.ts`
-- Serving: `GET /api/storage/objects/<path>` streams file from GCS
+- Files stored as `bytea` in the `uploads` table in Neon PostgreSQL
+- Fully independent of Replit — no GCS or object storage bucket needed
+- Upload flow: client POSTs multipart form (`POST /api/storage/upload`) → stored in DB → returns `/api/storage/uploads/:id` URL
+- Serving: `GET /api/storage/uploads/:id` reads from DB and streams bytes to client
+- Max file size: 50MB per upload (configurable in multer options)
+- Profile pictures: stored as uploads, URL saved in `users.avatar_url`
+- Server files: `artifacts/api-server/src/routes/storage.ts`, `lib/db/src/schema/uploads.ts`
 
 ## Color Palette
 

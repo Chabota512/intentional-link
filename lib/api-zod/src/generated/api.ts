@@ -37,6 +37,7 @@ export const LoginUserResponse = zod.object({
   username: zod.string(),
   name: zod.string(),
   token: zod.string(),
+  avatarUrl: zod.string().nullable().optional(),
   createdAt: zod.date(),
   lastSeenAt: zod.date().nullable().optional(),
 });
@@ -52,6 +53,7 @@ export const GetMeResponse = zod.object({
   id: zod.number(),
   username: zod.string(),
   name: zod.string(),
+  avatarUrl: zod.string().nullable().optional(),
   createdAt: zod.date(),
   lastSeenAt: zod.date().nullable().optional(),
 });
@@ -71,6 +73,7 @@ export const SearchUsersResponseItem = zod.object({
   id: zod.number(),
   username: zod.string(),
   name: zod.string(),
+  avatarUrl: zod.string().nullable().optional(),
   createdAt: zod.date(),
   lastSeenAt: zod.date().nullable().optional(),
 });
