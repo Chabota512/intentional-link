@@ -40,6 +40,7 @@ router.get("/contacts", async (req, res): Promise<void> => {
       contactUserId: contactsTable.contactUserId,
       contactName: usersTable.name,
       contactUsername: usersTable.username,
+      contactAvatarUrl: usersTable.avatarUrl,
       contactCreatedAt: usersTable.createdAt,
       contactLastSeenAt: usersTable.lastSeenAt,
     })
@@ -55,6 +56,7 @@ router.get("/contacts", async (req, res): Promise<void> => {
       id: r.contactUserId,
       name: r.contactName,
       username: r.contactUsername,
+      avatarUrl: r.contactAvatarUrl ?? null,
       createdAt: r.contactCreatedAt,
       lastSeenAt: r.contactLastSeenAt,
     },
@@ -75,6 +77,7 @@ router.get("/contacts/requests", async (req, res): Promise<void> => {
       createdAt: contactsTable.createdAt,
       senderName: usersTable.name,
       senderUsername: usersTable.username,
+      senderAvatarUrl: usersTable.avatarUrl,
       senderCreatedAt: usersTable.createdAt,
       senderLastSeenAt: usersTable.lastSeenAt,
     })
@@ -90,6 +93,7 @@ router.get("/contacts/requests", async (req, res): Promise<void> => {
       createdAt: contactsTable.createdAt,
       recipientName: usersTable.name,
       recipientUsername: usersTable.username,
+      recipientAvatarUrl: usersTable.avatarUrl,
     })
     .from(contactsTable)
     .innerJoin(usersTable, eq(contactsTable.contactUserId, usersTable.id))
@@ -101,6 +105,7 @@ router.get("/contacts/requests", async (req, res): Promise<void> => {
       senderId: r.userId,
       senderName: r.senderName,
       senderUsername: r.senderUsername,
+      senderAvatarUrl: r.senderAvatarUrl ?? null,
       createdAt: r.createdAt,
     })),
     outgoing: outgoing.map(r => ({
@@ -108,6 +113,7 @@ router.get("/contacts/requests", async (req, res): Promise<void> => {
       recipientId: r.contactUserId,
       recipientName: r.recipientName,
       recipientUsername: r.recipientUsername,
+      recipientAvatarUrl: r.recipientAvatarUrl ?? null,
       createdAt: r.createdAt,
     })),
   });

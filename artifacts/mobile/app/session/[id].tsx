@@ -33,11 +33,13 @@ import { useAuth } from "@/context/AuthContext";
 import { confirmAction } from "@/utils/confirm";
 import { formatTime, formatRelative } from "@/utils/date";
 import { isOnline, formatLastSeen } from "@/utils/lastSeen";
+import UserAvatar from "@/components/UserAvatar";
 
 interface User {
   id: number;
   name: string;
   username: string;
+  avatarUrl?: string | null;
   lastSeenAt?: string | null;
 }
 
@@ -149,10 +151,12 @@ function VoicePlayer({ url, colors }: { url: string; colors: any }) {
   );
 }
 
-function MessageBubble({ message, isOwn, showSender, colors, getFileUrl }: {
+function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
+  showAvatar: boolean;
+  currentUser: User | null;
   colors: ReturnType<typeof import("@/hooks/useTheme").useTheme>["colors"];
   getFileUrl: (path: string) => string;
 }) {
@@ -209,6 +213,8 @@ function MessageBubble({ message, isOwn, showSender, colors, getFileUrl }: {
     );
   };
 
+  const avatarPlaceholder = <View style={{ width: 30 }} />;
+
   return (
     <Animated.View
       entering={FadeInDown.duration(200)}
@@ -218,11 +224,9 @@ function MessageBubble({ message, isOwn, showSender, colors, getFileUrl }: {
       ]}
     >
       {!isOwn && (
-        <View style={[styles.senderAvatar, { backgroundColor: colors.accentSoft }]}>
-          <Text style={[styles.senderAvatarText, { color: colors.accent }]}>
-            {message.sender.name.charAt(0).toUpperCase()}
-          </Text>
-        </View>
+        showAvatar
+          ? <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} />
+          : avatarPlaceholder
       )}
       <View style={{ maxWidth: "75%", gap: 3 }}>
         {showSender && !isOwn && (
@@ -260,6 +264,11 @@ function MessageBubble({ message, isOwn, showSender, colors, getFileUrl }: {
           ) : null}
         </View>
       </View>
+      {isOwn && (
+        showAvatar
+          ? <UserAvatar name={currentUser?.name ?? "?"} avatarUrl={currentUser?.avatarUrl} size={30} style={styles.senderAvatar} />
+          : avatarPlaceholder
+      )}
     </Animated.View>
   );
 }
@@ -289,6 +298,7 @@ export default function SessionScreen() {
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isRecordingPaused, setIsRecordingPaused] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [inputHeight, setInputHeight] = useState(21);
@@ -603,6 +613,7 @@ export default function SessionScreen() {
       recordingTimerRef.current = null;
     }
     setIsRecording(false);
+    setIsRecordingPaused(false);
     setRecordingSeconds(0);
     if (recording) {
       try {
@@ -614,6 +625,35 @@ export default function SessionScreen() {
     await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
   };
 
+  const handlePauseRecording = async () => {
+    if (!recording) return;
+    try {
+      await recording.pauseAsync();
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      setIsRecordingPaused(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      Alert.alert("Error", "Could not pause recording.");
+    }
+  };
+
+  const handleResumeRecording = async () => {
+    if (!recording) return;
+    try {
+      await recording.startAsync();
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+      setIsRecordingPaused(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {
+      Alert.alert("Error", "Could not resume recording.");
+    }
+  };
+
   const handleStopRecording = async () => {
     if (!recording) return;
     if (recordingTimerRef.current) {
@@ -621,6 +661,7 @@ export default function SessionScreen() {
       recordingTimerRef.current = null;
     }
     setIsRecording(false);
+    setIsRecordingPaused(false);
     setRecordingSeconds(0);
     try {
       await recording.stopAndUnloadAsync();
@@ -898,12 +939,16 @@ export default function SessionScreen() {
             renderItem={({ item, index }) => {
               const isOwn = item.senderId === user?.id;
               const prev = messages[index - 1];
+              const next = messages[index + 1];
               const showSender = !prev || prev.senderId !== item.senderId;
+              const showAvatar = !next || next.senderId !== item.senderId;
               return (
                 <MessageBubble
                   message={item}
                   isOwn={isOwn}
                   showSender={showSender}
+                  showAvatar={showAvatar}
+                  currentUser={user ?? null}
                   colors={colors}
                   getFileUrl={getFileUrl}
                 />
@@ -970,16 +1015,25 @@ export default function SessionScreen() {
                   <Feather name="x" size={18} color={colors.textSecondary} />
                 </Pressable>
                 <View style={[styles.recordingBar, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-                  <View style={[styles.recordingDot, { backgroundColor: colors.danger }]} />
+                  <View style={[styles.recordingDot, {
+                    backgroundColor: isRecordingPaused ? colors.textTertiary : colors.danger,
+                    opacity: isRecordingPaused ? 1 : 1,
+                  }]} />
                   <Text style={[styles.recordingText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>
                     {`${Math.floor(recordingSeconds / 60).toString().padStart(2, "0")}:${(recordingSeconds % 60).toString().padStart(2, "0")}`}
                   </Text>
                   <Text style={[styles.recordingLabel, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                    Recording…
+                    {isRecordingPaused ? "Paused" : "Recording…"}
                   </Text>
                 </View>
                 <Pressable
-                  style={({ pressed }) => [styles.sendBtn, { backgroundColor: colors.danger, opacity: pressed ? 0.85 : 1 }]}
+                  style={({ pressed }) => [styles.recordingPauseBtn, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+                  onPress={isRecordingPaused ? handleResumeRecording : handlePauseRecording}
+                >
+                  <Feather name={isRecordingPaused ? "play" : "pause"} size={18} color={colors.accent} />
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.sendBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
                   onPress={handleStopRecording}
                 >
                   <Feather name="send" size={18} color="#fff" />
@@ -1434,6 +1488,14 @@ const styles = StyleSheet.create({
   },
   recordingText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   recordingLabel: { fontSize: 13, flex: 1 },
+  recordingPauseBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   loadOlderBtn: {
     flexDirection: "row",
     alignItems: "center",

@@ -10,7 +10,9 @@ import {
   Alert,
   Platform,
   ScrollView,
+  Image,
 } from "react-native";
+import UserAvatar from "@/components/UserAvatar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -25,6 +27,7 @@ interface ContactUser {
   id: number;
   name: string;
   username: string;
+  avatarUrl?: string | null;
   lastSeenAt?: string | null;
 }
 
@@ -40,6 +43,7 @@ interface IncomingRequest {
   senderId: number;
   senderName: string;
   senderUsername: string;
+  senderAvatarUrl?: string | null;
   createdAt: string;
 }
 
@@ -48,6 +52,7 @@ interface OutgoingRequest {
   recipientId: number;
   recipientName: string;
   recipientUsername: string;
+  recipientAvatarUrl?: string | null;
   createdAt: string;
 }
 
@@ -143,11 +148,7 @@ export default function ContactsScreen() {
     return (
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={{ position: "relative" }}>
-          <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
-            <Text style={[styles.avatarText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-              {item.contactUser.name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          <UserAvatar name={item.contactUser.name} avatarUrl={item.contactUser.avatarUrl} size={44} />
           {online && (
             <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
           )}
@@ -178,11 +179,7 @@ export default function ContactsScreen() {
 
   const renderIncoming = ({ item }: { item: IncomingRequest }) => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.accent + "44", borderWidth: 1.5 }]}>
-      <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
-        <Text style={[styles.avatarText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-          {item.senderName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      <UserAvatar name={item.senderName} avatarUrl={item.senderAvatarUrl} size={44} />
       <View style={{ flex: 1 }}>
         <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
           {item.senderName}
@@ -217,11 +214,7 @@ export default function ContactsScreen() {
 
   const renderOutgoing = ({ item }: { item: OutgoingRequest }) => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.avatar, { backgroundColor: colors.surfaceAlt }]}>
-        <Text style={[styles.avatarText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-          {item.recipientName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      <UserAvatar name={item.recipientName} avatarUrl={item.recipientAvatarUrl} size={44} />
       <View style={{ flex: 1 }}>
         <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
           {item.recipientName}

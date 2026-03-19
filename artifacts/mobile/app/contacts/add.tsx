@@ -18,11 +18,13 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
+import UserAvatar from "@/components/UserAvatar";
 
 interface User {
   id: number;
   name: string;
   username: string;
+  avatarUrl?: string | null;
 }
 
 interface Contact {
@@ -127,11 +129,7 @@ export default function AddContactScreen() {
 
     return (
       <View style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
-          <Text style={[styles.avatarText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-            {item.name.charAt(0).toUpperCase()}
-          </Text>
-        </View>
+        <UserAvatar name={item.name} avatarUrl={item.avatarUrl} size={44} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.userName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>{item.name}</Text>
           <Text style={[styles.userUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>

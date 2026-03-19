@@ -34,6 +34,7 @@ async function formatMessages(msgs: (typeof messagesTable.$inferSelect)[]) {
     id: usersTable.id,
     name: usersTable.name,
     username: usersTable.username,
+    avatarUrl: usersTable.avatarUrl,
     createdAt: usersTable.createdAt,
     lastSeenAt: usersTable.lastSeenAt,
   }).from(usersTable).where(inArray(usersTable.id, senderIds));

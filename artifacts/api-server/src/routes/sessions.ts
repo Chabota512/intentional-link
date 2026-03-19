@@ -22,6 +22,7 @@ async function getSessionWithParticipants(sessionId: number) {
       status: sessionParticipantsTable.status,
       userName: usersTable.name,
       userUsername: usersTable.username,
+      userAvatarUrl: usersTable.avatarUrl,
       userCreatedAt: usersTable.createdAt,
       userLastSeenAt: usersTable.lastSeenAt,
     })
@@ -33,6 +34,7 @@ async function getSessionWithParticipants(sessionId: number) {
     id: usersTable.id,
     name: usersTable.name,
     username: usersTable.username,
+    avatarUrl: usersTable.avatarUrl,
     lastSeenAt: usersTable.lastSeenAt,
   }).from(usersTable).where(eq(usersTable.id, session.creatorId)).limit(1);
 
@@ -43,11 +45,11 @@ async function getSessionWithParticipants(sessionId: number) {
       userId: p.userId,
       sessionId: p.sessionId,
       status: p.status,
-      user: { id: p.userId, name: p.userName, username: p.userUsername, createdAt: p.userCreatedAt, lastSeenAt: p.userLastSeenAt },
+      user: { id: p.userId, name: p.userName, username: p.userUsername, avatarUrl: p.userAvatarUrl ?? null, createdAt: p.userCreatedAt, lastSeenAt: p.userLastSeenAt },
     })),
   });
 
-  return { ...parsed, creator: creator ?? null };
+  return { ...parsed, creator: creator ? { ...creator, avatarUrl: creator.avatarUrl ?? null } : null };
 }
 
 async function getSessionMembership(sessionId: number, userId: number) {
