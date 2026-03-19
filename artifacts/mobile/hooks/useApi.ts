@@ -11,6 +11,19 @@ export class ApiError extends Error {
   }
 }
 
+async function safeJson(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError(
+      res.ok ? "Unexpected server response" : `Server error (${res.status})`,
+      res.status
+    );
+  }
+}
+
 export function useApi() {
   const { user } = useAuth();
 
@@ -22,8 +35,8 @@ export function useApi() {
 
   const get = async (path: string) => {
     const res = await fetch(`${BASE_URL}/api${path}`, { headers: headers() });
-    const data = await res.json();
-    if (!res.ok) throw new ApiError(data.error || "Request failed", res.status);
+    const data = await safeJson(res) as any;
+    if (!res.ok) throw new ApiError(data?.error || "Request failed", res.status);
     return data;
   };
 
@@ -33,8 +46,8 @@ export function useApi() {
       headers: headers(),
       body: body ? JSON.stringify(body) : undefined,
     });
-    const data = await res.json();
-    if (!res.ok) throw new ApiError(data.error || "Request failed", res.status);
+    const data = await safeJson(res) as any;
+    if (!res.ok) throw new ApiError(data?.error || "Request failed", res.status);
     return data;
   };
 
@@ -44,8 +57,8 @@ export function useApi() {
       headers: headers(),
       body: body ? JSON.stringify(body) : undefined,
     });
-    const data = await res.json();
-    if (!res.ok) throw new ApiError(data.error || "Request failed", res.status);
+    const data = await safeJson(res) as any;
+    if (!res.ok) throw new ApiError(data?.error || "Request failed", res.status);
     return data;
   };
 
@@ -55,16 +68,16 @@ export function useApi() {
       headers: headers(),
       body: body ? JSON.stringify(body) : undefined,
     });
-    const data = await res.json();
-    if (!res.ok) throw new ApiError(data.error || "Request failed", res.status);
+    const data = await safeJson(res) as any;
+    if (!res.ok) throw new ApiError(data?.error || "Request failed", res.status);
     return data;
   };
 
   const del = async (path: string) => {
     const res = await fetch(`${BASE_URL}/api${path}`, { method: "DELETE", headers: headers() });
     if (!res.ok) {
-      const data = await res.json();
-      throw new ApiError(data.error || "Request failed", res.status);
+      const data = await safeJson(res) as any;
+      throw new ApiError(data?.error || "Request failed", res.status);
     }
   };
 

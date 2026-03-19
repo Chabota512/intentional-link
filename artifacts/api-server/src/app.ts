@@ -28,6 +28,10 @@ app.use("/api", (req: Request, res: Response, next: NextFunction) => {
 
 app.use("/api", router);
 
+app.use("/api", (_req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
+});
+
 app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   const message = err instanceof Error ? err.message : "Internal server error";

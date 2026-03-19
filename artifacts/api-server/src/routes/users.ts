@@ -157,7 +157,7 @@ router.get("/users/search", async (req, res): Promise<void> => {
     name: usersTable.name,
     createdAt: usersTable.createdAt,
   }).from(usersTable)
-    .where(ilike(usersTable.username, `%${q}%`))
+    .where(and(ilike(usersTable.username, `%${q}%`), ne(usersTable.id, userId)))
     .limit(20);
 
   res.json(users.map(u => SearchUsersResponseItem.parse(u)));
