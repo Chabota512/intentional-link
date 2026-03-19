@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, lt, gt, ne, desc, inArray } from "drizzle-orm";
-import { db, messagesTable, usersTable, sessionsTable, sessionParticipantsTable } from "@workspace/db";
+import { db, messagesTable, usersTable, sessionsTable, sessionParticipantsTable, messageReactionsTable } from "@workspace/db";
 import { SendMessageBody, GetMessagesResponseItem } from "@workspace/api-zod";
 import { sendPushNotifications } from "../lib/pushNotifications";
 
@@ -30,22 +30,46 @@ async function formatMessages(msgs: (typeof messagesTable.$inferSelect)[]) {
   if (msgs.length === 0) return [];
 
   const senderIds = [...new Set(msgs.map(m => m.senderId))];
+  const msgIds = msgs.map(m => m.id);
 
-  const senders = await db.select({
-    id: usersTable.id,
-    name: usersTable.name,
-    username: usersTable.username,
-    avatarUrl: usersTable.avatarUrl,
-    createdAt: usersTable.createdAt,
-    lastSeenAt: usersTable.lastSeenAt,
-  }).from(usersTable).where(inArray(usersTable.id, senderIds));
+  const [senders, allReactions] = await Promise.all([
+    db.select({
+      id: usersTable.id,
+      name: usersTable.name,
+      username: usersTable.username,
+      avatarUrl: usersTable.avatarUrl,
+      createdAt: usersTable.createdAt,
+      lastSeenAt: usersTable.lastSeenAt,
+    }).from(usersTable).where(inArray(usersTable.id, senderIds)),
+    db.select({
+      messageId: messageReactionsTable.messageId,
+      userId: messageReactionsTable.userId,
+      emoji: messageReactionsTable.emoji,
+    }).from(messageReactionsTable).where(inArray(messageReactionsTable.messageId, msgIds)),
+  ]);
 
   const senderMap = new Map(senders.map(s => [s.id, s]));
 
-  return msgs.map(m => GetMessagesResponseItem.parse({
-    ...m,
-    sender: senderMap.get(m.senderId) ?? { id: m.senderId, name: "Unknown", username: "unknown", createdAt: new Date(), lastSeenAt: null },
-  }));
+  const reactionsMap = new Map<number, Map<string, number[]>>();
+  for (const r of allReactions) {
+    if (!reactionsMap.has(r.messageId)) reactionsMap.set(r.messageId, new Map());
+    const emojiMap = reactionsMap.get(r.messageId)!;
+    if (!emojiMap.has(r.emoji)) emojiMap.set(r.emoji, []);
+    emojiMap.get(r.emoji)!.push(r.userId);
+  }
+
+  return msgs.map(m => {
+    const emojiMap = reactionsMap.get(m.id);
+    const reactions = emojiMap
+      ? Array.from(emojiMap.entries()).map(([emoji, userIds]) => ({ emoji, count: userIds.length, userIds }))
+      : [];
+
+    return GetMessagesResponseItem.parse({
+      ...m,
+      reactions,
+      sender: senderMap.get(m.senderId) ?? { id: m.senderId, name: "Unknown", username: "unknown", createdAt: new Date(), lastSeenAt: null },
+    });
+  });
 }
 
 router.get("/sessions/:sessionId/messages", async (req, res): Promise<void> => {
@@ -254,6 +278,47 @@ router.post("/sessions/:sessionId/messages/:messageId/play", async (req, res): P
     );
 
   res.json({ ok: true });
+});
+
+router.post("/sessions/:sessionId/messages/:messageId/react", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
+  const sessionId = parseInt(raw, 10);
+  const messageId = parseInt(req.params.messageId, 10);
+  const { emoji } = req.body;
+
+  if (!emoji || typeof emoji !== "string") {
+    res.status(400).json({ error: "emoji is required" });
+    return;
+  }
+
+  if (!(await canAccessSession(sessionId, userId))) {
+    res.status(403).json({ error: "You do not have access to this session" });
+    return;
+  }
+
+  const [existing] = await db.select({ id: messageReactionsTable.id })
+    .from(messageReactionsTable)
+    .where(and(
+      eq(messageReactionsTable.messageId, messageId),
+      eq(messageReactionsTable.userId, userId),
+      eq(messageReactionsTable.emoji, emoji)
+    ))
+    .limit(1);
+
+  if (existing) {
+    await db.delete(messageReactionsTable).where(eq(messageReactionsTable.id, existing.id));
+    res.json({ action: "removed" });
+  } else {
+    await db.insert(messageReactionsTable).values({ messageId, userId, emoji });
+    res.json({ action: "added" });
+  }
 });
 
 export default router;

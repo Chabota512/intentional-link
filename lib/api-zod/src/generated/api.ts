@@ -342,6 +342,12 @@ export const GetMessagesHeader = zod.object({
   "x-user-id": zod.string(),
 });
 
+export const ReactionItem = zod.object({
+  emoji: zod.string(),
+  count: zod.number(),
+  userIds: zod.array(zod.number()),
+});
+
 export const GetMessagesResponseItem = zod.object({
   id: zod.number(),
   sessionId: zod.number(),
@@ -360,6 +366,7 @@ export const GetMessagesResponseItem = zod.object({
     createdAt: zod.date(),
     lastSeenAt: zod.date().nullable().optional(),
   }),
+  reactions: zod.array(ReactionItem).optional().default([]),
 });
 export const GetMessagesResponse = zod.array(GetMessagesResponseItem);
 
@@ -415,6 +422,7 @@ export const PollMessagesResponseItem = zod.object({
     createdAt: zod.date(),
     lastSeenAt: zod.date().nullable().optional(),
   }),
+  reactions: zod.array(ReactionItem).optional().default([]),
 });
 export const PollMessagesResponse = zod.array(PollMessagesResponseItem);
 

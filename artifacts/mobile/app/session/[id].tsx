@@ -44,6 +44,12 @@ interface User {
   lastSeenAt?: string | null;
 }
 
+interface Reaction {
+  emoji: string;
+  count: number;
+  userIds: number[];
+}
+
 interface Message {
   id: number;
   sessionId: number;
@@ -56,6 +62,7 @@ interface Message {
   status: string;
   createdAt: string;
   sender: User;
+  reactions?: Reaction[];
 }
 
 interface Participant {
@@ -276,7 +283,9 @@ function VoicePlayer({
   );
 }
 
-function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed }: {
+const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🙏", "👍"];
+
+function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
@@ -285,6 +294,8 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
   colors: ReturnType<typeof import("@/hooks/useTheme").useTheme>["colors"];
   getFileUrl: (path: string) => string;
   onPlayed?: () => void;
+  onLongPress?: () => void;
+  onReact?: (emoji: string) => void;
 }) {
   const renderContent = () => {
     if (message.type === "image" && message.attachmentUrl) {
@@ -349,6 +360,8 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
   };
 
   const avatarPlaceholder = <View style={{ width: 30 }} />;
+  const reactions = message.reactions ?? [];
+  const currentUserId = currentUser?.id;
 
   return (
     <Animated.View
@@ -374,17 +387,49 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
             )}
           </View>
         )}
-        <View
-          style={[
-            styles.bubble,
-            message.type === "image" ? styles.bubbleImage : null,
-            isOwn
-              ? [styles.bubbleOwn, { backgroundColor: colors.messageBubbleOwn }]
-              : [styles.bubbleOther, { backgroundColor: colors.messageBubbleOther, borderColor: colors.border }],
-          ]}
+        <Pressable
+          onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onLongPress?.(); }}
+          delayLongPress={350}
         >
-          {renderContent()}
-        </View>
+          <View
+            style={[
+              styles.bubble,
+              message.type === "image" ? styles.bubbleImage : null,
+              isOwn
+                ? [styles.bubbleOwn, { backgroundColor: colors.messageBubbleOwn }]
+                : [styles.bubbleOther, { backgroundColor: colors.messageBubbleOther, borderColor: colors.border }],
+            ]}
+          >
+            {renderContent()}
+          </View>
+        </Pressable>
+        {reactions.length > 0 && (
+          <View style={[styles.reactionsRow, { alignSelf: isOwn ? "flex-end" : "flex-start" }]}>
+            {reactions.map((r) => {
+              const isMine = currentUserId != null && r.userIds.includes(currentUserId);
+              return (
+                <Pressable
+                  key={r.emoji}
+                  onPress={() => onReact?.(r.emoji)}
+                  style={[
+                    styles.reactionPill,
+                    {
+                      backgroundColor: isMine ? colors.accentSoft : colors.surfaceAlt,
+                      borderColor: isMine ? colors.accent : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                  {r.count > 1 && (
+                    <Text style={[styles.reactionCount, { color: isMine ? colors.accent : colors.textSecondary }]}>
+                      {r.count}
+                    </Text>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
         <View style={[styles.bubbleMeta, { alignSelf: isOwn ? "flex-end" : "flex-start" }]}>
           <Text style={[styles.bubbleTime, { color: colors.textTertiary }]}>
             {formatTime(message.createdAt)}
@@ -435,6 +480,7 @@ export default function SessionScreen() {
   const consecutivePollErrors = useRef(0);
   const [attachMenuVisible, setAttachMenuVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
