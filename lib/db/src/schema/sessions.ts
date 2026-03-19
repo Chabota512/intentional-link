@@ -7,6 +7,7 @@ export const sessionsTable = pgTable("sessions", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
+  imageUrl: text("image_url"),
   creatorId: integer("creator_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   status: text("status", { enum: ["active", "completed"] }).notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

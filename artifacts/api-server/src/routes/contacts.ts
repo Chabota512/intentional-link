@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, contactsTable, usersTable } from "@workspace/db";
 import { AddContactBody, GetContactsResponseItem } from "@workspace/api-zod";
+import { sendPushNotification } from "../lib/pushNotifications";
 
 const router: IRouter = Router();
 
@@ -184,6 +185,22 @@ router.post("/contacts", async (req, res): Promise<void> => {
     recipientUsername: contactUser.username,
     createdAt: contact.createdAt,
   });
+
+  (async () => {
+    try {
+      const [me] = await db.select({ displayName: usersTable.displayName, pushToken: usersTable.pushToken })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+      const [them] = await db.select({ pushToken: usersTable.pushToken })
+        .from(usersTable)
+        .where(eq(usersTable.id, contactUserId))
+        .limit(1);
+      if (them?.pushToken && me) {
+        await sendPushNotification(them.pushToken, "New Contact Request", `${me.displayName || "Someone"} wants to connect with you`, { contactUserId: userId });
+      }
+    } catch {}
+  })();
 });
 
 router.post("/contacts/requests/:requestId/accept", async (req, res): Promise<void> => {

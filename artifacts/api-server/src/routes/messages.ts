@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, lt, gt, ne, desc, inArray } from "drizzle-orm";
 import { db, messagesTable, usersTable, sessionsTable, sessionParticipantsTable } from "@workspace/db";
 import { SendMessageBody, GetMessagesResponseItem } from "@workspace/api-zod";
+import { sendPushNotifications } from "../lib/pushNotifications";
 
 const router: IRouter = Router();
 
@@ -81,12 +82,12 @@ router.get("/sessions/:sessionId/messages", async (req, res): Promise<void> => {
   msgs.reverse();
 
   await db.update(messagesTable)
-    .set({ status: "delivered" })
+    .set({ status: "read" })
     .where(
       and(
         eq(messagesTable.sessionId, sessionId),
         ne(messagesTable.senderId, userId),
-        eq(messagesTable.status, "sent")
+        ne(messagesTable.status, "read")
       )
     );
 
@@ -141,6 +142,53 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
 
   const [formatted] = await formatMessages([msg]);
   res.status(201).json(formatted);
+
+  (async () => {
+    try {
+      const [sender] = await db.select({ displayName: usersTable.displayName })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+
+      const [session] = await db.select({ name: sessionsTable.name, creatorId: sessionsTable.creatorId })
+        .from(sessionsTable)
+        .where(eq(sessionsTable.id, sessionId))
+        .limit(1);
+
+      const participants = await db
+        .select({ userId: sessionParticipantsTable.userId })
+        .from(sessionParticipantsTable)
+        .where(and(
+          eq(sessionParticipantsTable.sessionId, sessionId),
+          ne(sessionParticipantsTable.userId, userId),
+          eq(sessionParticipantsTable.status, "joined")
+        ));
+
+      const otherUserIds = participants.map(p => p.userId);
+      if (session && session.creatorId !== userId) otherUserIds.push(session.creatorId);
+
+      if (otherUserIds.length === 0) return;
+
+      const others = await db.select({ pushToken: usersTable.pushToken })
+        .from(usersTable)
+        .where(inArray(usersTable.id, otherUserIds));
+
+      const tokens = others.map(u => u.pushToken).filter(Boolean) as string[];
+      if (tokens.length === 0) return;
+
+      const senderName = sender?.displayName || "Someone";
+      const sessionName = session?.name || "a session";
+      const notifBody = type === "voice"
+        ? `${senderName} sent a voice note`
+        : type === "image"
+          ? `${senderName} sent an image`
+          : type === "file"
+            ? `${senderName} sent a file`
+            : `${senderName}: ${(content || "").slice(0, 80)}`;
+
+      await sendPushNotifications(tokens, sessionName, notifBody, { sessionId });
+    } catch {}
+  })();
 });
 
 router.get("/sessions/:sessionId/messages/poll", async (req, res): Promise<void> => {
@@ -166,17 +214,46 @@ router.get("/sessions/:sessionId/messages/poll", async (req, res): Promise<void>
     .orderBy(messagesTable.createdAt);
 
   await db.update(messagesTable)
-    .set({ status: "delivered" })
+    .set({ status: "read" })
     .where(
       and(
         eq(messagesTable.sessionId, sessionId),
         ne(messagesTable.senderId, userId),
-        eq(messagesTable.status, "sent")
+        ne(messagesTable.status, "read")
       )
     );
 
   const formatted = await formatMessages(msgs);
   res.json(formatted);
+});
+
+router.post("/sessions/:sessionId/messages/:messageId/play", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
+  const sessionId = parseInt(raw, 10);
+  const messageId = parseInt(req.params.messageId, 10);
+
+  if (!(await canAccessSession(sessionId, userId))) {
+    res.status(403).json({ error: "You do not have access to this session" });
+    return;
+  }
+
+  await db.update(messagesTable)
+    .set({ status: "read" })
+    .where(
+      and(
+        eq(messagesTable.id, messageId),
+        ne(messagesTable.senderId, userId)
+      )
+    );
+
+  res.json({ ok: true });
 });
 
 export default router;

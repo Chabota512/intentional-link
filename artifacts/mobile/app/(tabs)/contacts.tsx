@@ -83,6 +83,7 @@ export default function ContactsScreen() {
   });
 
   const incomingCount = requests?.incoming.length ?? 0;
+  const contactsCount = contacts.length;
 
   const acceptMutation = useMutation({
     mutationFn: (requestId: number) => post(`/contacts/requests/${requestId}/accept`),
@@ -147,12 +148,13 @@ export default function ContactsScreen() {
     const online = isOnline(item.contactUser.lastSeenAt);
     return (
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={{ position: "relative" }}>
-          <UserAvatar name={item.contactUser.name} avatarUrl={item.contactUser.avatarUrl} size={44} />
-          {online && (
-            <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
-          )}
-        </View>
+        <UserAvatar
+          name={item.contactUser.name}
+          avatarUrl={item.contactUser.avatarUrl}
+          size={44}
+          isOnline={online}
+          showDot={true}
+        />
         <View style={{ flex: 1 }}>
           <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
             {item.contactUser.name}
@@ -260,9 +262,16 @@ export default function ContactsScreen() {
           style={[styles.tab, activeTab === "contacts" && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
           onPress={() => setActiveTab("contacts")}
         >
-          <Text style={[styles.tabText, { color: activeTab === "contacts" ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-            Contacts
-          </Text>
+          <View style={styles.tabInner}>
+            <Text style={[styles.tabText, { color: activeTab === "contacts" ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+              Contacts
+            </Text>
+            {contactsCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: activeTab === "contacts" ? colors.accent : colors.textTertiary }]}>
+                <Text style={[styles.badgeText, { fontFamily: "Inter_700Bold" }]}>{contactsCount}</Text>
+              </View>
+            )}
+          </View>
         </Pressable>
         <Pressable
           style={[styles.tab, activeTab === "requests" && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
@@ -273,7 +282,7 @@ export default function ContactsScreen() {
               Requests
             </Text>
             {incomingCount > 0 && (
-              <View style={[styles.badge, { backgroundColor: colors.accent }]}>
+              <View style={[styles.badge, { backgroundColor: colors.danger }]}>
                 <Text style={[styles.badgeText, { fontFamily: "Inter_700Bold" }]}>{incomingCount}</Text>
               </View>
             )}
@@ -445,23 +454,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 8,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  onlineDot: {
-    position: "absolute",
-    bottom: 1,
-    right: 1,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-  },
-  avatarText: { fontSize: 18 },
   contactName: { fontSize: 15 },
   contactSub: { fontSize: 13 },
   actionBtn: { padding: 8 },

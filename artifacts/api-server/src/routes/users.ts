@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, ne, or } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, sessionsTable, sessionParticipantsTable, messagesTable } from "@workspace/db";
 import {
   RegisterUserBody,
   LoginUserBody,
@@ -121,7 +121,7 @@ router.put("/users/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, username, avatarUrl } = req.body ?? {};
+  const { name, username, avatarUrl, pushToken } = req.body ?? {};
   if (name !== undefined && (typeof name !== "string" || name.trim().length === 0 || name.length > 100)) {
     res.status(400).json({ error: "Invalid name" });
     return;
@@ -148,6 +148,7 @@ router.put("/users/me", async (req, res): Promise<void> => {
     updates.username = username.trim();
   }
   if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+  if (pushToken !== undefined && typeof pushToken === "string") updates.pushToken = pushToken;
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No fields to update" });
@@ -209,6 +210,59 @@ router.get("/users/search", async (req, res): Promise<void> => {
     .limit(20);
 
   res.json(users.map(u => SearchUsersResponseItem.parse(u)));
+});
+
+router.delete("/users/me/data", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const createdSessions = await db.select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.creatorId, userId));
+
+  for (const session of createdSessions) {
+    await db.delete(messagesTable).where(eq(messagesTable.sessionId, session.id));
+    await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.sessionId, session.id));
+    await db.delete(sessionsTable).where(eq(sessionsTable.id, session.id));
+  }
+
+  await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
+  await db.delete(messagesTable).where(eq(messagesTable.senderId, userId));
+
+  await db.update(usersTable)
+    .set({ avatarUrl: null, pushToken: null })
+    .where(eq(usersTable.id, userId));
+
+  res.json({ ok: true });
+});
+
+router.delete("/users/me", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const createdSessions = await db.select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.creatorId, userId));
+
+  for (const session of createdSessions) {
+    await db.delete(messagesTable).where(eq(messagesTable.sessionId, session.id));
+    await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.sessionId, session.id));
+    await db.delete(sessionsTable).where(eq(sessionsTable.id, session.id));
+  }
+
+  await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
+  await db.delete(messagesTable).where(eq(messagesTable.senderId, userId));
+  await db.delete(usersTable).where(eq(usersTable.id, userId));
+
+  res.json({ ok: true });
 });
 
 export { isOnline };

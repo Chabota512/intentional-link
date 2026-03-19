@@ -51,16 +51,22 @@ artifacts-monorepo/
 - **Invite UI**: Creator can invite contacts from inside a session via a People sheet
 - **Participants panel**: Tap participant count to see all participants, their status and online presence
 - **Profile editing**: Users can edit their name, username, and profile picture from the Profile tab
-- **Tab badge**: Sessions tab shows a badge count for pending invites
-- **Message status**: Own messages show delivery tick indicator
+- **Tab badge**: Sessions tab shows a badge count for pending invites; Contacts tab shows count of pending requests
+- **Read receipts**: Own messages show single grey tick (sent), double grey (delivered), double blue #2196F3 (read)
+- **Voice notes**: VoicePlayer shows sender avatar, waveform, duration; raise-to-ear switches playback to earpiece (iOS auto via PlayAndRecord category); marks voice notes as read after playback
+- **Online presence dots**: UserAvatar shows green dot for online users in all locations (contacts, participants panel, chat)
+- **Delete Session**: Creator can delete session from chat screen via trash icon in navbar
+- **Session logo**: Create-session modal supports image upload for session cover art
+- **Push notifications**: App registers device token on launch; server sends push when new message arrives or contact request is made; uses Expo push notification service
+- **Expanded Settings page**: Full-featured settings with Account, Privacy, Sessions, About, and Danger Zone sections; includes account deletion and data clearing
 
 ## Database Schema (Drizzle ORM)
 
-- `users` — id, username, name, passwordHash, **avatarUrl**, createdAt, **lastSeenAt**
-- `contacts` — id, userId, contactUserId, createdAt
-- `sessions` — id, title, description, creatorId, status, createdAt, endedAt
+- `users` — id, username, name, displayName, passwordHash, avatarUrl, pushToken, createdAt, lastSeenAt
+- `contacts` — id, userId, contactUserId, status (pending|accepted), createdAt
+- `sessions` — id, name, description, imageUrl, creatorId, status, createdAt, endedAt
 - `session_participants` — id, sessionId, userId, status (invited|joined)
-- `messages` — id, sessionId, senderId, content, **type** (text|image|file|voice), **attachmentUrl**, **attachmentName**, **attachmentSize**, status, createdAt
+- `messages` — id, sessionId, senderId, content, type (text|image|file|voice), attachmentUrl, attachmentName, attachmentSize, status (sent|delivered|read), createdAt
 - `uploads` — id (uuid), data (bytea), contentType, filename, fileSize, uploadedBy (FK→users), createdAt
 
 ## API Routes
@@ -70,17 +76,24 @@ All at `/api/*`:
 - `POST /users/register` — register
 - `POST /users/login` — login (updates lastSeenAt)
 - `GET /users/me` — get current user
-- `PUT /users/me` — update name/username
+- `PUT /users/me` — update name/username/pushToken
+- `DELETE /users/me` — delete account
+- `DELETE /users/me/data` — clear all user data
 - `POST /users/heartbeat` — update lastSeenAt (called every 30s by client)
 - `GET /users/search?q=` — search users
-- `GET/POST /contacts` — list/add contacts (includes lastSeenAt)
+- `GET/POST /contacts` — list/add contacts (includes lastSeenAt); sends push notification on request
 - `DELETE /contacts/:id` — remove contact
+- `POST /contacts/requests/:id/accept` — accept contact request
+- `POST /contacts/requests/:id/decline` — decline contact request
+- `GET /contacts/requests` — list pending incoming contact requests
 - `GET/POST /sessions` — list/create sessions
 - `GET/PATCH /sessions/:id` — get/update session (includes creator + participant lastSeenAt)
+- `DELETE /sessions/:id` — delete session (creator only)
 - `POST /sessions/:id/invite` — invite participant
 - `POST /sessions/:id/join` — join session
-- `GET/POST /sessions/:id/messages` — list/send messages (supports type + attachment fields)
+- `GET/POST /sessions/:id/messages` — list/send messages; sends push notification to other participants
 - `GET /sessions/:id/messages/poll?since=` — poll for new messages
+- `POST /sessions/:id/messages/:msgId/play` — mark voice note as read
 - `POST /storage/upload` — multipart upload; stores file as bytea in DB, returns `{ uploadId, url }`
 - `GET /storage/uploads/:id` — stream file from DB by upload UUID
 
@@ -107,10 +120,11 @@ artifacts/mobile/
 │   └── contacts/
 │       └── add.tsx          # Add contact modal
 ├── context/AuthContext.tsx  # Auth state (user, login, register, logout, updateUser)
-├── hooks/useApi.ts          # Fetch wrapper with auth headers + uploadFile helper
-├── hooks/useTheme.ts        # Theme from constants/colors.ts
-├── hooks/useHeartbeat.ts    # Sends POST /users/heartbeat every 30s
+├── hooks/useApi.ts              # Fetch wrapper with auth headers + uploadFile helper
+├── hooks/useTheme.ts            # Theme from constants/colors.ts
+├── hooks/useHeartbeat.ts        # Sends POST /users/heartbeat every 30s
 ├── hooks/usePendingInvites.ts
+├── hooks/usePushNotifications.ts  # Registers device for push notifications on app launch
 ├── constants/colors.ts      # Light + dark color palette
 └── utils/
     ├── date.ts              # formatRelative, formatTime helpers

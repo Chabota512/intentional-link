@@ -19,6 +19,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,6 +41,7 @@ function OfflineBanner() {
 
 function HeartbeatProvider({ children }: { children: React.ReactNode }) {
   useHeartbeat();
+  usePushNotifications();
   return <>{children}</>;
 }
 

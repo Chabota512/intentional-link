@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Image,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -26,16 +27,73 @@ import { confirmAction } from "@/utils/confirm";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
+function SettingsRow({
+  icon,
+  label,
+  sublabel,
+  onPress,
+  rightElement,
+  color,
+  colors,
+  last,
+}: {
+  icon: string;
+  label: string;
+  sublabel?: string;
+  onPress?: () => void;
+  rightElement?: React.ReactNode;
+  color?: string;
+  colors: any;
+  last?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [
+        styles.settingsRow,
+        !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+        onPress && pressed && { backgroundColor: colors.surfaceAlt },
+      ]}
+    >
+      <View style={[styles.settingsIcon, { backgroundColor: (color ?? colors.accent) + "22" }]}>
+        <Feather name={icon as any} size={16} color={color ?? colors.accent} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.settingsLabel, { color: color ?? colors.text, fontFamily: "Inter_500Medium" }]}>
+          {label}
+        </Text>
+        {sublabel && (
+          <Text style={[styles.settingsSublabel, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+            {sublabel}
+          </Text>
+        )}
+      </View>
+      {rightElement ?? (onPress ? <Feather name="chevron-right" size={16} color={colors.textTertiary} /> : null)}
+    </Pressable>
+  );
+}
+
+function SectionHeader({ title, colors }: { title: string; colors: any }) {
+  return (
+    <Text style={[styles.sectionHeader, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+      {title}
+    </Text>
+  );
+}
+
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, logout, updateUser } = useAuth();
-  const { get, uploadFile } = useApi();
+  const { get, put, del, uploadFile } = useApi();
   const [showEdit, setShowEdit] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editUsername, setEditUsername] = useState(user?.username ?? "");
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deletingData, setDeletingData] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const { data: sessions = [] } = useQuery<{ id: number; status: string }[]>({
     queryKey: ["sessions"],
@@ -123,6 +181,57 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleDeleteData = () => {
+    Alert.alert(
+      "Clear All Data",
+      "This will permanently delete all your sessions, messages, and reset your profile photo. Your account stays active. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear Data",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingData(true);
+            try {
+              await del("/users/me/data");
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert("Done", "Your data has been cleared.");
+            } catch (e: any) {
+              Alert.alert("Error", e.message || "Failed to clear data.");
+            } finally {
+              setDeletingData(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account, all sessions, and all messages. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingAccount(true);
+            try {
+              await del("/users/me");
+              await logout();
+              router.replace("/auth");
+            } catch (e: any) {
+              Alert.alert("Error", e.message || "Failed to delete account.");
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const avatarUrl = user?.avatarUrl
     ? user.avatarUrl.startsWith("http")
       ? user.avatarUrl
@@ -134,7 +243,7 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 10, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Profile</Text>
+        <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Settings</Text>
         <Pressable
           onPress={openEdit}
           style={({ pressed }) => [styles.editBtn, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
@@ -186,44 +295,122 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        <SectionHeader title="ACCOUNT" colors={colors} />
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-            ABOUT INTENTIONAL LINK
-          </Text>
-          <View style={styles.infoItem}>
-            <Feather name="zap" size={16} color={colors.accent} />
-            <Text style={[styles.infoText, { color: colors.text, fontFamily: "Inter_400Regular" }]}>
-              Intentional, distraction-free communication
-            </Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.infoItem}>
-            <Feather name="lock" size={16} color={colors.accent} />
-            <Text style={[styles.infoText, { color: colors.text, fontFamily: "Inter_400Regular" }]}>
-              Only your contacts can join sessions
-            </Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.infoItem}>
-            <Feather name="archive" size={16} color={colors.accent} />
-            <Text style={[styles.infoText, { color: colors.text, fontFamily: "Inter_400Regular" }]}>
-              All past sessions are archived and searchable
-            </Text>
-          </View>
+          <SettingsRow
+            icon="user"
+            label="Edit Profile"
+            sublabel="Name, username, and photo"
+            onPress={openEdit}
+            colors={colors}
+          />
+          <SettingsRow
+            icon="at-sign"
+            label="Username"
+            sublabel={`@${user?.username ?? ""}`}
+            onPress={openEdit}
+            colors={colors}
+            last
+          />
         </View>
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.logoutBtn,
-            { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-          ]}
-          onPress={handleLogout}
-        >
-          <Feather name="log-out" size={18} color={colors.danger} />
-          <Text style={[styles.logoutText, { color: colors.danger, fontFamily: "Inter_600SemiBold" }]}>
-            Sign Out
-          </Text>
-        </Pressable>
+        <SectionHeader title="PRIVACY" colors={colors} />
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SettingsRow
+            icon="eye-off"
+            label="Profile Visibility"
+            sublabel="Only contacts can see your status"
+            colors={colors}
+          />
+          <SettingsRow
+            icon="check-circle"
+            label="Read Receipts"
+            sublabel="Others can see when you read messages"
+            colors={colors}
+            last
+          />
+        </View>
+
+        <SectionHeader title="SESSIONS" colors={colors} />
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SettingsRow
+            icon="layers"
+            label="Active Sessions"
+            sublabel={`${activeSessions} session${activeSessions !== 1 ? "s" : ""} in progress`}
+            onPress={() => router.push("/(tabs)")}
+            colors={colors}
+          />
+          <SettingsRow
+            icon="archive"
+            label="Past Sessions"
+            sublabel={`${totalSessions} total sessions`}
+            onPress={() => router.push("/(tabs)")}
+            colors={colors}
+            last
+          />
+        </View>
+
+        <SectionHeader title="ABOUT" colors={colors} />
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SettingsRow
+            icon="zap"
+            label="Intentional Link"
+            sublabel="Distraction-free communication"
+            colors={colors}
+          />
+          <SettingsRow
+            icon="lock"
+            label="Privacy First"
+            sublabel="Only your contacts can join sessions"
+            colors={colors}
+          />
+          <SettingsRow
+            icon="shield"
+            label="Version"
+            sublabel="1.0.0"
+            colors={colors}
+            last
+          />
+        </View>
+
+        <SectionHeader title="ACCOUNT ACTIONS" colors={colors} />
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SettingsRow
+            icon="log-out"
+            label="Sign Out"
+            onPress={handleLogout}
+            color={colors.textSecondary}
+            colors={colors}
+            last
+          />
+        </View>
+
+        <SectionHeader title="DANGER ZONE" colors={colors} />
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: "#FFCCCC" }]}>
+          <SettingsRow
+            icon="trash"
+            label="Clear All Data"
+            sublabel="Delete sessions, messages, and photos"
+            onPress={deletingData ? undefined : handleDeleteData}
+            color={colors.danger}
+            colors={colors}
+            rightElement={
+              deletingData ? <ActivityIndicator size="small" color={colors.danger} /> : undefined
+            }
+          />
+          <SettingsRow
+            icon="user-x"
+            label="Delete Account"
+            sublabel="Permanently delete your account and all data"
+            onPress={deletingAccount ? undefined : handleDeleteAccount}
+            color={colors.danger}
+            colors={colors}
+            last
+            rightElement={
+              deletingAccount ? <ActivityIndicator size="small" color={colors.danger} /> : undefined
+            }
+          />
+        </View>
       </ScrollView>
 
       <Modal visible={showEdit} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowEdit(false)}>
@@ -323,7 +510,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   editBtnText: { fontSize: 13 },
-  scroll: { padding: 16, gap: 12 },
+  scroll: { padding: 16, gap: 8 },
+  sectionHeader: { fontSize: 11, letterSpacing: 1, marginTop: 8, marginBottom: 4, paddingHorizontal: 4 },
   profileCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -335,6 +523,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+    marginBottom: 8,
   },
   avatarWrapper: {
     position: "relative",
@@ -385,25 +574,25 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11 },
   statDivider: { width: StyleSheet.hairlineWidth, height: 32 },
   section: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    gap: 0,
-  },
-  sectionTitle: { fontSize: 11, letterSpacing: 1, marginBottom: 12 },
-  infoItem: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 4 },
-  infoText: { flex: 1, fontSize: 14, lineHeight: 20 },
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: 10 },
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    padding: 16,
     borderRadius: 14,
     borderWidth: 1,
+    overflow: "hidden",
   },
-  logoutText: { fontSize: 16 },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+  },
+  settingsIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsLabel: { fontSize: 15 },
+  settingsSublabel: { fontSize: 12, marginTop: 1 },
   modalContainer: { flex: 1 },
   modalHeader: {
     flexDirection: "row",

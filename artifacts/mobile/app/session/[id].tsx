@@ -26,7 +26,7 @@ import * as SMS from "expo-sms";
 import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { Audio } from "expo-av";
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
@@ -69,7 +69,7 @@ interface Session {
   title: string;
   description?: string;
   creatorId: number;
-  creator?: { id: number; name: string; username: string; lastSeenAt?: string | null } | null;
+  creator?: { id: number; name: string; username: string; avatarUrl?: string | null; lastSeenAt?: string | null } | null;
   status: "active" | "completed";
   participants: Participant[];
   createdAt: string;
@@ -98,10 +98,27 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function VoicePlayer({ url, colors }: { url: string; colors: any }) {
+function VoicePlayer({
+  url,
+  colors,
+  senderName,
+  senderAvatarUrl,
+  isOwn,
+  onPlayed,
+}: {
+  url: string;
+  colors: any;
+  senderName?: string;
+  senderAvatarUrl?: string | null;
+  isOwn?: boolean;
+  onPlayed?: () => void;
+}) {
   const soundRef = useRef<Audio.Sound | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [hasPlayed, setHasPlayed] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [position, setPosition] = useState(0);
 
   const togglePlay = async () => {
     if (loading) return;
@@ -111,18 +128,37 @@ function VoicePlayer({ url, colors }: { url: string; colors: any }) {
         await soundRef.current.pauseAsync();
         setPlaying(false);
       } else {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+          shouldDuckAndroid: true,
+          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+          playThroughEarpieceAndroid: false,
+        });
         if (!soundRef.current) {
-          const { sound } = await Audio.Sound.createAsync({ uri: url });
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: url },
+            { shouldPlay: false },
+          );
           soundRef.current = sound;
           sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.isLoaded) {
+              setPosition(status.positionMillis ?? 0);
+              setDuration(status.durationMillis ?? 0);
+            }
             if (status.didJustFinish) {
               setPlaying(false);
-              soundRef.current = null;
+              setPosition(0);
             }
           });
         }
         await soundRef.current.playAsync();
         setPlaying(true);
+        if (!hasPlayed) {
+          setHasPlayed(true);
+          onPlayed?.();
+        }
       }
     } catch {
       Alert.alert("Error", "Could not play voice note.");
@@ -136,22 +172,61 @@ function VoicePlayer({ url, colors }: { url: string; colors: any }) {
     };
   }, []);
 
+  const formatDur = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+  };
+
+  const displayTime = playing && duration > 0 ? formatDur(duration - position) : duration > 0 ? formatDur(duration) : "Voice note";
+
   return (
-    <Pressable onPress={togglePlay} style={[styles.voicePlayer, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
-      {loading ? (
-        <ActivityIndicator size="small" color="#fff" />
-      ) : (
-        <Feather name={playing ? "pause" : "play"} size={16} color="#fff" />
+    <View style={[styles.voicePlayerRow]}>
+      {!isOwn && senderName && (
+        <UserAvatar name={senderName} avatarUrl={senderAvatarUrl} size={28} />
       )}
-      <Feather name="mic" size={14} color="rgba(255,255,255,0.8)" />
-      <Text style={[styles.voiceLabel, { color: "rgba(255,255,255,0.9)", fontFamily: "Inter_500Medium" }]}>
-        Voice note
-      </Text>
-    </Pressable>
+      <Pressable
+        onPress={togglePlay}
+        style={[styles.voicePlayer, { backgroundColor: isOwn ? "rgba(255,255,255,0.18)" : colors.surfaceAlt }]}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={isOwn ? "#fff" : colors.accent} />
+        ) : (
+          <View style={[styles.voicePlayBtn, { backgroundColor: isOwn ? "rgba(255,255,255,0.25)" : colors.accentSoft }]}>
+            <Feather name={playing ? "pause" : "play"} size={14} color={isOwn ? "#fff" : colors.accent} />
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <View style={[styles.voiceWaveform]}>
+            {[4, 8, 12, 6, 10, 14, 8, 5, 11, 7, 13, 9].map((h, i) => (
+              <View
+                key={i}
+                style={{
+                  width: 2.5,
+                  height: h,
+                  borderRadius: 2,
+                  backgroundColor: isOwn
+                    ? playing ? "#fff" : "rgba(255,255,255,0.5)"
+                    : playing ? colors.accent : colors.textTertiary,
+                }}
+              />
+            ))}
+          </View>
+          <Text style={[styles.voiceLabel, { color: isOwn ? "rgba(255,255,255,0.8)" : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+            {displayTime}
+          </Text>
+        </View>
+        {!isOwn && (
+          <Feather name="headphones" size={12} color={colors.textTertiary} style={{ opacity: 0.6 }} />
+        )}
+      </Pressable>
+      {isOwn && senderName && (
+        <UserAvatar name={senderName} avatarUrl={senderAvatarUrl} size={28} />
+      )}
+    </View>
   );
 }
 
-function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl }: {
+function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
@@ -159,6 +234,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
   currentUser: User | null;
   colors: ReturnType<typeof import("@/hooks/useTheme").useTheme>["colors"];
   getFileUrl: (path: string) => string;
+  onPlayed?: () => void;
 }) {
   const renderContent = () => {
     if (message.type === "image" && message.attachmentUrl) {
@@ -203,7 +279,16 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
 
     if (message.type === "voice" && message.attachmentUrl) {
       const url = getFileUrl(message.attachmentUrl);
-      return <VoicePlayer url={url} colors={colors} />;
+      return (
+        <VoicePlayer
+          url={url}
+          colors={colors}
+          senderName={isOwn ? currentUser?.name : message.sender.name}
+          senderAvatarUrl={isOwn ? currentUser?.avatarUrl : message.sender.avatarUrl}
+          isOwn={isOwn}
+          onPlayed={!isOwn ? onPlayed : undefined}
+        />
+      );
     }
 
     return (
@@ -254,10 +339,15 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
           <Text style={[styles.bubbleTime, { color: colors.textTertiary }]}>
             {formatTime(message.createdAt)}
           </Text>
-          {isOwn && message.status === "delivered" ? (
+          {isOwn && message.status === "read" ? (
             <View style={{ flexDirection: "row" }}>
-              <Feather name="check" size={10} color={colors.accent} style={{ marginRight: -4 }} />
-              <Feather name="check" size={10} color={colors.accent} />
+              <Feather name="check" size={10} color="#2196F3" style={{ marginRight: -4 }} />
+              <Feather name="check" size={10} color="#2196F3" />
+            </View>
+          ) : isOwn && message.status === "delivered" ? (
+            <View style={{ flexDirection: "row" }}>
+              <Feather name="check" size={10} color={colors.textTertiary} style={{ marginRight: -4 }} />
+              <Feather name="check" size={10} color={colors.textTertiary} />
             </View>
           ) : isOwn ? (
             <Feather name="check" size={10} color={colors.textTertiary} />
@@ -478,6 +568,25 @@ export default function SessionScreen() {
     },
     onError: (e: any) => {
       Alert.alert("Error", e.message || "Failed to leave session");
+    },
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: () => del(`/sessions/${sessionId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.replace("/(tabs)");
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to delete session");
+    },
+  });
+
+  const markPlayedMutation = useMutation({
+    mutationFn: (messageId: number) => post(`/sessions/${sessionId}/messages/${messageId}/play`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", sessionId] });
     },
   });
 
@@ -703,6 +812,21 @@ export default function SessionScreen() {
     );
   };
 
+  const handleDeleteSession = () => {
+    Alert.alert(
+      "Delete Session",
+      "This will permanently delete the session and all messages. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteSessionMutation.mutate(),
+        },
+      ]
+    );
+  };
+
   const handleLeaveSession = () => {
     confirmAction(
       "Leave Session",
@@ -853,6 +977,12 @@ export default function SessionScreen() {
               >
                 <Text style={[styles.endBtnText, { color: colors.danger, fontFamily: "Inter_600SemiBold" }]}>End</Text>
               </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+                onPress={handleDeleteSession}
+              >
+                <Feather name="trash-2" size={18} color={colors.danger} />
+              </Pressable>
             </>
           )}
           {isActive && !isCreator && hasJoined && (
@@ -951,6 +1081,7 @@ export default function SessionScreen() {
                   currentUser={user ?? null}
                   colors={colors}
                   getFileUrl={getFileUrl}
+                  onPlayed={item.type === "voice" && !isOwn ? () => markPlayedMutation.mutate(item.id) : undefined}
                 />
               );
             }}
@@ -1173,26 +1304,19 @@ export default function SessionScreen() {
           {sheetView === "participants" ? (
             <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
               <View style={[styles.participantRow, { borderBottomColor: colors.border }]}>
-                <View style={{ position: "relative" }}>
-                  <View style={[styles.participantAvatar, { backgroundColor: colors.accent }]}>
-                    <Text style={[styles.participantAvatarText, { fontFamily: "Inter_700Bold" }]}>
-                      {(session.creator?.name ?? (isCreator ? user?.name : null) ?? "?").charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  {isOnline(session.creator?.lastSeenAt) && (
-                    <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
-                  )}
-                </View>
+                <UserAvatar
+                  name={session.creator?.name ?? (isCreator ? user?.name ?? "?" : "?")}
+                  avatarUrl={session.creator?.avatarUrl ?? (isCreator ? user?.avatarUrl : null)}
+                  size={44}
+                  isOnline={isOnline(session.creator?.lastSeenAt)}
+                  showDot
+                />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
                     {session.creator?.name ?? (isCreator ? user?.name : "Unknown")}
                   </Text>
-                  <Text style={[styles.participantUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                    {isOnline(session.creator?.lastSeenAt) ? (
-                      <Text style={{ color: colors.success }}>Online</Text>
-                    ) : (
-                      `Last seen ${formatLastSeen(session.creator?.lastSeenAt)}`
-                    )}
+                  <Text style={[styles.participantUsername, { color: isOnline(session.creator?.lastSeenAt) ? colors.success : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    {isOnline(session.creator?.lastSeenAt) ? "Online" : `Last seen ${formatLastSeen(session.creator?.lastSeenAt)}`}
                   </Text>
                 </View>
                 <View style={[styles.rolePill, { backgroundColor: colors.accentSoft }]}>
@@ -1202,26 +1326,19 @@ export default function SessionScreen() {
 
               {session.participants.filter(p => p.userId !== session.creatorId).map((p) => (
                 <View key={p.id} style={[styles.participantRow, { borderBottomColor: colors.border }]}>
-                  <View style={{ position: "relative" }}>
-                    <View style={[styles.participantAvatar, { backgroundColor: colors.accentSoft }]}>
-                      <Text style={[styles.participantAvatarText, { color: colors.accent, fontFamily: "Inter_700Bold" }]}>
-                        {p.user.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    {isOnline(p.user.lastSeenAt) && (
-                      <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
-                    )}
-                  </View>
+                  <UserAvatar
+                    name={p.user.name}
+                    avatarUrl={p.user.avatarUrl}
+                    size={44}
+                    isOnline={isOnline(p.user.lastSeenAt)}
+                    showDot
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
                       {p.user.name}
                     </Text>
-                    <Text style={[styles.participantUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                      {isOnline(p.user.lastSeenAt) ? (
-                        <Text style={{ color: colors.success }}>Online</Text>
-                      ) : (
-                        `Last seen ${formatLastSeen(p.user.lastSeenAt)}`
-                      )}
+                    <Text style={[styles.participantUsername, { color: isOnline(p.user.lastSeenAt) ? colors.success : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                      {isOnline(p.user.lastSeenAt) ? "Online" : `Last seen ${formatLastSeen(p.user.lastSeenAt)}`}
                     </Text>
                   </View>
                   <View style={[
@@ -1412,16 +1529,36 @@ const styles = StyleSheet.create({
   },
   fileName: { fontSize: 14, maxWidth: 110 },
   fileSize: { fontSize: 11, marginTop: 1 },
+  voicePlayerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   voicePlayer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
-    minWidth: 140,
+    minWidth: 160,
+    flex: 1,
   },
-  voiceLabel: { fontSize: 13 },
+  voicePlayBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  voiceWaveform: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    height: 16,
+    flex: 1,
+  },
+  voiceLabel: { fontSize: 11 },
   bubbleMeta: { flexDirection: "row", alignItems: "center", gap: 3 },
   bubbleTime: { fontSize: 10, fontFamily: "Inter_400Regular" },
   inputBar: {

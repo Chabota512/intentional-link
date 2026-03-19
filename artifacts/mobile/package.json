@@ -59,6 +59,8 @@
     "@react-native-community/netinfo": "^12.0.1",
     "expo-av": "^16.0.8",
     "expo-document-picker": "^55.0.9",
+    "expo-notifications": "~0.32.16",
+    "expo-sensors": "~15.0.8",
     "expo-sms": "^55.0.9"
   }
 }

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, inArray, ne } from "drizzle-orm";
-import { db, sessionsTable, sessionParticipantsTable, usersTable } from "@workspace/db";
+import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable } from "@workspace/db";
 import {
   CreateSessionBody,
   UpdateSessionBody,
@@ -122,9 +122,12 @@ router.post("/sessions", async (req, res): Promise<void> => {
     return;
   }
 
+  const imageUrl = (req.body as any).imageUrl ?? null;
+
   const [session] = await db.insert(sessionsTable).values({
     title: parsed.data.title,
     description: parsed.data.description ?? null,
+    imageUrl: typeof imageUrl === "string" ? imageUrl : null,
     creatorId: userId,
     status: "active",
   }).returning();
@@ -212,6 +215,35 @@ router.patch("/sessions/:sessionId", async (req, res): Promise<void> => {
 
   const result = await getSessionWithParticipants(session.id);
   res.json(result);
+});
+
+router.delete("/sessions/:sessionId", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
+  const sessionId = parseInt(raw, 10);
+
+  const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.creatorId !== userId) {
+    res.status(403).json({ error: "Only the session creator can delete this session" });
+    return;
+  }
+
+  await db.delete(messagesTable).where(eq(messagesTable.sessionId, sessionId));
+  await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.sessionId, sessionId));
+  await db.delete(sessionsTable).where(eq(sessionsTable.id, sessionId));
+
+  res.sendStatus(204);
 });
 
 router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
