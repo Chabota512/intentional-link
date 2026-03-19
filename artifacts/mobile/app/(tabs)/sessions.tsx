@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Platform,
   TextInput,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,10 +28,19 @@ interface Participant {
   user: { id: number; name: string; username: string };
 }
 
+const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+
+function resolveUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${BASE_URL}${url}`;
+}
+
 interface Session {
   id: number;
   title: string;
   description?: string;
+  imageUrl?: string | null;
   creatorId: number;
   status: "active" | "completed";
   participants: Participant[];
@@ -125,8 +135,12 @@ export default function SessionsScreen() {
           </View>
         )}
         <View style={styles.sessionCardTop}>
-          <View style={[styles.sessionIconBg, { backgroundColor: isActive ? colors.accentSoft : colors.surfaceAlt }]}>
-            <Feather name={isActive ? "zap" : "archive"} size={18} color={isActive ? colors.accent : colors.textSecondary} />
+          <View style={[styles.sessionIconBg, { backgroundColor: isActive ? colors.accentSoft : colors.surfaceAlt, overflow: "hidden" }]}>
+            {resolveUrl(item.imageUrl) ? (
+              <Image source={{ uri: resolveUrl(item.imageUrl)! }} style={{ width: 40, height: 40, borderRadius: 12 }} resizeMode="cover" />
+            ) : (
+              <Feather name={isActive ? "zap" : "archive"} size={18} color={isActive ? colors.accent : colors.textSecondary} />
+            )}
           </View>
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={[styles.sessionTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>

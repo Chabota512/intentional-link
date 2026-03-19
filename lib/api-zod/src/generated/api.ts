@@ -186,6 +186,7 @@ export const GetSessionResponse = zod.object({
   id: zod.number(),
   title: zod.string(),
   description: zod.string().nullish(),
+  imageUrl: zod.string().nullish(),
   creatorId: zod.number(),
   status: zod.enum(["active", "completed"]),
   participants: zod.array(

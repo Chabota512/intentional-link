@@ -346,6 +346,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /sessions/{sessionId}/delete:
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Permanently delete a session and all its messages (creator only)
+      parameters:
+        - in: header
+          name: x-user-id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "403":
+          description: Forbidden — only the creator can delete a session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /sessions/{sessionId}/invite:
     post:
       operationId: inviteToSession
@@ -649,6 +685,8 @@ components:
           type: string
         description:
           type: ["string", "null"]
+        imageUrl:
+          type: ["string", "null"]
         creatorId:
           type: integer
         status:
@@ -675,6 +713,8 @@ components:
         title:
           type: string
         description:
+          type: ["string", "null"]
+        imageUrl:
           type: ["string", "null"]
         creatorId:
           type: integer

@@ -13,6 +13,8 @@ export interface SessionWithParticipants {
   title: string;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  imageUrl?: string | null;
   creatorId: number;
   status: SessionWithParticipantsStatus;
   participants: SessionParticipant[];

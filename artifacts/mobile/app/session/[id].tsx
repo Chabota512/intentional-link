@@ -69,6 +69,7 @@ interface Session {
   id: number;
   title: string;
   description?: string;
+  imageUrl?: string | null;
   creatorId: number;
   creator?: { id: number; name: string; username: string; avatarUrl?: string | null; lastSeenAt?: string | null } | null;
   status: "active" | "completed";
@@ -994,9 +995,18 @@ export default function SessionScreen() {
           <Feather name="arrow-left" size={22} color={colors.text} />
         </Pressable>
         <View style={styles.navCenter}>
-          <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
-            {session.title}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {session.imageUrl ? (
+              <Image
+                source={{ uri: getFileUrl(session.imageUrl) }}
+                style={{ width: 28, height: 28, borderRadius: 8 }}
+                resizeMode="cover"
+              />
+            ) : null}
+            <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold", flex: 1 }]} numberOfLines={1}>
+              {session.title}
+            </Text>
+          </View>
           <Pressable style={styles.navMeta} onPress={openParticipants}>
             <View style={[styles.statusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
             <Text style={[styles.navSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>

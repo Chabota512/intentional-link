@@ -19,12 +19,14 @@ import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/UserAvatar";
+import { isOnline } from "@/utils/lastSeen";
 
 interface User {
   id: number;
   name: string;
   username: string;
   avatarUrl?: string | null;
+  lastSeenAt?: string | null;
 }
 
 interface Contact {
@@ -129,7 +131,7 @@ export default function AddContactScreen() {
 
     return (
       <View style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <UserAvatar name={item.name} avatarUrl={item.avatarUrl} size={44} />
+        <UserAvatar name={item.name} avatarUrl={item.avatarUrl} size={44} isOnline={isOnline(item.lastSeenAt)} showDot />
         <View style={{ flex: 1 }}>
           <Text style={[styles.userName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>{item.name}</Text>
           <Text style={[styles.userUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
