@@ -290,6 +290,7 @@ export default function SessionScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [inputHeight, setInputHeight] = useState(21);
 
   const { data: session, isLoading: sessionLoading, error: sessionError } = useQuery<Session>({
     queryKey: ["session", sessionId],
@@ -483,6 +484,7 @@ export default function SessionScreen() {
     const trimmed = text.trim();
     if (!trimmed) return;
     setText("");
+    setInputHeight(21);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sendMutation.mutate({ content: trimmed, type: "text" });
   };
@@ -960,15 +962,17 @@ export default function SessionScreen() {
                 >
                   <Feather name="plus" size={20} color={colors.accent} />
                 </Pressable>
-                <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, height: Math.min(Math.max(inputHeight + 20, 42), 160) }]}>
                   <TextInput
-                    style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular" }]}
+                    style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular", height: inputHeight }]}
                     placeholder="Type a message…"
                     placeholderTextColor={colors.textTertiary}
                     value={text}
                     onChangeText={setText}
+                    onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
                     multiline
                     maxLength={2000}
+                    scrollEnabled
                   />
                 </View>
                 {text.trim() ? (
@@ -1353,8 +1357,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    maxHeight: 120,
+    justifyContent: "center",
   },
   input: { fontSize: 15, lineHeight: 21 },
   sendBtn: {
