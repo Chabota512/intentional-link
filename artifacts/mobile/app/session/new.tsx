@@ -11,30 +11,69 @@ import {
   Platform,
   Image,
   Alert,
+  FlatList,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
+import UserAvatar from "@/components/UserAvatar";
+import { isOnline } from "@/utils/lastSeen";
+
+interface ContactUser {
+  id: number;
+  name: string;
+  username: string;
+  avatarUrl?: string | null;
+  lastSeenAt?: string | null;
+}
+
+interface Contact {
+  id: number;
+  contactUser: ContactUser;
+}
 
 export default function NewSessionScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { post, uploadFile } = useApi();
+  const { post, uploadFile, get } = useApi();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  const mutation = useMutation({
-    mutationFn: (data: { title: string; description?: string; imageUrl?: string }) => post("/sessions", data),
-    onSuccess: (session) => {
+  const { data: contacts = [], isLoading: loadingContacts } = useQuery<Contact[]>({
+    queryKey: ["contacts"],
+    queryFn: () => get("/contacts"),
+  });
+
+  const toggleContact = (id: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (data: { title: string; description?: string; imageUrl?: string }) =>
+      post("/sessions", data),
+    onSuccess: async (session) => {
+      const inviteIds = Array.from(selectedIds);
+      for (const userId of inviteIds) {
+        try {
+          await post(`/sessions/${session.id}/invite`, { userId });
+        } catch {}
+      }
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.dismiss();
@@ -48,26 +87,20 @@ export default function NewSessionScreen() {
       Alert.alert("Permission needed", "Please allow access to your photo library.");
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
-
     if (result.canceled || !result.assets[0]) return;
-
     const asset = result.assets[0];
     setImageUri(asset.uri);
     setUploadingImage(true);
-
     try {
       const ext = asset.uri.split(".").pop() ?? "jpg";
       const contentType = `image/${ext === "jpg" ? "jpeg" : ext}`;
-      const fileName = `session_image.${ext}`;
-      const fileSize = asset.fileSize ?? 0;
-      const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
+      const uploaded = await uploadFile(asset.uri, `session_image.${ext}`, asset.fileSize ?? 0, contentType);
       setImageUrl(uploaded.url || uploaded.objectPath);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (e: any) {
@@ -81,12 +114,33 @@ export default function NewSessionScreen() {
 
   const handleCreate = () => {
     if (!title.trim()) return;
-    mutation.mutate({
+    if (selectedIds.size === 0) {
+      Alert.alert(
+        "No contacts selected",
+        "You haven't added anyone to this session. Create it anyway?",
+        [
+          { text: "Go back", style: "cancel" },
+          {
+            text: "Create anyway",
+            onPress: () =>
+              createMutation.mutate({
+                title: title.trim(),
+                description: description.trim() || undefined,
+                imageUrl: imageUrl ?? undefined,
+              }),
+          },
+        ]
+      );
+      return;
+    }
+    createMutation.mutate({
       title: title.trim(),
       description: description.trim() || undefined,
       imageUrl: imageUrl ?? undefined,
     });
   };
+
+  const selectedContacts = contacts.filter((c) => selectedIds.has(c.contactUser.id));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -106,9 +160,9 @@ export default function NewSessionScreen() {
               { backgroundColor: title.trim() ? colors.accent : colors.border, opacity: pressed ? 0.85 : 1 },
             ]}
             onPress={handleCreate}
-            disabled={!title.trim() || mutation.isPending || uploadingImage}
+            disabled={!title.trim() || createMutation.isPending || uploadingImage}
           >
-            {mutation.isPending ? (
+            {createMutation.isPending ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Text style={[styles.createBtnText, { fontFamily: "Inter_600SemiBold" }]}>Create</Text>
@@ -138,9 +192,6 @@ export default function NewSessionScreen() {
           <Text style={[styles.iconHint, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
             Tap to add a session photo
           </Text>
-          <Text style={[styles.hint, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-            Give your session a clear name so everyone stays focused.
-          </Text>
 
           <Text style={[styles.label, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
             SESSION TITLE
@@ -161,7 +212,7 @@ export default function NewSessionScreen() {
           <Text style={[styles.label, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
             DESCRIPTION (optional)
           </Text>
-          <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, minHeight: 100 }]}>
+          <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, minHeight: 90 }]}>
             <TextInput
               style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular", textAlignVertical: "top" }]}
               placeholder="What is this session about?"
@@ -169,18 +220,101 @@ export default function NewSessionScreen() {
               value={description}
               onChangeText={setDescription}
               multiline
-              numberOfLines={4}
+              numberOfLines={3}
               maxLength={500}
             />
           </View>
 
-          {mutation.isError && (
+          <View style={styles.labelRow}>
+            <Text style={[styles.label, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
+              INVITE CONTACTS
+            </Text>
+            {selectedIds.size > 0 && (
+              <Text style={[styles.selectedCount, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
+                {selectedIds.size} selected
+              </Text>
+            )}
+          </View>
+
+          {selectedIds.size > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedScroll} contentContainerStyle={styles.selectedRow}>
+              {selectedContacts.map((c) => (
+                <Pressable key={c.contactUser.id} onPress={() => toggleContact(c.contactUser.id)} style={styles.selectedChip}>
+                  <UserAvatar name={c.contactUser.name} avatarUrl={c.contactUser.avatarUrl} size={36} />
+                  <Text style={[styles.selectedChipName, { color: colors.text, fontFamily: "Inter_500Medium" }]} numberOfLines={1}>
+                    {c.contactUser.name.split(" ")[0]}
+                  </Text>
+                  <View style={[styles.removeChip, { backgroundColor: colors.danger }]}>
+                    <Feather name="x" size={9} color="#fff" />
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+
+          {loadingContacts ? (
+            <View style={styles.contactsLoading}>
+              <ActivityIndicator color={colors.accent} size="small" />
+            </View>
+          ) : contacts.length === 0 ? (
+            <View style={[styles.noContacts, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Feather name="users" size={20} color={colors.textTertiary} />
+              <Text style={[styles.noContactsText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                No contacts yet. Add contacts first to invite them.
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.contactsList, { borderColor: colors.border }]}>
+              {contacts.map((contact, index) => {
+                const u = contact.contactUser;
+                const selected = selectedIds.has(u.id);
+                return (
+                  <Pressable
+                    key={contact.id}
+                    style={({ pressed }) => [
+                      styles.contactRow,
+                      {
+                        backgroundColor: selected ? colors.accentSoft : colors.surface,
+                        borderBottomColor: colors.border,
+                        borderBottomWidth: index < contacts.length - 1 ? StyleSheet.hairlineWidth : 0,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                    onPress={() => toggleContact(u.id)}
+                  >
+                    <UserAvatar name={u.name} avatarUrl={u.avatarUrl} size={40} isOnline={isOnline(u.lastSeenAt)} showDot />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                        {u.name}
+                      </Text>
+                      <Text style={[styles.contactUsername, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                        @{u.username}
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.checkbox,
+                      {
+                        backgroundColor: selected ? colors.accent : "transparent",
+                        borderColor: selected ? colors.accent : colors.border,
+                      },
+                    ]}>
+                      {selected && <Feather name="check" size={13} color="#fff" />}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
+          {createMutation.isError && (
             <View style={[styles.errorBox, { backgroundColor: "#FFF0F0", borderColor: colors.danger }]}>
               <Text style={[styles.errorText, { color: colors.danger, fontFamily: "Inter_400Regular" }]}>
-                {(mutation.error as Error).message}
+                {(createMutation.error as Error).message}
               </Text>
             </View>
           )}
+
+          <View style={{ height: insets.bottom + 24 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -208,36 +342,46 @@ const styles = StyleSheet.create({
   createBtnText: { color: "#fff", fontSize: 14 },
   content: { padding: 20, gap: 12 },
   iconWrapper: { alignSelf: "center", marginBottom: 4 },
-  iconRow: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconHint: { fontSize: 12, textAlign: "center", marginTop: -6 },
+  iconRow: { width: 72, height: 72, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  iconHint: { fontSize: 12, textAlign: "center", marginTop: -6, marginBottom: 4 },
   imagePreviewWrapper: { position: "relative" },
   imagePreview: { width: 72, height: 72, borderRadius: 20 },
   imageEditBadge: {
-    position: "absolute",
-    bottom: -4,
-    right: -4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
+    position: "absolute", bottom: -4, right: -4,
+    width: 22, height: 22, borderRadius: 11,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: "#fff",
   },
-  hint: { fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 4 },
+  labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   label: { fontSize: 11, letterSpacing: 0.8 },
-  inputWrapper: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-  },
+  selectedCount: { fontSize: 12 },
+  inputWrapper: { borderRadius: 14, borderWidth: 1, padding: 14 },
   input: { fontSize: 16, lineHeight: 24 },
+  selectedScroll: { marginHorizontal: -4 },
+  selectedRow: { flexDirection: "row", gap: 12, paddingHorizontal: 4, paddingVertical: 4 },
+  selectedChip: { alignItems: "center", gap: 4, position: "relative" },
+  selectedChipName: { fontSize: 11, maxWidth: 52, textAlign: "center" },
+  removeChip: {
+    position: "absolute", top: -2, right: -2,
+    width: 16, height: 16, borderRadius: 8,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: "#fff",
+  },
+  contactsLoading: { paddingVertical: 20, alignItems: "center" },
+  noContacts: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    padding: 14, borderRadius: 14, borderWidth: 1,
+  },
+  noContactsText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  contactsList: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
+  contactRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 },
+  contactName: { fontSize: 15 },
+  contactUsername: { fontSize: 12, marginTop: 1 },
+  checkbox: {
+    width: 24, height: 24, borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center", justifyContent: "center",
+  },
   errorBox: { padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText: { fontSize: 13 },
 });
