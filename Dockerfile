@@ -12,4 +12,4 @@ ENV NODE_ENV=production
 
 EXPOSE 8080
 
-CMD ["node_modules/.bin/tsx", "artifacts/api-server/src/index.ts"]
+CMD ["artifacts/api-server/node_modules/.bin/tsx", "artifacts/api-server/src/index.ts"]
