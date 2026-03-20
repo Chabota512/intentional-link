@@ -483,6 +483,8 @@ export default function SessionScreen() {
   const [attachMenuVisible, setAttachMenuVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
+  const [customEmojiInput, setCustomEmojiInput] = useState("");
+  const [showCustomEmoji, setShowCustomEmoji] = useState(false);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -1410,10 +1412,18 @@ export default function SessionScreen() {
         visible={reactionPickerMessage !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setReactionPickerMessage(null)}
+        onRequestClose={() => {
+          setReactionPickerMessage(null);
+          setShowCustomEmoji(false);
+          setCustomEmojiInput("");
+        }}
       >
-        <Pressable style={styles.attachOverlay} onPress={() => setReactionPickerMessage(null)}>
-          <View style={[styles.reactionPickerSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Pressable style={styles.attachOverlay} onPress={() => {
+          setReactionPickerMessage(null);
+          setShowCustomEmoji(false);
+          setCustomEmojiInput("");
+        }}>
+          <Pressable onPress={() => {}} style={[styles.reactionPickerSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.attachTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
               React to message
             </Text>
@@ -1428,13 +1438,75 @@ export default function SessionScreen() {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }
                     setReactionPickerMessage(null);
+                    setShowCustomEmoji(false);
+                    setCustomEmojiInput("");
                   }}
                 >
                   <Text style={{ fontSize: 30 }}>{emoji}</Text>
                 </Pressable>
               ))}
+              <Pressable
+                style={({ pressed }) => [styles.reactionPickerEmoji, {
+                  opacity: pressed ? 0.6 : 1,
+                  backgroundColor: showCustomEmoji ? colors.accentSoft : colors.surfaceAlt,
+                  borderRadius: 20,
+                  width: 44,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }]}
+                onPress={() => setShowCustomEmoji(v => !v)}
+              >
+                <Feather name="plus" size={22} color={showCustomEmoji ? colors.accent : colors.textSecondary} />
+              </Pressable>
             </View>
-          </View>
+            {showCustomEmoji && (
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12, gap: 8, paddingHorizontal: 4 }}>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    fontSize: 26,
+                    textAlign: "center",
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    paddingVertical: 8,
+                    backgroundColor: colors.surfaceAlt,
+                    color: colors.text,
+                    maxHeight: 52,
+                  }}
+                  placeholder="Type emoji…"
+                  placeholderTextColor={colors.textTertiary}
+                  value={customEmojiInput}
+                  onChangeText={setCustomEmojiInput}
+                  autoFocus
+                  maxLength={8}
+                />
+                <Pressable
+                  style={({ pressed }) => ({
+                    backgroundColor: customEmojiInput.trim() ? colors.accent : colors.surfaceAlt,
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                  onPress={() => {
+                    const emoji = customEmojiInput.trim();
+                    if (!emoji || !reactionPickerMessage) return;
+                    reactMutation.mutate({ messageId: reactionPickerMessage.id, emoji });
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setReactionPickerMessage(null);
+                    setShowCustomEmoji(false);
+                    setCustomEmojiInput("");
+                  }}
+                >
+                  <Text style={{ color: customEmojiInput.trim() ? "#fff" : colors.textTertiary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                    React
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </Pressable>
         </Pressable>
       </Modal>
 
