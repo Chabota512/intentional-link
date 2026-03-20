@@ -15,7 +15,7 @@ function NativeTabLayout() {
     <NativeTabs>
       <NativeTabs.Trigger name="sessions">
         <Icon sf={{ default: "bubble.left.and.bubble.right", selected: "bubble.left.and.bubble.right.fill" }} />
-        <Label>Sessions</Label>
+        <Label>Chats</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="contacts">
         <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
@@ -68,7 +68,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="sessions"
         options={{
-          title: "Sessions",
+          title: "Chats",
           tabBarBadge: pendingInvites > 0 ? pendingInvites : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 10 },
           tabBarIcon: ({ color }) =>

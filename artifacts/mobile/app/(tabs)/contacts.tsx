@@ -160,7 +160,13 @@ export default function ContactsScreen() {
       ? { text: formatLastSeen(item.contactUser.lastSeenAt), color: colors.textTertiary }
       : presenceLabel(status);
     return (
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Pressable
+        style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push(`/contact/${item.contactUser.id}`);
+        }}
+      >
         <UserAvatar
           name={item.contactUser.name}
           avatarUrl={item.contactUser.avatarUrl}
@@ -182,13 +188,17 @@ export default function ContactsScreen() {
             </Text>
           </View>
         </View>
-        <Pressable
-          onPress={() => handleRemove(item)}
-          style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          <Feather name="user-minus" size={18} color={colors.danger} />
-        </Pressable>
-      </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Feather name="chevron-right" size={16} color={colors.textTertiary} />
+          <Pressable
+            onPress={(e) => { e.stopPropagation(); handleRemove(item); }}
+            style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.6 : 1 }]}
+            hitSlop={8}
+          >
+            <Feather name="user-minus" size={18} color={colors.danger} />
+          </Pressable>
+        </View>
+      </Pressable>
     );
   };
 

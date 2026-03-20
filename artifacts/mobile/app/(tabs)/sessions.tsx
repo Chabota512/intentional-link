@@ -185,7 +185,7 @@ export default function SessionsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 10, borderBottomColor: colors.border }]}>
         <View>
-          <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Sessions</Text>
+          <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Chats</Text>
           <Text style={[styles.headerSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
             {activeSessions.length} active
           </Text>
@@ -296,10 +296,10 @@ export default function SessionsScreen() {
                   <Feather name="search" size={36} color={colors.textTertiary} />
                 </View>
                 <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-                  No sessions found
+                  No chats found
                 </Text>
                 <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                  No sessions match "{searchQuery}"
+                  No chats match "{searchQuery}"
                 </Text>
               </View>
             ) : (
@@ -308,10 +308,10 @@ export default function SessionsScreen() {
                   <Feather name="message-circle" size={36} color={colors.textTertiary} />
                 </View>
                 <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-                  No sessions yet
+                  No chats yet
                 </Text>
                 <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                  Start a focus session for intentional, distraction-free communication.
+                  Start a chat for intentional, distraction-free communication.
                 </Text>
                 <Pressable
                   style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
