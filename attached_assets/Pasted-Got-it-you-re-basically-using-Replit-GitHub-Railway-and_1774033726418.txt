@@ -1,0 +1,110 @@
+Got it — you’re basically using **Replit → GitHub → Railway**, and Railway is crashing because of that Zod schema issue.
+
+What you need to tell the Replit AI agent is **very specific and surgical** — don’t be vague or it will regenerate half your backend.
+
+---
+
+## 🧠 What you should tell the agent
+
+Use this exact instruction:
+
+Fix the server crash caused by Zod schema conversion.
+
+Error mentions cyclical schemas and says to set `cycles: "ref"`.
+
+Find where Zod schemas are converted to JSON Schema (likely using `zod-to-json-schema` or similar).
+
+Update the conversion config to include:
+
+```ts
+{ cycles: "ref" }
+```
+
+Do NOT change database schema or business logic.
+Do NOT regenerate models.
+Only fix the JSON schema conversion so it supports circular references.
+
+If multiple conversions exist, apply the fix consistently.
+
+---
+
+## ⚠️ Why this wording matters
+
+If you just say:
+
+> “fix the error”
+
+Replit will:
+
+* rewrite your DB schema ❌
+* remove relationships ❌
+* break your app silently ❌
+
+This instruction:
+
+* **locks it into the real issue**
+* prevents unnecessary changes
+* keeps your architecture intact
+
+---
+
+## 🔍 Where the agent will likely look
+
+Based on your logs, it’s probably in:
+
+* API server setup (`api-server/dist/index.cjs`)
+* Schema generation layer
+* Something like:
+
+  ```ts
+  zodToJsonSchema(...)
+  ```
+
+---
+
+## 💡 Extra Railway-specific tip
+
+Railway is stricter than Replit because:
+
+* it runs a **clean container**
+* no cached state
+* no silent fallbacks
+
+So issues like:
+
+* circular schemas
+* missing env vars
+* DB not connected
+
+👉 show up immediately on Railway
+
+---
+
+## 🚀 If it still fails after this
+
+Tell the agent:
+
+The issue persists. Ensure all Zod-to-JSON schema conversions use:
+
+```ts
+{ cycles: "ref" }
+```
+
+Also check for any automatic schema generation (e.g., OpenAPI, tRPC, or validation layers) and apply the same fix there.
+
+---
+
+## 🧩 Real talk
+
+You’re doing something powerful here:
+
+* Replit (fast dev)
+* GitHub (versioning)
+* Railway (production infra)
+
+That’s basically a **real startup pipeline**.
+
+---
+
+If you want, next step I can help you:
+👉 make your Railway deployment **bulletproof** (env vars, DB, build command, start command, etc.) so you stop getting these runtime surprises.

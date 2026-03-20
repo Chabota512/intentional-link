@@ -1,58 +1,17 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { build as esbuild } from "esbuild";
-import { rm, readFile } from "fs/promises";
+import { rm } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// server deps to bundle to reduce openat(2) syscalls
-// which helps cold start times without risking some
-// packages that are not bundle compatible
-const allowlist = [
-  "@google/generative-ai",
-  "axios",
-  "connect-pg-simple",
-  "cors",
-  "date-fns",
-  "drizzle-orm",
-  "drizzle-zod",
-  "express",
-  "express-rate-limit",
-  "express-session",
-  "jsonwebtoken",
-  "memorystore",
-  "multer",
-  "nanoid",
-  "nodemailer",
-  "openai",
-  "passport",
-  "passport-local",
-  "pg",
-  "stripe",
-  "uuid",
-  "ws",
-  "xlsx",
-  "zod",
-  "zod-validation-error",
-];
+const workspaceRoot = path.resolve(__dirname, "../..");
 
 async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
   await rm(distDir, { recursive: true, force: true });
 
   console.log("building server...");
-  const pkgPath = path.resolve(__dirname, "package.json");
-  const pkg = JSON.parse(await readFile(pkgPath, "utf-8"));
-  const allDeps = [
-    ...Object.keys(pkg.dependencies || {}),
-    ...Object.keys(pkg.devDependencies || {}),
-  ];
-  const externals = allDeps.filter(
-    (dep) =>
-      !allowlist.includes(dep) &&
-      !(pkg.dependencies?.[dep]?.startsWith("workspace:")),
-  );
 
   await esbuild({
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
@@ -64,7 +23,14 @@ async function buildAll() {
       "process.env.NODE_ENV": '"production"',
     },
     minify: true,
-    external: externals,
+    // Mark all node_modules as external — prevents ESM/CJS interop issues.
+    // Workspace packages are aliased below so their TypeScript source is
+    // bundled directly into the output instead.
+    packages: "external",
+    alias: {
+      "@workspace/api-zod": path.join(workspaceRoot, "lib/api-zod/src/index.ts"),
+      "@workspace/db": path.join(workspaceRoot, "lib/db/src/index.ts"),
+    },
     logLevel: "info",
   });
 }
