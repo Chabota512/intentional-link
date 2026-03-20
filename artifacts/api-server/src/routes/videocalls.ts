@@ -1,5 +1,8 @@
 import { Router } from "express";
+import { eq, and, ne, inArray } from "drizzle-orm";
 import agoraToken from "agora-token";
+import { db, sessionsTable, sessionParticipantsTable, usersTable } from "@workspace/db";
+import { sendPushNotifications } from "../lib/pushNotifications.js";
 const { RtcTokenBuilder, RtcRole } = agoraToken;
 
 const router = Router();
@@ -22,8 +25,10 @@ router.post("/sessions/:id/video-call", async (req, res) => {
     return res.status(500).json({ error: "Voice/video calls not configured" });
   }
 
-  const channel = channelName(sessionId);
   const uid = parseInt(userId as string, 10);
+  const mode: string = req.body?.mode ?? "video";
+
+  const channel = channelName(sessionId);
   const expireTime = Math.floor(Date.now() / 1000) + 4 * 60 * 60;
 
   const token = RtcTokenBuilder.buildTokenWithUid(
@@ -35,6 +40,52 @@ router.post("/sessions/:id/video-call", async (req, res) => {
     expireTime,
     expireTime,
   );
+
+  // Send push notifications to all other session members
+  try {
+    const [caller] = await db.select({ name: usersTable.name })
+      .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+
+    const [session] = await db.select({ creatorId: sessionsTable.creatorId })
+      .from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+
+    if (caller && session) {
+      // Get all member user IDs except the caller
+      const participantRows = await db
+        .select({ userId: sessionParticipantsTable.userId })
+        .from(sessionParticipantsTable)
+        .where(and(
+          eq(sessionParticipantsTable.sessionId, sessionId),
+          ne(sessionParticipantsTable.userId, uid),
+        ));
+
+      const otherUserIds = participantRows.map(p => p.userId);
+      if (session.creatorId !== uid) otherUserIds.push(session.creatorId);
+
+      if (otherUserIds.length > 0) {
+        const memberTokenRows = await db
+          .select({ pushToken: usersTable.pushToken })
+          .from(usersTable)
+          .where(inArray(usersTable.id, otherUserIds));
+
+        const pushTokens = memberTokenRows
+          .map(r => r.pushToken)
+          .filter((t): t is string => !!t);
+
+        if (pushTokens.length > 0) {
+          const callLabel = mode === "voice" ? "voice call" : "video call";
+          await sendPushNotifications(
+            pushTokens,
+            `📞 Incoming ${callLabel}`,
+            `${caller.name} is calling you`,
+            { sessionId, mode, type: "incoming-call" },
+          );
+        }
+      }
+    }
+  } catch {
+    // Notification failure should not block the call
+  }
 
   res.json({ appId: APP_ID, channel, token, uid });
 });

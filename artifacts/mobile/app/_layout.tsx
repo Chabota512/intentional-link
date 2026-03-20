@@ -6,8 +6,9 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router as expoRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as Notifications from "expo-notifications";
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -43,6 +44,19 @@ function OfflineBanner() {
 function HeartbeatProvider({ children }: { children: React.ReactNode }) {
   useHeartbeat();
   usePushNotifications();
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      if (data?.type === "incoming-call" && data?.sessionId) {
+        const sessionId = data.sessionId as number;
+        const mode = (data.mode as string) ?? "video";
+        expoRouter.push(`/session/call/${sessionId}?mode=${mode}` as any);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   return <>{children}</>;
 }
 

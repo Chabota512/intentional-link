@@ -47,7 +47,7 @@ export default function CallScreen() {
     try {
       const data = await post<{ appId: string; channel: string; token: string; uid: number }>(
         `/sessions/${sessionId}/video-call`,
-        {}
+        { mode: isVoice ? "voice" : "video" }
       );
       const params = new URLSearchParams({
         appId: data.appId,
