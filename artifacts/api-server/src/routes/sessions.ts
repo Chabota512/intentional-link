@@ -296,7 +296,7 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
     await sendPushNotification(
       invitedUser.pushToken,
       "Session Invitation",
-      `${inviter.name} invited you to join "${membership.session.name}"`,
+      `${inviter.name} invited you to join "${membership.session.title}"`,
       { sessionId, type: "session-invite" }
     );
   }
