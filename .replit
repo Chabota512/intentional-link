@@ -32,6 +32,7 @@ DAILY_API_KEY = "9009d6f514544929a93c31950d239bfb2c9169314a5458ef670b4e86ce15299
 NEON_DATABASE_URL = "postgresql://neondb_owner:npg_t8nMwPcDYRr5@ep-sparkling-queen-admhi4ox-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 AGORA_APP_CERTIFICATE = "dbabc95354ed4c8cb3ff225584c795cc"
 AGORA_APP_ID = "ca37022df03743949dd32f31efab2137"
+EXPO_TOKEN = "2Y2E1-J52Sy7LFeKyXutfVVZCe8mQT1UjkmijaYb"
 
 [nix]
 channel = "stable-25_05"
