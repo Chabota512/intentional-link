@@ -1,28 +1,38 @@
 {
-  "cli": {
-    "version": ">= 12.0.0"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
+    "cli": {
+      "version": ">= 12.0.0"
+    },
+    "build": {
+      "development": {
+        "developmentClient": true,
+        "distribution": "internal",
+        "android": {
+          "buildType": "apk"
+        },
+        "env": {
+          "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-aaa8.up.railway.app"
+        }
+      },
+      "preview": {
+        "distribution": "internal",
+        "android": {
+          "buildType": "apk"
+        },
+        "env": {
+          "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-aaa8.up.railway.app"
+        }
+      },
+      "production": {
+        "android": {
+          "buildType": "app-bundle"
+        },
+        "env": {
+          "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-aaa8.up.railway.app"
+        }
       }
     },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
-    },
-    "production": {
-      "android": {
-        "buildType": "app-bundle"
-      }
+    "submit": {
+      "production": {}
     }
-  },
-  "submit": {
-    "production": {}
   }
-}
+  
