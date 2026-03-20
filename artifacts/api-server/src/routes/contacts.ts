@@ -23,6 +23,7 @@ async function buildContactResponse(row: typeof contactsTable.$inferSelect) {
       id: contactUser.id,
       name: contactUser.name,
       username: contactUser.username,
+      avatarUrl: contactUser.avatarUrl ?? null,
       createdAt: contactUser.createdAt,
       lastSeenAt: contactUser.lastSeenAt,
     },

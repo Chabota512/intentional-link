@@ -93,6 +93,7 @@ export const GetContactsResponseItem = zod.object({
     id: zod.number(),
     username: zod.string(),
     name: zod.string(),
+    avatarUrl: zod.string().nullable().optional(),
     createdAt: zod.date(),
     lastSeenAt: zod.date().nullable().optional(),
   }),

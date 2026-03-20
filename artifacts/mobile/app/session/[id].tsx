@@ -492,6 +492,7 @@ export default function SessionScreen() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [inputHeight, setInputHeight] = useState(21);
+  const isLoadingOlderRef = useRef(false);
 
   const { data: session, isLoading: sessionLoading, error: sessionError } = useQuery<Session>({
     queryKey: ["session", sessionId],
@@ -580,19 +581,16 @@ export default function SessionScreen() {
   }, [session, sessionId]);
 
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && !isLoadingOlderRef.current) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length]);
-
-  const tempIdRef = useRef<number>(0);
 
   const sendMutation = useMutation({
     mutationFn: (payload: { content?: string; type?: string; attachmentUrl?: string; attachmentName?: string; attachmentSize?: number }) =>
       post(`/sessions/${sessionId}/messages`, payload),
     onMutate: async (payload) => {
       const tempId = -(Date.now());
-      tempIdRef.current = tempId;
       const tempMsg: Message = {
         id: tempId,
         sessionId,
@@ -607,16 +605,19 @@ export default function SessionScreen() {
         sender: { id: user!.id, name: user!.name, username: user!.username },
       };
       queryClient.setQueryData(["messages", sessionId], (old: Message[] = []) => [...old, tempMsg]);
+      return { tempId };
     },
-    onSuccess: (newMsg) => {
+    onSuccess: (newMsg, _vars, context) => {
       lastMsgId.current = newMsg.id;
+      const tempId = context?.tempId;
       queryClient.setQueryData(["messages", sessionId], (old: Message[] = []) => {
-        return old.map((m) => m.id === tempIdRef.current ? newMsg : m);
+        return old.map((m) => m.id === tempId ? newMsg : m);
       });
     },
-    onError: () => {
+    onError: (_err, _vars, context) => {
+      const tempId = context?.tempId;
       queryClient.setQueryData(["messages", sessionId], (old: Message[] = []) => {
-        return old.filter((m) => m.id !== tempIdRef.current);
+        return old.filter((m) => m.id !== tempId);
       });
       Alert.alert("Failed to send", "Your message could not be sent. Please try again.");
     },
@@ -700,6 +701,7 @@ export default function SessionScreen() {
 
   const loadOlderMessages = async () => {
     if (loadingOlder || messages.length === 0) return;
+    isLoadingOlderRef.current = true;
     setLoadingOlder(true);
     try {
       const oldest = messages[0];
@@ -718,6 +720,7 @@ export default function SessionScreen() {
       Alert.alert("Error", "Could not load older messages. Please try again.");
     }
     setLoadingOlder(false);
+    isLoadingOlderRef.current = false;
   };
 
   const handleSend = () => {
