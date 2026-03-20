@@ -31,6 +31,7 @@ import { LightSensor } from "expo-sensors";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
+import { useLocalDiscovery } from "@/context/LocalDiscoveryContext";
 import { confirmAction } from "@/utils/confirm";
 import { formatTime, formatRelative } from "@/utils/date";
 import { isOnline, formatLastSeen } from "@/utils/lastSeen";
@@ -468,6 +469,7 @@ export default function SessionScreen() {
   const insets = useSafeAreaInsets();
   const { get, post, patch, del, uploadFile, getFileUrl } = useApi();
   const { user } = useAuth();
+  const { getPresenceStatus } = useLocalDiscovery();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const flatListRef = useRef<FlatList>(null);
@@ -962,7 +964,12 @@ export default function SessionScreen() {
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
-  const onlineParticipants = session?.participants.filter(p => isOnline(p.user.lastSeenAt)) ?? [];
+  const onlineParticipants = session?.participants.filter(p =>
+    getPresenceStatus(p.userId, p.user.lastSeenAt) !== "offline"
+  ) ?? [];
+  const localParticipants = session?.participants.filter(p =>
+    getPresenceStatus(p.userId, p.user.lastSeenAt) === "local"
+  ) ?? [];
 
   if (sessionLoading) {
     return (
@@ -1064,7 +1071,7 @@ export default function SessionScreen() {
           <Pressable style={styles.navMeta} onPress={openParticipants}>
             <View style={[styles.statusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
             <Text style={[styles.navSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-              {isActive ? (onlineParticipants.length > 0 ? `${onlineParticipants.length} online` : "Active") : "Completed"} · {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
+              {isActive ? (localParticipants.length > 0 ? `${localParticipants.length} nearby` : onlineParticipants.length > 0 ? `${onlineParticipants.length} online` : "Active") : "Completed"} · {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
             </Text>
             <Feather name="chevron-right" size={12} color={colors.textTertiary} />
           </Pressable>
@@ -1460,41 +1467,55 @@ export default function SessionScreen() {
           {sheetView === "participants" ? (
             <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
               <View style={[styles.participantRow, { borderBottomColor: colors.border }]}>
-                <UserAvatar
-                  name={session.creator?.name ?? (isCreator ? user?.name ?? "?" : "?")}
-                  avatarUrl={session.creator?.avatarUrl ?? (isCreator ? user?.avatarUrl : null)}
-                  size={44}
-                  isOnline={isOnline(session.creator?.lastSeenAt)}
-                  showDot
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-                    {session.creator?.name ?? (isCreator ? user?.name : "Unknown")}
-                  </Text>
-                  <Text style={[styles.participantUsername, { color: isOnline(session.creator?.lastSeenAt) ? colors.success : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                    {isOnline(session.creator?.lastSeenAt) ? "Online" : `Last seen ${formatLastSeen(session.creator?.lastSeenAt)}`}
-                  </Text>
-                </View>
-                <View style={[styles.rolePill, { backgroundColor: colors.accentSoft }]}>
-                  <Text style={[styles.rolePillText, { color: colors.accent, fontFamily: "Inter_500Medium" }]}>Creator</Text>
-                </View>
+                {(() => {
+                  const creatorId = session.creator?.id ?? session.creatorId;
+                  const creatorStatus = getPresenceStatus(creatorId, session.creator?.lastSeenAt);
+                  const statusColor = creatorStatus === "local" ? "#FF6B9D" : creatorStatus === "online" ? colors.success : colors.textSecondary;
+                  const statusText = creatorStatus === "local" ? "On this network" : creatorStatus === "online" ? "Online" : `Last seen ${formatLastSeen(session.creator?.lastSeenAt)}`;
+                  return (
+                    <>
+                      <UserAvatar
+                        name={session.creator?.name ?? (isCreator ? user?.name ?? "?" : "?")}
+                        avatarUrl={session.creator?.avatarUrl ?? (isCreator ? user?.avatarUrl : null)}
+                        size={44}
+                        presenceStatus={creatorStatus}
+                        showDot
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                          {session.creator?.name ?? (isCreator ? user?.name : "Unknown")}
+                        </Text>
+                        <Text style={[styles.participantUsername, { color: statusColor, fontFamily: "Inter_400Regular" }]}>
+                          {statusText}
+                        </Text>
+                      </View>
+                      <View style={[styles.rolePill, { backgroundColor: colors.accentSoft }]}>
+                        <Text style={[styles.rolePillText, { color: colors.accent, fontFamily: "Inter_500Medium" }]}>Creator</Text>
+                      </View>
+                    </>
+                  );
+                })()}
               </View>
 
-              {session.participants.filter(p => p.userId !== session.creatorId).map((p) => (
+              {session.participants.filter(p => p.userId !== session.creatorId).map((p) => {
+                const pStatus = getPresenceStatus(p.userId, p.user.lastSeenAt);
+                const pStatusColor = pStatus === "local" ? "#FF6B9D" : pStatus === "online" ? colors.success : colors.textSecondary;
+                const pStatusText = pStatus === "local" ? "On this network" : pStatus === "online" ? "Online" : `Last seen ${formatLastSeen(p.user.lastSeenAt)}`;
+                return (
                 <View key={p.id} style={[styles.participantRow, { borderBottomColor: colors.border }]}>
                   <UserAvatar
                     name={p.user.name}
                     avatarUrl={p.user.avatarUrl}
                     size={44}
-                    isOnline={isOnline(p.user.lastSeenAt)}
+                    presenceStatus={pStatus}
                     showDot
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.participantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
                       {p.user.name}
                     </Text>
-                    <Text style={[styles.participantUsername, { color: isOnline(p.user.lastSeenAt) ? colors.success : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                      {isOnline(p.user.lastSeenAt) ? "Online" : `Last seen ${formatLastSeen(p.user.lastSeenAt)}`}
+                    <Text style={[styles.participantUsername, { color: pStatusColor, fontFamily: "Inter_400Regular" }]}>
+                      {pStatusText}
                     </Text>
                   </View>
                   <View style={[
@@ -1509,7 +1530,8 @@ export default function SessionScreen() {
                     </Text>
                   </View>
                 </View>
-              ))}
+                );
+              })}
 
               {isActive && isCreator && (
                 <Pressable

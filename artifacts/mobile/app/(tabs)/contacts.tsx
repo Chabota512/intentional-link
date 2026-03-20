@@ -22,6 +22,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
 import { isOnline, formatLastSeen } from "@/utils/lastSeen";
 import { confirmAction } from "@/utils/confirm";
+import { useLocalDiscovery } from "@/context/LocalDiscoveryContext";
 
 interface ContactUser {
   id: number;
@@ -139,20 +140,32 @@ export default function ContactsScreen() {
     );
   };
 
+  const { getPresenceStatus } = useLocalDiscovery();
+
   const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
-  const onlineCount = contacts.filter(c => isOnline(c.contactUser.lastSeenAt)).length;
+  const localCount = contacts.filter(c => getPresenceStatus(c.contactUser.id, c.contactUser.lastSeenAt) === "local").length;
+  const onlineCount = contacts.filter(c => getPresenceStatus(c.contactUser.id, c.contactUser.lastSeenAt) !== "offline").length;
+
+  const presenceLabel = (status: "local" | "online" | "offline") => {
+    if (status === "local") return { text: "On this network", color: "#FF6B9D" };
+    if (status === "online") return { text: "Online", color: colors.success };
+    return { text: formatLastSeen(undefined), color: colors.textTertiary };
+  };
 
   const renderContact = ({ item }: { item: Contact }) => {
-    const online = isOnline(item.contactUser.lastSeenAt);
+    const status = getPresenceStatus(item.contactUser.id, item.contactUser.lastSeenAt);
+    const label = status === "offline"
+      ? { text: formatLastSeen(item.contactUser.lastSeenAt), color: colors.textTertiary }
+      : presenceLabel(status);
     return (
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <UserAvatar
           name={item.contactUser.name}
           avatarUrl={item.contactUser.avatarUrl}
           size={44}
-          isOnline={online}
+          presenceStatus={status}
           showDot={true}
         />
         <View style={{ flex: 1 }}>
@@ -164,8 +177,8 @@ export default function ContactsScreen() {
               @{item.contactUser.username}
             </Text>
             <Text style={[styles.contactSub, { color: colors.textTertiary }]}>·</Text>
-            <Text style={[styles.contactSub, { color: online ? colors.success : colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
-              {online ? "Online" : formatLastSeen(item.contactUser.lastSeenAt)}
+            <Text style={[styles.contactSub, { color: label.color, fontFamily: "Inter_400Regular" }]}>
+              {label.text}
             </Text>
           </View>
         </View>
@@ -243,7 +256,7 @@ export default function ContactsScreen() {
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Contacts</Text>
           <Text style={[styles.headerSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-            {contacts.length} contacts{onlineCount > 0 ? ` · ${onlineCount} online` : ""}
+            {contacts.length} contacts{localCount > 0 ? ` · ${localCount} nearby` : onlineCount > 0 ? ` · ${onlineCount} online` : ""}
           </Text>
         </View>
         <Pressable

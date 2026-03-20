@@ -1,13 +1,28 @@
 import React from "react";
-import { View, Text, Image, StyleSheet } from "react-native";
+import { View, Text, Image } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
+import type { PresenceStatus } from "@/utils/localDiscovery";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+
+const LOCAL_COLOR = "#FF6B9D";
 
 function resolveAvatarUrl(avatarUrl: string | null | undefined): string | null {
   if (!avatarUrl) return null;
   if (avatarUrl.startsWith("http")) return avatarUrl;
   return `${BASE_URL}${avatarUrl}`;
+}
+
+function dotColor(
+  presenceStatus: PresenceStatus | undefined,
+  isOnline: boolean | undefined,
+  successColor: string,
+  offlineColor: string
+): string {
+  if (presenceStatus === "local") return LOCAL_COLOR;
+  if (presenceStatus === "online") return successColor;
+  if (presenceStatus === "offline") return offlineColor;
+  return isOnline ? successColor : offlineColor;
 }
 
 interface UserAvatarProps {
@@ -19,6 +34,7 @@ interface UserAvatarProps {
   style?: any;
   isOnline?: boolean;
   showDot?: boolean;
+  presenceStatus?: PresenceStatus;
 }
 
 export default function UserAvatar({
@@ -30,6 +46,7 @@ export default function UserAvatar({
   style,
   isOnline,
   showDot = true,
+  presenceStatus,
 }: UserAvatarProps) {
   const { colors } = useTheme();
   const resolvedUrl = resolveAvatarUrl(avatarUrl);
@@ -37,6 +54,9 @@ export default function UserAvatar({
   const fontSize = Math.round(size * 0.38);
   const dotSize = Math.max(8, Math.round(size * 0.22));
   const dotBorder = Math.max(1.5, Math.round(size * 0.04));
+
+  const showPresenceDot = showDot && (presenceStatus !== undefined || isOnline !== undefined);
+  const dot = dotColor(presenceStatus, isOnline, colors.success, colors.textTertiary);
 
   return (
     <View style={[{ width: size, height: size, position: "relative" }, style]}>
@@ -61,7 +81,7 @@ export default function UserAvatar({
           </Text>
         )}
       </View>
-      {showDot && isOnline !== undefined && (
+      {showPresenceDot && (
         <View style={{
           position: "absolute",
           bottom: 0,
@@ -69,7 +89,7 @@ export default function UserAvatar({
           width: dotSize,
           height: dotSize,
           borderRadius: dotSize / 2,
-          backgroundColor: isOnline ? colors.success : colors.textTertiary,
+          backgroundColor: dot,
           borderWidth: dotBorder,
           borderColor: colors.surface,
         }} />
