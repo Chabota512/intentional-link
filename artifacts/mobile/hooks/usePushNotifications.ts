@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import { router } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useApi } from "@/hooks/useApi";
+
+const EXPO_PROJECT_ID = "8bf968f3-4d7e-434b-8a10-23281a087dd9";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -18,6 +21,26 @@ export function usePushNotifications() {
   const { user } = useAuth();
   const { put } = useApi();
   const registered = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      const sessionId = data?.sessionId;
+      const type = data?.type;
+
+      if (sessionId) {
+        if (type === "incoming-call") {
+          router.push(`/session/call/${sessionId}`);
+        } else {
+          router.push(`/session/${sessionId}`);
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (!user || registered.current) return;
@@ -37,7 +60,7 @@ export function usePushNotifications() {
         if (finalStatus !== "granted") return;
 
         const tokenData = await Notifications.getExpoPushTokenAsync({
-          projectId: process.env.EXPO_PUBLIC_REPL_ID,
+          projectId: EXPO_PROJECT_ID,
         });
 
         const pushToken = tokenData.data;

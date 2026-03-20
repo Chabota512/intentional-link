@@ -7,6 +7,7 @@ import {
   InviteToSessionBody,
   GetSessionResponse,
 } from "@workspace/api-zod";
+import { sendPushNotification } from "../lib/pushNotifications";
 
 const router: IRouter = Router();
 
@@ -284,6 +285,20 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
       userId: parsed.data.userId,
       status: "invited",
     });
+  }
+
+  const [invitedUser] = await db.select({ pushToken: usersTable.pushToken, name: usersTable.name })
+    .from(usersTable).where(eq(usersTable.id, parsed.data.userId)).limit(1);
+  const [inviter] = await db.select({ name: usersTable.name })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+
+  if (invitedUser?.pushToken && inviter) {
+    await sendPushNotification(
+      invitedUser.pushToken,
+      "Session Invitation",
+      `${inviter.name} invited you to join "${membership.session.name}"`,
+      { sessionId, type: "session-invite" }
+    );
   }
 
   const result = await getSessionWithParticipants(sessionId);
