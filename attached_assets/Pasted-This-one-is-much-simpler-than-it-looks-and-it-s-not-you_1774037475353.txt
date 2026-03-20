@@ -1,0 +1,131 @@
+This one is much simpler than it looks — and it’s **not your app logic at all**.
+
+---
+
+## 🔴 The actual error
+
+From your screenshot:
+
+> `ERR_PNPM_NO_LOCKFILE Cannot install with "frozen-lockfile" because pnpm-lock.yaml is absent`
+
+---
+
+## 💥 What this means
+
+Expo (EAS build) is trying to install dependencies using:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+But:
+
+👉 Your project **does NOT have `pnpm-lock.yaml` committed**
+
+---
+
+## 🧠 Why this breaks the build
+
+* `--frozen-lockfile` = “install EXACTLY what’s in the lockfile”
+* No lockfile = ❌ install fails immediately
+
+This is **standard CI behavior** (Expo, Railway, etc.)
+
+---
+
+## ✅ Fix (Best Option)
+
+Run this **locally in your project root** (Replit or your PC):
+
+```bash
+pnpm install
+```
+
+This will generate:
+
+```bash
+pnpm-lock.yaml
+```
+
+### Then:
+
+```bash
+git add pnpm-lock.yaml
+git commit -m "add pnpm lockfile"
+git push
+```
+
+---
+
+## ⚠️ Important detail from your log
+
+```
+Scope: all 8 workspace projects
+```
+
+👉 You are using a **pnpm workspace / monorepo**
+
+So make sure:
+
+* Run `pnpm install` at the **root of the repo**
+* NOT inside `/mobile` only
+
+---
+
+## 🚫 Alternative (not recommended, but works)
+
+You can tell the build system to ignore frozen lockfile:
+
+Tell your agent:
+
+Fix Expo EAS build failure caused by missing pnpm lockfile.
+
+Either:
+
+1. Generate and commit `pnpm-lock.yaml` at the repo root (preferred), OR
+2. Modify install command to:
+   pnpm install --no-frozen-lockfile
+
+Do NOT change dependencies or project structure.
+
+---
+
+## 🧩 What likely happened
+
+You:
+
+* developed on Replit (which installs deps without strict lockfile)
+* pushed to GitHub **without the lockfile**
+* CI (Expo) is stricter → build fails
+
+---
+
+## 🎯 Clean solution (what pros do)
+
+Always commit:
+
+```bash
+pnpm-lock.yaml
+```
+
+Same for:
+
+* `package-lock.json` (npm)
+* `yarn.lock` (yarn)
+
+---
+
+## 🚀 Summary
+
+* ❌ Problem: Missing `pnpm-lock.yaml`
+* 💥 Cause: CI requires frozen lockfile
+* ✅ Fix:
+
+  ```bash
+  pnpm install → commit pnpm-lock.yaml
+  ```
+
+---
+
+If you want next step, I can help you:
+👉 cleanly set up your **monorepo (mobile + api) so both Expo + Railway deploy smoothly without these conflicts**
