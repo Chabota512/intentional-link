@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
+import InCallManager from "react-native-incall-manager";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -29,9 +30,15 @@ export default function CallScreen() {
   const [callUrl, setCallUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [speakerOn, setSpeakerOn] = useState(!isVoice);
 
   useEffect(() => {
     joinCall();
+    return () => {
+      if (Platform.OS !== "web") {
+        InCallManager.stop();
+      }
+    };
   }, []);
 
   async function joinCall() {
@@ -50,6 +57,11 @@ export default function CallScreen() {
       });
       const pageUrl = `${BASE_URL}/api/sessions/${sessionId}/call-page?mode=${isVoice ? "voice" : "video"}&${params.toString()}`;
       setCallUrl(pageUrl);
+
+      if (Platform.OS !== "web") {
+        InCallManager.start({ media: isVoice ? "audio" : "video", auto: true });
+        InCallManager.setSpeakerphoneOn(!isVoice);
+      }
     } catch (e: any) {
       setError(e?.message ?? "Failed to join call");
     } finally {
@@ -61,16 +73,29 @@ export default function CallScreen() {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === "endCall") {
-        router.back();
+        leaveCall();
+      } else if (msg.type === "toggleSpeaker") {
+        const next = !speakerOn;
+        setSpeakerOn(next);
+        if (Platform.OS !== "web") {
+          InCallManager.setSpeakerphoneOn(next);
+        }
       }
     } catch {}
+  }
+
+  function leaveCall() {
+    if (Platform.OS !== "web") {
+      InCallManager.stop();
+    }
+    router.back();
   }
 
   function handleEnd() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(`Leave ${isVoice ? "voice" : "video"} call?`, "You will exit the call.", [
       { text: "Stay", style: "cancel" },
-      { text: "Leave", style: "destructive", onPress: () => router.back() },
+      { text: "Leave", style: "destructive", onPress: leaveCall },
     ]);
   }
 
