@@ -227,7 +227,7 @@ router.get("/users/search", async (req, res): Promise<void> => {
       createdAt: usersTable.createdAt,
       lastSeenAt: usersTable.lastSeenAt,
     }).from(usersTable)
-      .where(and(ilike(usersTable.username, `%${q}%`), ne(usersTable.id, userId)))
+      .where(and(or(ilike(usersTable.username, `%${q}%`), ilike(usersTable.name, `%${q}%`)), ne(usersTable.id, userId)))
       .limit(20);
   } catch {
     res.status(503).json({ error: "Search unavailable. Please try again." });
