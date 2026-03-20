@@ -20,7 +20,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#4F6EF7"
+        "backgroundColor": "#4BA896"
       }
     },
     "web": {
@@ -28,7 +28,7 @@
       "name": "Intentional Link",
       "shortName": "Intl. Link",
       "description": "Meaningful, intentional communication sessions",
-      "themeColor": "#4F6EF7",
+      "themeColor": "#4BA896",
       "backgroundColor": "#F0F2F8",
       "lang": "en",
       "bundler": "metro",
