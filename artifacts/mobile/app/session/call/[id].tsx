@@ -16,19 +16,19 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
 
-export default function VideoCallScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+
+export default function CallScreen() {
+  const { id, mode = "video" } = useLocalSearchParams<{ id: string; mode?: string }>();
   const sessionId = parseInt(id, 10);
+  const isVoice = mode === "voice";
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { post } = useApi();
-  const webviewRef = useRef<WebView>(null);
 
-  const [roomUrl, setRoomUrl] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [callUrl, setCallUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [callUrl, setCallUrl] = useState<string | null>(null);
 
   useEffect(() => {
     joinCall();
@@ -38,10 +38,18 @@ export default function VideoCallScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await post<{ roomUrl: string; token: string }>(`/sessions/${sessionId}/video-call`, {});
-      setRoomUrl(data.roomUrl);
-      setToken(data.token);
-      setCallUrl(`${data.roomUrl}?t=${data.token}`);
+      const data = await post<{ appId: string; channel: string; token: string; uid: number }>(
+        `/sessions/${sessionId}/video-call`,
+        {}
+      );
+      const params = new URLSearchParams({
+        appId: data.appId,
+        channel: data.channel,
+        token: data.token,
+        uid: String(data.uid),
+      });
+      const pageUrl = `${BASE_URL}/api/sessions/${sessionId}/call-page?mode=${isVoice ? "voice" : "video"}&${params.toString()}`;
+      setCallUrl(pageUrl);
     } catch (e: any) {
       setError(e?.message ?? "Failed to join call");
     } finally {
@@ -49,32 +57,37 @@ export default function VideoCallScreen() {
     }
   }
 
+  function handleMessage(event: WebViewMessageEvent) {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === "endCall") {
+        router.back();
+      }
+    } catch {}
+  }
+
   function handleEnd() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert("Leave call?", "You will exit the video call.", [
+    Alert.alert(`Leave ${isVoice ? "voice" : "video"} call?`, "You will exit the call.", [
       { text: "Stay", style: "cancel" },
-      {
-        text: "Leave", style: "destructive", onPress: () => {
-          router.back();
-        }
-      },
+      { text: "Leave", style: "destructive", onPress: () => router.back() },
     ]);
   }
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: "#000", paddingTop: insets.top }]}>
-        <ActivityIndicator color="#fff" size="large" />
-        <Text style={[styles.loadingText, { color: "#fff" }]}>Connecting…</Text>
+      <View style={[styles.center, { backgroundColor: "#111", paddingTop: insets.top }]}>
+        <ActivityIndicator color="#FF6B9D" size="large" />
+        <Text style={styles.loadingText}>Connecting…</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={[styles.center, { backgroundColor: "#000", paddingTop: insets.top }]}>
-        <Feather name="video-off" size={48} color="#FF6B6B" />
-        <Text style={[styles.errorText, { color: "#fff" }]}>{error}</Text>
+      <View style={[styles.center, { backgroundColor: "#111", paddingTop: insets.top }]}>
+        <Feather name={isVoice ? "phone-off" : "video-off"} size={48} color="#FF6B6B" />
+        <Text style={styles.errorText}>{error}</Text>
         <Pressable style={styles.retryBtn} onPress={joinCall}>
           <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold" }}>Retry</Text>
         </Pressable>
@@ -92,7 +105,7 @@ export default function VideoCallScreen() {
       <View style={styles.topBar}>
         <View style={styles.callBadge}>
           <View style={styles.liveDot} />
-          <Text style={styles.liveText}>LIVE</Text>
+          <Text style={styles.liveText}>{isVoice ? "VOICE" : "VIDEO"}</Text>
         </View>
         <Pressable style={styles.endBtn} onPress={handleEnd}>
           <Feather name="phone-off" size={18} color="#fff" />
@@ -102,9 +115,9 @@ export default function VideoCallScreen() {
 
       {Platform.OS === "web" ? (
         <View style={styles.webFallback}>
-          <Feather name="video" size={48} color="#FF6B9D" />
+          <Feather name={isVoice ? "phone" : "video"} size={48} color="#FF6B9D" />
           <Text style={{ color: "#fff", fontSize: 16, marginTop: 16, textAlign: "center", paddingHorizontal: 32 }}>
-            Video calls open in your browser on web. Tap below to join.
+            {isVoice ? "Voice" : "Video"} calls open in your browser. Tap below to join.
           </Text>
           <Pressable
             style={styles.openBrowserBtn}
@@ -117,9 +130,9 @@ export default function VideoCallScreen() {
         </View>
       ) : (
         <WebView
-          ref={webviewRef}
           source={{ uri: callUrl }}
           style={styles.webview}
+          onMessage={handleMessage}
           mediaPlaybackRequiresUserAction={false}
           allowsInlineMediaPlayback
           mediaCapturePermissionGrantType="grant"
@@ -137,7 +150,7 @@ export default function VideoCallScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#111",
   },
   center: {
     flex: 1,
@@ -149,12 +162,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 12,
     fontFamily: "Inter_400Regular",
+    color: "#fff",
   },
   errorText: {
     fontSize: 15,
     textAlign: "center",
     paddingHorizontal: 32,
     fontFamily: "Inter_400Regular",
+    color: "#fff",
   },
   retryBtn: {
     backgroundColor: "#FF6B9D",
@@ -168,7 +183,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0,0,0,0.8)",
   },
   callBadge: {
     flexDirection: "row",
@@ -183,7 +198,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#FF3B30",
+    backgroundColor: "#4CAF50",
   },
   liveText: {
     color: "#fff",
@@ -207,7 +222,7 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#111",
   },
   webFallback: {
     flex: 1,

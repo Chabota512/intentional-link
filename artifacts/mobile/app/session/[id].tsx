@@ -1083,15 +1083,26 @@ export default function SessionScreen() {
         </View>
         <View style={styles.navActions}>
           {isActive && canSend && (
-            <Pressable
-              style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1, backgroundColor: "#FF6B9D22", borderRadius: 8, padding: 6 }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push(`/session/call/${sessionId}` as any);
-              }}
-            >
-              <Feather name="video" size={20} color="#FF6B9D" />
-            </Pressable>
+            <>
+              <Pressable
+                style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1, backgroundColor: "#4CAF5022", borderRadius: 8, padding: 6 }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/session/call/${sessionId}?mode=voice` as any);
+                }}
+              >
+                <Feather name="phone" size={20} color="#4CAF50" />
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1, backgroundColor: "#FF6B9D22", borderRadius: 8, padding: 6 }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/session/call/${sessionId}?mode=video` as any);
+                }}
+              >
+                <Feather name="video" size={20} color="#FF6B9D" />
+              </Pressable>
+            </>
           )}
           <Pressable
             style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
