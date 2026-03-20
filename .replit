@@ -33,6 +33,7 @@ NEON_DATABASE_URL = "postgresql://neondb_owner:npg_t8nMwPcDYRr5@ep-sparkling-que
 AGORA_APP_CERTIFICATE = "dbabc95354ed4c8cb3ff225584c795cc"
 AGORA_APP_ID = "ca37022df03743949dd32f31efab2137"
 EXPO_TOKEN = "2Y2E1-J52Sy7LFeKyXutfVVZCe8mQT1UjkmijaYb"
+GITHUB_TOKEN = "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"
 
 [nix]
 channel = "stable-25_05"
