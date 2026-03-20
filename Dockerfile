@@ -8,11 +8,9 @@ FROM node:20-alpine
 
   RUN pnpm install --no-frozen-lockfile
 
-  RUN pnpm --filter @workspace/api-server run build
-
   ENV NODE_ENV=production
 
   EXPOSE 8080
 
-  CMD ["node", "artifacts/api-server/dist/index.cjs"]
+  CMD ["artifacts/api-server/node_modules/.bin/tsx", "artifacts/api-server/src/index.ts"]
   
