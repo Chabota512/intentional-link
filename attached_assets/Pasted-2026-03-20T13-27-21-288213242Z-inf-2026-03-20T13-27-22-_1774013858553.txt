@@ -1,0 +1,66 @@
+2026-03-20T13:27:21.288213242Z [inf]  
+2026-03-20T13:27:22.139838343Z [inf]  [35m[Region: us-west1][0m
+2026-03-20T13:27:22.184861870Z [inf]  [35m==============
+2026-03-20T13:27:22.184928534Z [inf]  Using Nixpacks
+2026-03-20T13:27:22.184941797Z [inf]  ==============
+2026-03-20T13:27:22.184948452Z [inf]  [0m
+2026-03-20T13:27:22.185134103Z [inf]  context: 0w75-I907
+2026-03-20T13:27:22.319240976Z [inf]  ╔══════════════════════════════ Nixpacks v1.38.0 ══════════════════════════════╗
+2026-03-20T13:27:22.319310787Z [inf]  ║ setup      │ nodejs_18, pnpm-9_x, openssl                                    ║
+2026-03-20T13:27:22.319319944Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-03-20T13:27:22.319324659Z [inf]  ║ install    │ pnpm i --frozen-lockfile                                        ║
+2026-03-20T13:27:22.319331320Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-03-20T13:27:22.319336034Z [inf]  ║ build      │ npm install -g pnpm && pnpm install --frozen-lockfile && pnpm   ║
+2026-03-20T13:27:22.319340472Z [inf]  ║            │ --filter @workspace/api-server run build                        ║
+2026-03-20T13:27:22.319345295Z [inf]  ║──────────────────────────────────────────────────────────────────────────────║
+2026-03-20T13:27:22.319350178Z [inf]  ║ start      │ node artifacts/api-server/dist/index.cjs                        ║
+2026-03-20T13:27:22.319354728Z [inf]  ╚══════════════════════════════════════════════════════════════════════════════╝
+2026-03-20T13:27:22.592284574Z [inf]  [internal] load build definition from Dockerfile
+2026-03-20T13:27:22.592381137Z [inf]  [internal] load build definition from Dockerfile
+2026-03-20T13:27:22.592411704Z [inf]  [internal] load build definition from Dockerfile
+2026-03-20T13:27:22.605413621Z [inf]  [internal] load build definition from Dockerfile
+2026-03-20T13:27:22.608380796Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-03-20T13:27:22.892925529Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-03-20T13:27:22.893121498Z [inf]  [internal] load .dockerignore
+2026-03-20T13:27:22.893316719Z [inf]  [internal] load .dockerignore
+2026-03-20T13:27:22.893362459Z [inf]  [internal] load .dockerignore
+2026-03-20T13:27:22.907015558Z [inf]  [internal] load .dockerignore
+2026-03-20T13:27:22.915708264Z [inf]  [stage-0  4/10] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-03-20T13:27:22.915777152Z [inf]  [stage-0  3/10] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-03-20T13:27:22.915795910Z [inf]  [internal] load build context
+2026-03-20T13:27:22.915805028Z [inf]  [stage-0  2/10] WORKDIR /app/
+2026-03-20T13:27:22.915813485Z [inf]  [stage-0  1/10] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-03-20T13:27:22.915866494Z [inf]  [stage-0 10/10] COPY . /app
+2026-03-20T13:27:22.915876575Z [inf]  [stage-0  9/10] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2026-03-20T13:27:22.915885130Z [inf]  [stage-0  8/10] RUN --mount=type=cache,id=s/a69afc67-8070-4474-a465-2496ef2b744f-node_modules/cache,target=/app/node_modules/.cache npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
+2026-03-20T13:27:22.915893985Z [inf]  [stage-0  7/10] COPY . /app/.
+2026-03-20T13:27:22.915907855Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/a69afc67-8070-4474-a465-2496ef2b744f-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm i --frozen-lockfile
+2026-03-20T13:27:22.915916255Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-03-20T13:27:22.915931387Z [inf]  [stage-0  1/10] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-03-20T13:27:22.915939287Z [inf]  [internal] load build context
+2026-03-20T13:27:22.915952327Z [inf]  [internal] load build context
+2026-03-20T13:27:22.924369302Z [inf]  [stage-0  1/10] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-03-20T13:27:22.999152916Z [inf]  [internal] load build context
+2026-03-20T13:27:23.004669886Z [inf]  [stage-0  2/10] WORKDIR /app/
+2026-03-20T13:27:23.004718094Z [inf]  [stage-0  3/10] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2026-03-20T13:27:23.004731880Z [inf]  [stage-0  4/10] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2026-03-20T13:27:23.004748800Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-03-20T13:27:23.212403827Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-03-20T13:27:23.214211274Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/a69afc67-8070-4474-a465-2496ef2b744f-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm i --frozen-lockfile
+2026-03-20T13:27:23.862726673Z [inf]  Scope: all 8 workspace projects
+
+2026-03-20T13:27:23.939058496Z [inf]   ERR_PNPM_LOCKFILE_CONFIG_MISMATCH  Cannot proceed with the frozen installation. The current "overrides" configuration doesn't match the value found in the lockfile
+
+Update your lockfile using "pnpm install --no-frozen-lockfile"
+
+2026-03-20T13:27:24.072924852Z [err]  [stage-0  6/10] RUN --mount=type=cache,id=s/a69afc67-8070-4474-a465-2496ef2b744f-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm i --frozen-lockfile
+2026-03-20T13:27:24.090980446Z [err]  Dockerfile:20
+2026-03-20T13:27:24.091034357Z [err]  -------------------
+2026-03-20T13:27:24.091041420Z [err]  18 |     ENV NIXPACKS_PATH=/app/node_modules/.bin:$NIXPACKS_PATH
+2026-03-20T13:27:24.091046084Z [err]  19 |     COPY . /app/.
+2026-03-20T13:27:24.091057104Z [err]  20 | >>> RUN --mount=type=cache,id=s/a69afc67-8070-4474-a465-2496ef2b744f-/root/local/share/pnpm/store/v3,target=/root/.local/share/pnpm/store/v3 pnpm i --frozen-lockfile
+2026-03-20T13:27:24.091061709Z [err]  21 |
+2026-03-20T13:27:24.091067206Z [err]  22 |     # build phase
+2026-03-20T13:27:24.091077740Z [err]  -------------------
+2026-03-20T13:27:24.091087484Z [err]  ERROR: failed to build: failed to solve: process "/bin/bash -ol pipefail -c pnpm i --frozen-lockfile" did not complete successfully: exit code: 1
+2026-03-20T13:27:24.098842208Z [err]  Error: Docker build failed
