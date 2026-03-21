@@ -222,6 +222,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on("messages_read", (_data: { userId: number; sessionId: number }) => {
     });
 
+    socket.on("session_deleted", (data: { sessionId: number }) => {
+      queryClient.setQueryData(["sessions"], (old: any) => {
+        if (!old) return old;
+        return old.filter((s: any) => s.id !== data.sessionId);
+      });
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+    });
+
+    socket.on("participant_left", (data: { sessionId: number; userId: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["messages", data.sessionId] });
+    });
+
     socket.on("show_presence_dialog", (data: PresenceDialogData) => {
       setPresenceDialogData(data);
     });
