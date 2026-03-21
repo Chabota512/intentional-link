@@ -13,6 +13,7 @@ import {
   Share,
   Image,
   Linking,
+  Keyboard,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -485,6 +486,17 @@ export default function SessionScreen() {
   const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
   const [customEmojiInput, setCustomEmojiInput] = useState("");
   const [showCustomEmoji, setShowCustomEmoji] = useState(false);
+  const [reactionKeyboardHeight, setReactionKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      if (reactionPickerMessage !== null) setReactionKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => setReactionKeyboardHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [reactionPickerMessage]);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -585,6 +597,15 @@ export default function SessionScreen() {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const sub = Keyboard.addListener(showEvent, () => {
+      if (reactionPickerMessage !== null) return;
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    return () => sub.remove();
+  }, [reactionPickerMessage]);
 
   const sendMutation = useMutation({
     mutationFn: (payload: { content?: string; type?: string; attachmentUrl?: string; attachmentName?: string; attachmentSize?: number }) =>
@@ -1190,7 +1211,7 @@ export default function SessionScreen() {
       )}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         keyboardVerticalOffset={0}
         style={{ flex: 1 }}
       >
@@ -1443,11 +1464,15 @@ export default function SessionScreen() {
           setCustomEmojiInput("");
         }}
       >
-        <Pressable style={styles.attachOverlay} onPress={() => {
-          setReactionPickerMessage(null);
-          setShowCustomEmoji(false);
-          setCustomEmojiInput("");
-        }}>
+        <Pressable
+          style={[styles.attachOverlay, { paddingBottom: Math.max(24, reactionKeyboardHeight + 12) }]}
+          onPress={() => {
+            Keyboard.dismiss();
+            setReactionPickerMessage(null);
+            setShowCustomEmoji(false);
+            setCustomEmojiInput("");
+          }}
+        >
           <Pressable onPress={() => {}} style={[styles.reactionPickerSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.attachTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
               React to message
