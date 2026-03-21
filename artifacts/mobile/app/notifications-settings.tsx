@@ -11,7 +11,6 @@ import {
   Alert,
   Modal,
   Platform,
-  TextInput,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
@@ -70,17 +69,6 @@ const DAYS = [
 ];
 
 
-const HOUR_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
-  const totalMin = i * 15;
-  const h24 = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  const ampm = h24 < 12 ? "AM" : "PM";
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  return {
-    label: `${h12}:${String(m).padStart(2, "0")} ${ampm}`,
-    value: `${String(h24).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
-  };
-});
 
 function Avatar({ name, avatarUrl, size = 38, colors }: { name: string; avatarUrl: string | null; size?: number; colors: any }) {
   const initials = name.trim().charAt(0).toUpperCase();
@@ -93,44 +81,7 @@ function Avatar({ name, avatarUrl, size = 38, colors }: { name: string; avatarUr
 }
 
 
-function parseCustomTime(input: string): string | null {
-  const cleaned = input.trim().toUpperCase().replace(/\s+/g, " ");
-
-  const withMinAmPm = cleaned.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
-  if (withMinAmPm) {
-    let h = parseInt(withMinAmPm[1]);
-    const m = parseInt(withMinAmPm[2]);
-    const pm = withMinAmPm[3] === "PM";
-    if (h < 1 || h > 12 || m < 0 || m > 59) return null;
-    if (h === 12) h = pm ? 12 : 0;
-    else if (pm) h += 12;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-  }
-
-  const hourAmPm = cleaned.match(/^(\d{1,2})\s*(AM|PM)$/);
-  if (hourAmPm) {
-    let h = parseInt(hourAmPm[1]);
-    const pm = hourAmPm[2] === "PM";
-    if (h < 1 || h > 12) return null;
-    if (h === 12) h = pm ? 12 : 0;
-    else if (pm) h += 12;
-    return `${String(h).padStart(2, "0")}:00`;
-  }
-
-  const mil = cleaned.match(/^(\d{1,2}):(\d{2})$/);
-  if (mil) {
-    const h = parseInt(mil[1]);
-    const m = parseInt(mil[2]);
-    if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-  }
-
-  return null;
-}
-
 function formatTimeValue(value: string): string {
-  const preset = HOUR_OPTIONS.find(h => h.value === value);
-  if (preset) return preset.label;
   const [hStr, mStr] = value.split(":");
   const h = parseInt(hStr);
   const m = parseInt(mStr);
@@ -141,25 +92,38 @@ function formatTimeValue(value: string): string {
 
 function TimePicker({ value, onChange, label, colors }: { value: string | null; onChange: (v: string | null) => void; label: string; colors: any }) {
   const [open, setOpen] = useState(false);
-  const [customInput, setCustomInput] = useState("");
-  const [customError, setCustomError] = useState(false);
 
-  const display = value ? formatTimeValue(value) : "—";
-
-  const handleCustomSubmit = () => {
-    const parsed = parseCustomTime(customInput);
-    if (!parsed) { setCustomError(true); return; }
-    setCustomError(false);
-    onChange(parsed);
-    setOpen(false);
-    setCustomInput("");
+  const parseValue = (v: string | null) => {
+    if (!v) return { h: 12, m: 0, ampm: "AM" as "AM" | "PM" };
+    const [hStr, mStr] = v.split(":");
+    const h24 = parseInt(hStr);
+    const m = parseInt(mStr);
+    const ampm: "AM" | "PM" = h24 < 12 ? "AM" : "PM";
+    const h = h24 % 12 === 0 ? 12 : h24 % 12;
+    return { h, m, ampm };
   };
+
+  const init = parseValue(value);
+  const [stepH, setStepH] = useState(init.h);
+  const [stepM, setStepM] = useState(init.m);
+  const [stepAmPm, setStepAmPm] = useState<"AM" | "PM">(init.ampm);
 
   const handleOpen = () => {
-    setCustomInput("");
-    setCustomError(false);
+    const p = parseValue(value);
+    setStepH(p.h);
+    setStepM(p.m);
+    setStepAmPm(p.ampm);
     setOpen(true);
   };
+
+  const handleSet = () => {
+    let h24 = stepH % 12;
+    if (stepAmPm === "PM") h24 += 12;
+    onChange(`${String(h24).padStart(2, "0")}:${String(stepM).padStart(2, "0")}`);
+    setOpen(false);
+  };
+
+  const display = value ? formatTimeValue(value) : "—";
 
   return (
     <>
@@ -176,39 +140,65 @@ function TimePicker({ value, onChange, label, colors }: { value: string | null; 
           <View style={[styles.pickerSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.pickerTitle, { color: colors.text }]}>{label}</Text>
 
-            {/* Custom time entry */}
-            <View style={[styles.customTimeRow, { borderColor: customError ? "#EF4444" : colors.border, backgroundColor: colors.background }]}>
-              <Feather name="clock" size={15} color={customError ? "#EF4444" : colors.textTertiary} />
-              <TextInput
-                style={[styles.customTimeInput, { color: colors.text }]}
-                placeholder="e.g. 3:45 PM or 15:45"
-                placeholderTextColor={colors.textTertiary}
-                value={customInput}
-                onChangeText={t => { setCustomInput(t); setCustomError(false); }}
-                onSubmitEditing={handleCustomSubmit}
-                returnKeyType="done"
-                autoCorrect={false}
-              />
-              <Pressable onPress={handleCustomSubmit} style={[styles.customTimeSet, { backgroundColor: colors.accent }]}>
-                <Text style={styles.customTimeSetText}>Set</Text>
+            <View style={styles.timeStepperRow}>
+              {/* Hours */}
+              <View style={styles.timeStepperCol}>
+                <Text style={[styles.durationStepperLabel, { color: colors.textTertiary }]}>Hour</Text>
+                <View style={styles.durationStepperRow}>
+                  <Pressable style={[styles.durationStepBtn, { borderColor: colors.border }]} onPress={() => setStepH(h => h === 1 ? 12 : h - 1)}>
+                    <Feather name="minus" size={16} color={colors.text} />
+                  </Pressable>
+                  <Text style={[styles.durationStepValue, { color: colors.text }]}>{stepH}</Text>
+                  <Pressable style={[styles.durationStepBtn, { borderColor: colors.border }]} onPress={() => setStepH(h => h === 12 ? 1 : h + 1)}>
+                    <Feather name="plus" size={16} color={colors.text} />
+                  </Pressable>
+                </View>
+              </View>
+
+              <Text style={[styles.timeStepColon, { color: colors.text }]}>:</Text>
+
+              {/* Minutes */}
+              <View style={styles.timeStepperCol}>
+                <Text style={[styles.durationStepperLabel, { color: colors.textTertiary }]}>Min</Text>
+                <View style={styles.durationStepperRow}>
+                  <Pressable style={[styles.durationStepBtn, { borderColor: colors.border }]} onPress={() => setStepM(m => m === 0 ? 59 : m - 1)}>
+                    <Feather name="minus" size={16} color={colors.text} />
+                  </Pressable>
+                  <Text style={[styles.durationStepValue, { color: colors.text }]}>{String(stepM).padStart(2, "0")}</Text>
+                  <Pressable style={[styles.durationStepBtn, { borderColor: colors.border }]} onPress={() => setStepM(m => m === 59 ? 0 : m + 1)}>
+                    <Feather name="plus" size={16} color={colors.text} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* AM / PM */}
+              <View style={styles.timeStepperCol}>
+                <Text style={[styles.durationStepperLabel, { color: colors.textTertiary }]}> </Text>
+                <View style={[styles.ampmToggle, { borderColor: colors.border }]}>
+                  <Pressable
+                    style={[styles.ampmBtn, stepAmPm === "AM" && { backgroundColor: colors.accent }]}
+                    onPress={() => setStepAmPm("AM")}
+                  >
+                    <Text style={[styles.ampmBtnText, { color: stepAmPm === "AM" ? "#fff" : colors.textSecondary }]}>AM</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.ampmBtn, stepAmPm === "PM" && { backgroundColor: colors.accent }]}
+                    onPress={() => setStepAmPm("PM")}
+                  >
+                    <Text style={[styles.ampmBtnText, { color: stepAmPm === "PM" ? "#fff" : colors.textSecondary }]}>PM</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.timePickerActions}>
+              <Pressable onPress={() => { onChange(null); setOpen(false); }} style={[styles.timePickerBtn, { borderColor: colors.border }]}>
+                <Text style={[styles.timePickerBtnText, { color: colors.textSecondary }]}>Clear</Text>
+              </Pressable>
+              <Pressable onPress={handleSet} style={[styles.timePickerBtn, { backgroundColor: colors.accent, borderColor: colors.accent }]}>
+                <Text style={[styles.timePickerBtnText, { color: "#fff" }]}>Set</Text>
               </Pressable>
             </View>
-            {customError && (
-              <Text style={styles.customTimeError}>Enter a time like "3:45 PM" or "15:45"</Text>
-            )}
-
-            <ScrollView style={{ maxHeight: 240 }}>
-              <Pressable onPress={() => { onChange(null); setOpen(false); }}>
-                <Text style={[styles.pickerOption, { color: colors.textTertiary, borderBottomColor: colors.border }]}>Clear</Text>
-              </Pressable>
-              {HOUR_OPTIONS.map(h => (
-                <Pressable key={h.value} onPress={() => { onChange(h.value); setOpen(false); }}>
-                  <Text style={[styles.pickerOption, { color: h.value === value ? colors.accent : colors.text, borderBottomColor: colors.border }]}>
-                    {h.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
           </View>
         </Pressable>
       </Modal>
@@ -928,6 +918,56 @@ const styles = StyleSheet.create({
   modalEmoji: { fontSize: 18 },
   modalTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
   modalAction: { fontSize: 15, fontFamily: "Inter_400Regular" },
+
+  timeStepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  timeStepperCol: {
+    alignItems: "center",
+    gap: 8,
+  },
+  timeStepColon: {
+    fontSize: 24,
+    fontFamily: "Inter_600SemiBold",
+    marginTop: 20,
+  },
+  ampmToggle: {
+    borderWidth: 1.5,
+    borderRadius: 10,
+    overflow: "hidden",
+    flexDirection: "column",
+  },
+  ampmBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  ampmBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  timePickerActions: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  timePickerBtn: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  timePickerBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+  },
 
   durationStepperCard: {
     flexDirection: "row",
