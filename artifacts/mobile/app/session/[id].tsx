@@ -1554,9 +1554,6 @@ export default function SessionScreen() {
       >
         <Pressable style={styles.attachOverlay} onPress={() => setAttachMenuVisible(false)}>
           <Pressable onPress={() => {}} style={[styles.attachSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.attachTitle, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
-              Send attachment
-            </Text>
             <View style={styles.attachOptionsRow}>
               <Pressable
                 style={({ pressed }) => [styles.attachIconTile, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
@@ -2359,11 +2356,9 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   attachSheet: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    padding: 16,
-    gap: 14,
-    minWidth: 220,
+    padding: 10,
   },
   attachTitle: {
     fontSize: 12,
@@ -2373,24 +2368,23 @@ const styles = StyleSheet.create({
   },
   attachOptionsRow: {
     flexDirection: "row",
-    gap: 12,
-    justifyContent: "center",
+    gap: 8,
   },
   attachIconTile: {
     alignItems: "center",
-    gap: 8,
-    padding: 14,
-    borderRadius: 16,
-    flex: 1,
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
   },
   attachIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
-  attachIconLabel: { fontSize: 13 },
+  attachIconLabel: { fontSize: 12 },
   onlineDot: {
     position: "absolute",
     bottom: 1,
