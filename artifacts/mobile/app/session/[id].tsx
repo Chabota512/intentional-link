@@ -1247,7 +1247,7 @@ export default function SessionScreen() {
       router.replace("/(tabs)");
     },
     onError: (e: any) => {
-      Alert.alert("Error", e.message || "Failed to delete session");
+      Alert.alert("Error", e.message || "Failed to delete chat");
     },
   });
 
@@ -2350,7 +2350,7 @@ export default function SessionScreen() {
                   onPress={() => { setMoreMenuVisible(false); handleDeleteSession(); }}
                 >
                   <Feather name="trash-2" size={20} color={colors.danger} />
-                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Session</Text>
+                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Chat</Text>
                 </Pressable>
               </>
             )}
@@ -2362,7 +2362,7 @@ export default function SessionScreen() {
                   onPress={() => { setMoreMenuVisible(false); handleDeleteSession(); }}
                 >
                   <Feather name="trash-2" size={20} color={colors.danger} />
-                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Session</Text>
+                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Chat</Text>
                 </Pressable>
               </>
             )}
