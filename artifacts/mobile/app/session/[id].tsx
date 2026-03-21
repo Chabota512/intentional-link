@@ -1378,7 +1378,7 @@ export default function SessionScreen() {
         <Pressable
           style={styles.navCenter}
           onPress={() => {
-            if (headerPerson) {
+            if (!session.imageUrl && headerPerson) {
               setProfileViewUser({
                 name: headerPerson.name,
                 username: headerPerson.username,
@@ -1391,19 +1391,19 @@ export default function SessionScreen() {
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            {headerPerson ? (
+            {session.imageUrl ? (
+              <Image
+                source={{ uri: getFileUrl(session.imageUrl) }}
+                style={{ width: 34, height: 34, borderRadius: 17 }}
+                resizeMode="cover"
+              />
+            ) : headerPerson ? (
               <UserAvatar
                 name={session.title}
                 avatarUrl={headerPerson.avatarUrl}
                 size={34}
                 showDot={true}
                 presenceStatus={getEffectivePresence(headerPerson.id, headerPerson.lastSeenAt) as any}
-              />
-            ) : session.imageUrl ? (
-              <Image
-                source={{ uri: getFileUrl(session.imageUrl) }}
-                style={{ width: 34, height: 34, borderRadius: 17 }}
-                resizeMode="cover"
               />
             ) : (
               <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center" }}>
