@@ -165,7 +165,7 @@ router.get("/sessions/:id/call-page", async (req, res) => {
     align-items: center;
     justify-content: center;
     gap: 14px;
-    background: rgba(0,0,0,0.72);
+    background: rgba(0,0,0,0.92);
     z-index: 8;
     transition: opacity 0.4s;
   }
@@ -233,7 +233,6 @@ router.get("/sessions/:id/call-page", async (req, res) => {
   <div id="remote-video-wrap">
     <div id="remote-placeholder">
       <div class="ph-avatar">👤</div>
-      <div class="ph-name">No one connected yet</div>
     </div>
   </div>
   <div id="local-video-wrap">
