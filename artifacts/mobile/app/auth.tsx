@@ -130,26 +130,13 @@ export default function AuthScreen() {
           </View>
 
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.tabRow, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-              <Pressable
-                style={[styles.tab, mode === "login" && { backgroundColor: colors.accent }]}
-                onPress={() => switchMode("login")}
-              >
-                <Text style={[styles.tabText, { color: mode === "login" ? "#fff" : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-                  Sign In
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.tab, mode === "register" && { backgroundColor: colors.accent }]}
-                onPress={() => switchMode("register")}
-              >
-                <Text style={[styles.tabText, { color: mode === "register" ? "#fff" : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-                  Create Account
-                </Text>
-              </Pressable>
-            </View>
-
             <View style={styles.fields}>
+              <Text style={[styles.cardTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>
+                {mode === "login" ? "Welcome back" : "Create account"}
+              </Text>
+              <Text style={[styles.cardSubtitle, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                {mode === "login" ? "Sign in to continue" : "Join to get started"}
+              </Text>
               {mode === "register" && (
                 <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                   <Feather name="user" size={18} color={colors.textSecondary} />
@@ -269,6 +256,18 @@ export default function AuthScreen() {
                   </Text>
                 )}
               </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.switchLink, { opacity: pressed ? 0.6 : 1 }]}
+                onPress={() => switchMode(mode === "login" ? "register" : "login")}
+              >
+                <Text style={[styles.switchLinkText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+                  <Text style={{ color: colors.accent, fontFamily: "Inter_600SemiBold" }}>
+                    {mode === "login" ? "Sign up" : "Sign in"}
+                  </Text>
+                </Text>
+              </Pressable>
             </View>
           </View>
         </ScrollView>
@@ -309,22 +308,11 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 3,
   },
-  tabRow: {
-    flexDirection: "row",
-    padding: 4,
-    margin: 16,
-    marginBottom: 0,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 9,
-    alignItems: "center",
-  },
-  tabText: { fontSize: 14 },
-  fields: { padding: 20, gap: 12 },
+  fields: { padding: 24, gap: 12 },
+  cardTitle: { fontSize: 22, marginBottom: 2 },
+  cardSubtitle: { fontSize: 14, marginBottom: 4 },
+  switchLink: { alignItems: "center", paddingVertical: 4, marginTop: 4 },
+  switchLinkText: { fontSize: 14 },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
