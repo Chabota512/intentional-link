@@ -112,17 +112,15 @@ router.get("/sessions/:id/call-page", async (req, res) => {
   .avatar { width: 96px; height: 96px; border-radius: 48px; background: #FF6B9D; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; }
   .speaking-ring { box-shadow: 0 0 0 6px rgba(255,107,157,0.4); }
   #caller-name { font-size: 20px; font-weight: 600; }
-  #controls { display: flex; justify-content: center; gap: 20px; padding: 24px; flex-wrap: wrap; }
-  .ctrl-btn { width: 60px; height: 60px; border-radius: 30px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 22px; transition: opacity 0.15s; }
-  .ctrl-btn:active { opacity: 0.7; }
-  .btn-mute { background: #333; }
+  #controls { display: flex; justify-content: center; align-items: flex-end; gap: 16px; padding: 20px 24px 32px; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%); }
+  .ctrl-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .ctrl-btn { width: 64px; height: 64px; border-radius: 32px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, opacity 0.15s; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .ctrl-btn:active { transform: scale(0.92); opacity: 0.85; }
+  .ctrl-btn svg { display: block; }
   .btn-mute.active { background: #FF3B30; }
-  .btn-video { background: #333; }
   .btn-video.active { background: #FF3B30; }
-  .btn-speaker { background: #333; }
-  .btn-end { background: #FF3B30; width: 68px; height: 68px; border-radius: 34px; }
-  .btn-label { font-size: 11px; color: #aaa; text-align: center; margin-top: 4px; }
-  .ctrl-wrap { display: flex; flex-direction: column; align-items: center; }
+  .btn-end { background: #FF3B30; width: 64px; height: 64px; border-radius: 32px; box-shadow: 0 4px 16px rgba(255,59,48,0.45); }
+  .btn-label { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.75); text-align: center; letter-spacing: 0.1px; }
   #participants { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   .participant { text-align: center; }
   .p-avatar { width: 56px; height: 56px; border-radius: 28px; background: #444; display: flex; align-items: center; justify-content: center; font-size: 20px; margin: 0 auto 4px; }
@@ -139,10 +137,31 @@ router.get("/sessions/:id/call-page", async (req, res) => {
   ` : ""}
 </div>
 <div id="controls">
-  <div class="ctrl-wrap"><button class="ctrl-btn btn-mute" id="btnMute" onclick="toggleMute()">🎤</button><div class="btn-label">Mute</div></div>
-  ${!isVoiceOnly ? `<div class="ctrl-wrap"><button class="ctrl-btn btn-video" id="btnVideo" onclick="toggleVideo()">📷</button><div class="btn-label">Camera</div></div>` : ""}
-  <div class="ctrl-wrap"><button class="ctrl-btn btn-speaker" id="btnSpeaker" onclick="toggleSpeaker()">🔊</button><div class="btn-label">Speaker</div></div>
-  <div class="ctrl-wrap"><button class="ctrl-btn btn-end" onclick="endCall()">📵</button><div class="btn-label">End</div></div>
+  <div class="ctrl-wrap">
+    <button class="ctrl-btn btn-mute" id="btnMute" onclick="toggleMute()">
+      <svg id="iconMute" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <div class="btn-label" id="labelMute">Mute</div>
+  </div>
+  ${!isVoiceOnly ? `
+  <div class="ctrl-wrap">
+    <button class="ctrl-btn btn-video" id="btnVideo" onclick="toggleVideo()">
+      <svg id="iconVideo" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    </button>
+    <div class="btn-label" id="labelVideo">Camera</div>
+  </div>` : ""}
+  <div class="ctrl-wrap">
+    <button class="ctrl-btn btn-speaker" id="btnSpeaker" onclick="toggleSpeaker()">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+    </button>
+    <div class="btn-label">Speaker</div>
+  </div>
+  <div class="ctrl-wrap">
+    <button class="ctrl-btn btn-end" onclick="endCall()">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.42 19.42 0 0 1 4.26 8.63 19.79 19.79 0 0 1 1.19 0h0"/><line x1="23" y1="1" x2="1" y2="23"/></svg>
+    </button>
+    <div class="btn-label">End</div>
+  </div>
 </div>
 <script src="https://cdn.agora.io/sdk/release/AgoraRTC_N-4.23.2.js"></script>
 <script>
