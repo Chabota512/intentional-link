@@ -454,14 +454,29 @@ router.get("/messages/search", async (req, res): Promise<void> => {
   const sessionMap = new Map(sessions.map(s => [s.id, s]));
   const senderMap = new Map(senders.map(s => [s.id, s]));
 
-  const results = msgs.map(m => ({
-    id: m.id,
-    content: m.content,
-    type: m.type,
-    createdAt: m.createdAt,
-    session: sessionMap.get(m.sessionId) ?? { id: m.sessionId, title: "Unknown", status: "active" },
-    sender: senderMap.get(m.senderId) ?? { id: m.senderId, name: "Unknown", username: "unknown", avatarUrl: null },
-  }));
+  const searchLower = q.trim().toLowerCase();
+  const results = msgs.map(m => {
+    let snippet = m.content;
+    const idx = m.content.toLowerCase().indexOf(searchLower);
+    if (idx !== -1) {
+      const start = Math.max(0, idx - 40);
+      const end = Math.min(m.content.length, idx + searchLower.length + 40);
+      snippet = (start > 0 ? "..." : "") + m.content.slice(start, end) + (end < m.content.length ? "..." : "");
+    } else if (m.content.length > 120) {
+      snippet = m.content.slice(0, 120) + "...";
+    }
+
+    return {
+      id: m.id,
+      content: m.content,
+      snippet,
+      type: m.type,
+      createdAt: m.createdAt,
+      sessionId: m.sessionId,
+      session: sessionMap.get(m.sessionId) ?? { id: m.sessionId, title: "Unknown", status: "active" },
+      sender: senderMap.get(m.senderId) ?? { id: m.senderId, name: "Unknown", username: "unknown", avatarUrl: null },
+    };
+  });
 
   res.json({ results });
 });

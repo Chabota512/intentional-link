@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray, ne, desc } from "drizzle-orm";
+import { eq, and, inArray, ne, desc, count as drizzleCount } from "drizzle-orm";
 import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable } from "@workspace/db";
 import {
   CreateSessionBody,
@@ -553,6 +553,17 @@ router.get("/sessions/:sessionId/media", async (req, res): Promise<void> => {
     .limit(limit)
     .offset(offset);
 
+  const [totalResult] = await db.select({ count: drizzleCount() })
+    .from(messagesTable)
+    .where(
+      and(
+        eq(messagesTable.sessionId, sessionId),
+        inArray(messagesTable.type, targetTypes)
+      )
+    );
+
+  const total = totalResult?.count ?? 0;
+
   const senderIds = [...new Set(media.map(m => m.senderId))];
   const senders = senderIds.length > 0
     ? await db.select({ id: usersTable.id, name: usersTable.name, username: usersTable.username, avatarUrl: usersTable.avatarUrl })
@@ -581,7 +592,7 @@ router.get("/sessions/:sessionId/media", async (req, res): Promise<void> => {
     images,
     files,
     voiceNotes,
-    total: media.length,
+    total,
     offset,
     limit,
   });
