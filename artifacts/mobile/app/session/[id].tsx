@@ -14,6 +14,7 @@ import {
   Image,
   Linking,
   Keyboard,
+  Dimensions,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -376,7 +377,7 @@ function VoicePlayer({
 
 const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🙏", "👍"];
 
-function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, senderPresenceStatus, onAvatarPress }: {
+function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, senderPresenceStatus, onAvatarPress, onImagePress }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
@@ -389,12 +390,13 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
   onReact?: (emoji: string) => void;
   senderPresenceStatus?: "online" | "offline" | "local";
   onAvatarPress?: (user: { name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" }) => void;
+  onImagePress?: (url: string) => void;
 }) {
   const renderContent = () => {
     if (message.type === "image" && message.attachmentUrl) {
       const url = getFileUrl(message.attachmentUrl);
       return (
-        <Pressable onPress={() => Linking.openURL(url)}>
+        <Pressable onPress={() => onImagePress ? onImagePress(url) : Linking.openURL(url)}>
           <Image
             source={{ uri: url }}
             style={styles.imageBubble}
@@ -644,6 +646,7 @@ export default function SessionScreen() {
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [profileViewUser, setProfileViewUser] = useState<{ name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" } | null>(null);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -1546,6 +1549,7 @@ export default function SessionScreen() {
                   onReact={(emoji) => reactMutation.mutate({ messageId: item.id, emoji })}
                   senderPresenceStatus={isOwn ? "online" : getEffectivePresence(item.senderId, item.sender.lastSeenAt) as any}
                   onAvatarPress={setProfileViewUser}
+                  onImagePress={setViewerImage}
                 />
               );
             }}
@@ -2318,6 +2322,21 @@ export default function SessionScreen() {
             </ScrollView>
           )}
         </View>
+      </Modal>
+
+      <Modal visible={viewerImage !== null} transparent animationType="fade" onRequestClose={() => setViewerImage(null)}>
+        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.93)", alignItems: "center", justifyContent: "center" }} onPress={() => setViewerImage(null)}>
+          <Pressable style={{ position: "absolute", top: 60, right: 20, zIndex: 10, padding: 8 }} onPress={() => setViewerImage(null)}>
+            <Feather name="x" size={26} color="#fff" />
+          </Pressable>
+          {viewerImage && (
+            <Image
+              source={{ uri: viewerImage }}
+              style={{ width: Dimensions.get("window").width, height: Dimensions.get("window").width * 1.2 }}
+              resizeMode="contain"
+            />
+          )}
+        </Pressable>
       </Modal>
     </View>
   );
