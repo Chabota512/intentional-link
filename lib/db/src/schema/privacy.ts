@@ -10,6 +10,7 @@ export const userDndSettingsTable = pgTable("user_dnd_settings", {
   scheduledDays: text("scheduled_days").array(),
   notificationVolume: integer("notification_volume").notNull().default(100),
   activatedAt: timestamp("activated_at", { withTimezone: true }),
+  dndExpiresAt: timestamp("dnd_expires_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

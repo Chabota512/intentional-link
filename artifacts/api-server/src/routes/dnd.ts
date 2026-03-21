@@ -36,7 +36,19 @@ async function getOrCreateDnd(userId: number) {
 
 router.get("/users/dnd", authMiddleware, async (req: any, res): Promise<void> => {
   const userId = req.userId as number;
-  const settings = await getOrCreateDnd(userId);
+  let settings = await getOrCreateDnd(userId);
+
+  // Auto-expire DND if the duration has passed
+  if (settings.isDndActive && settings.dndExpiresAt && new Date() >= new Date(settings.dndExpiresAt)) {
+    const now = new Date();
+    await db
+      .update(userDndSettingsTable)
+      .set({ isDndActive: false, activatedAt: null, dndExpiresAt: null, updatedAt: now })
+      .where(eq(userDndSettingsTable.userId, userId));
+    await db.delete(dndWhitelistTable).where(eq(dndWhitelistTable.userId, userId));
+    settings = { ...settings, isDndActive: false, activatedAt: null, dndExpiresAt: null };
+  }
+
   const whitelist = await db
     .select({ contactUserId: dndWhitelistTable.contactUserId })
     .from(dndWhitelistTable)
@@ -49,6 +61,7 @@ router.get("/users/dnd", authMiddleware, async (req: any, res): Promise<void> =>
     scheduledDays: settings.scheduledDays ?? [],
     notificationVolume: settings.notificationVolume,
     activatedAt: settings.activatedAt,
+    dndExpiresAt: settings.dndExpiresAt,
     whitelistedContactIds: whitelist.map(w => w.contactUserId),
   });
 });
@@ -62,6 +75,7 @@ router.put("/users/dnd", authMiddleware, async (req: any, res): Promise<void> =>
     scheduledDays,
     notificationVolume,
     whitelistedContactIds,
+    dndDurationMinutes, // null = indefinite, number = minutes until auto-off
   } = req.body;
 
   if (notificationVolume !== undefined) {
@@ -78,8 +92,16 @@ router.put("/users/dnd", authMiddleware, async (req: any, res): Promise<void> =>
     setFields.isDndActive = isDndActive;
     if (isDndActive) {
       setFields.activatedAt = now;
+      // Set expiry if a duration was provided
+      if (dndDurationMinutes != null && Number.isFinite(Number(dndDurationMinutes)) && Number(dndDurationMinutes) > 0) {
+        const expiresAt = new Date(now.getTime() + Number(dndDurationMinutes) * 60 * 1000);
+        setFields.dndExpiresAt = expiresAt;
+      } else {
+        setFields.dndExpiresAt = null;
+      }
     } else {
       setFields.activatedAt = null;
+      setFields.dndExpiresAt = null;
     }
   }
   if (scheduledStartTime !== undefined) setFields.scheduledStartTime = scheduledStartTime;

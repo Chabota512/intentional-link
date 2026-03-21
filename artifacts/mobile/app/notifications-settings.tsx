@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -33,7 +33,23 @@ interface DndSettings {
   scheduledDays: string[];
   notificationVolume: number;
   whitelistedContactIds: number[];
+  activatedAt: string | null;
+  dndExpiresAt: string | null;
 }
+
+interface DurationPreset {
+  label: string;
+  sublabel: string;
+  minutes: number | null; // null = indefinite
+}
+
+const DURATION_PRESETS: DurationPreset[] = [
+  { label: "30 minutes", sublabel: "Until then, all notifications are silenced", minutes: 30 },
+  { label: "1 hour", sublabel: "Quick focus block", minutes: 60 },
+  { label: "2 hours", sublabel: "Deep work session", minutes: 120 },
+  { label: "4 hours", sublabel: "Half a day of quiet", minutes: 240 },
+  { label: "Until I turn it off", sublabel: "No automatic end — you decide when to stop", minutes: null },
+];
 
 const DAYS = [
   { key: "mon", label: "Mon" },
@@ -113,13 +129,35 @@ export default function NotificationsSettingsScreen() {
     scheduledDays: [],
     notificationVolume: 100,
     whitelistedContactIds: [],
+    activatedAt: null,
+    dndExpiresAt: null,
   });
   const [contacts, setContacts] = useState<DndContact[]>([]);
   const [selectedWhitelist, setSelectedWhitelist] = useState<Set<number>>(new Set());
+  const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<number | null>(60);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showWhitelistModal, setShowWhitelistModal] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const pendingDndOn = useRef(false);
+
+  // Tick every minute so the countdown refreshes live
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const remainingLabel = useMemo(() => {
+    if (!settings.isDndActive) return null;
+    if (!settings.dndExpiresAt) return "Active indefinitely";
+    const msLeft = new Date(settings.dndExpiresAt).getTime() - now;
+    if (msLeft <= 0) return "Expiring…";
+    const totalMin = Math.ceil(msLeft / 60_000);
+    if (totalMin < 60) return `${totalMin}m remaining`;
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return m > 0 ? `${h}h ${m}m remaining` : `${h}h remaining`;
+  }, [settings.isDndActive, settings.dndExpiresAt, now]);
 
   const load = useCallback(async () => {
     try {
@@ -161,13 +199,14 @@ export default function NotificationsSettingsScreen() {
   const confirmDndOn = async () => {
     setShowWhitelistModal(false);
     const ids = [...selectedWhitelist];
-    await save({ isDndActive: true, whitelistedContactIds: ids });
+    await save({ isDndActive: true, whitelistedContactIds: ids, dndDurationMinutes: selectedDurationMinutes } as any);
   };
 
   const cancelDndOn = () => {
     setShowWhitelistModal(false);
     pendingDndOn.current = false;
     setSelectedWhitelist(new Set(settings.whitelistedContactIds));
+    setSelectedDurationMinutes(60);
   };
 
   const toggleWhitelistContact = (id: number) => {
@@ -227,13 +266,19 @@ export default function NotificationsSettingsScreen() {
               <View style={[styles.toggleRow, { borderTopColor: colors.border }]}>
                 <View style={styles.toggleLeft}>
                   <Text style={[styles.moonEmoji]}>{settings.isDndActive ? "🌙" : "🔔"}</Text>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text style={[styles.toggleLabel, { color: colors.text }]}>
                       {settings.isDndActive ? "Do Not Disturb is ON" : "Do Not Disturb is OFF"}
                     </Text>
-                    <Text style={[styles.toggleSub, { color: colors.textTertiary }]}>
-                      {settings.isDndActive ? "Tap to turn off and clear whitelist" : "Tap to enable and choose who can still call"}
-                    </Text>
+                    {settings.isDndActive && remainingLabel ? (
+                      <Text style={[styles.toggleSub, { color: "#6366F1", fontFamily: "Inter_500Medium" }]}>
+                        {remainingLabel}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.toggleSub, { color: colors.textTertiary }]}>
+                        {settings.isDndActive ? "Tap to turn off and clear whitelist" : "Tap to enable and choose who can still call"}
+                      </Text>
+                    )}
                   </View>
                 </View>
                 <Switch
@@ -359,13 +404,42 @@ export default function NotificationsSettingsScreen() {
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-            <Text style={[styles.whitelistModalDesc, { color: colors.textSecondary }]}>
-              Choose contacts who can still reach you while you are in Do Not Disturb — their calls and messages will come through normally. Everyone else will be silenced and told you are unavailable.
+
+            {/* DURATION PICKER */}
+            <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 20 }]}>HOW LONG?</Text>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {DURATION_PRESETS.map((preset, i) => {
+                const active = selectedDurationMinutes === preset.minutes;
+                return (
+                  <Pressable
+                    key={preset.label}
+                    style={[
+                      styles.durationRow,
+                      i < DURATION_PRESETS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                    ]}
+                    onPress={() => setSelectedDurationMinutes(preset.minutes)}
+                  >
+                    <View style={styles.durationText}>
+                      <Text style={[styles.durationLabel, { color: active ? colors.accent : colors.text }]}>{preset.label}</Text>
+                      <Text style={[styles.durationSub, { color: colors.textTertiary }]}>{preset.sublabel}</Text>
+                    </View>
+                    <View style={[
+                      styles.radioOuter,
+                      { borderColor: active ? colors.accent : colors.border },
+                      active && { backgroundColor: colors.accent },
+                    ]}>
+                      {active && <View style={styles.radioInner} />}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* WHITELIST */}
+            <Text style={[styles.whitelistModalDesc, { color: colors.textSecondary, marginTop: 20 }]}>
+              Choose contacts who can still reach you during this DND session — their calls will come through. Everyone else will be told you are unavailable.
             </Text>
-            <Text style={[styles.whitelistModalDesc, { color: colors.textTertiary, marginTop: 0 }]}>
-              This whitelist is only for this DND session. When you turn DND off, it resets and you will choose fresh next time.
-            </Text>
-            <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 16 }]}>
+            <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 4 }]}>
               {selectedWhitelist.size === 0 ? "NO CONTACTS SELECTED — EVERYONE IS SILENCED" : `${selectedWhitelist.size} CONTACT${selectedWhitelist.size !== 1 ? "S" : ""} CAN REACH YOU`}
             </Text>
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
