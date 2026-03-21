@@ -10,18 +10,11 @@ import {
   sessionParticipantsTable,
   messagesTable,
 } from "@workspace/db";
-import { verifyToken } from "../lib/auth";
 
 const router: IRouter = Router();
 
 function authMiddleware(req: any, res: any, next: any) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader?.replace("Bearer ", "");
-  if (!token) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const userId = verifyToken(token);
+  const userId = parseInt(req.headers["x-user-id"] as string, 10);
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;

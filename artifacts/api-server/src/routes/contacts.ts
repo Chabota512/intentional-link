@@ -204,7 +204,9 @@ router.post("/contacts", async (req, res): Promise<void> => {
           await sendPushNotification(them.pushToken, "New Contact Request", `${senderName} wants to connect with you`, { contactUserId: userId });
         }
       }
-    } catch {}
+    } catch (err) {
+      console.error("[contacts] Failed to send contact request notification:", err);
+    }
   })();
 });
 
@@ -255,7 +257,9 @@ router.post("/contacts/requests/:requestId/accept", async (req, res): Promise<vo
         const accepterName = accepter.name || "Someone";
         await saveNotification(request.userId, "contact_accepted", "Contact Request Accepted", `${accepterName} accepted your contact request`, { fromUserId: userId });
       }
-    } catch {}
+    } catch (err) {
+      console.error("[contacts] Failed to send contact accepted notification:", err);
+    }
   })();
 });
 

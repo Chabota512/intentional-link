@@ -333,7 +333,9 @@ router.patch("/sessions/:sessionId", async (req, res): Promise<void> => {
         for (const p of otherParticipants) {
           await saveNotification(p.userId, "chat_completed", "Chat Ended", `${enderName} ended the chat "${session.title}"`, { sessionId });
         }
-      } catch {}
+      } catch (err) {
+        console.error("[sessions] Failed to send chat completion notification:", err);
+      }
     })();
   }
 });

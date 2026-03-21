@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, ne, or } from "drizzle-orm";
-import { db, usersTable, sessionsTable, sessionParticipantsTable, messagesTable, userPrivacySettingsTable } from "@workspace/db";
+import { db, usersTable, sessionsTable, sessionParticipantsTable, messagesTable, userPrivacySettingsTable, contactsTable, notificationsTable, uploadsTable, sessionReadCursorsTable, messageReactionsTable } from "@workspace/db";
 import { emitToUser, emitToSession } from "../lib/socketio";
 import {
   RegisterUserBody,
@@ -123,20 +123,25 @@ router.get("/users/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  if (!user) {
-    res.status(401).json({ error: "User not found" });
-    return;
-  }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user) {
+      res.status(401).json({ error: "User not found" });
+      return;
+    }
 
-  res.json(GetMeResponse.parse({
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    avatarUrl: user.avatarUrl ?? null,
-    createdAt: user.createdAt,
-    lastSeenAt: user.lastSeenAt,
-  }));
+    res.json(GetMeResponse.parse({
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      avatarUrl: user.avatarUrl ?? null,
+      createdAt: user.createdAt,
+      lastSeenAt: user.lastSeenAt,
+    }));
+  } catch (err) {
+    console.error("[GET /users/me] Error:", err);
+    res.status(500).json({ error: "Failed to fetch user profile" });
+  }
 });
 
 router.put("/users/me", async (req, res): Promise<void> => {
@@ -161,41 +166,46 @@ router.put("/users/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const updates: Record<string, string | null> = {};
-  if (name) updates.name = name.trim();
-  if (username) {
-    const normalizedUsername = username.trim().toLowerCase();
-    const existing = await db.select().from(usersTable)
-      .where(and(ilike(usersTable.username, normalizedUsername), ne(usersTable.id, userId)))
-      .limit(1);
-    if (existing.length > 0) {
-      res.status(409).json({ error: "Username already taken" });
+  try {
+    const updates: Record<string, string | null> = {};
+    if (name) updates.name = name.trim();
+    if (username) {
+      const normalizedUsername = username.trim().toLowerCase();
+      const existing = await db.select().from(usersTable)
+        .where(and(ilike(usersTable.username, normalizedUsername), ne(usersTable.id, userId)))
+        .limit(1);
+      if (existing.length > 0) {
+        res.status(409).json({ error: "Username already taken" });
+        return;
+      }
+      updates.username = normalizedUsername;
+    }
+    if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+    if (pushToken !== undefined && typeof pushToken === "string") updates.pushToken = pushToken;
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: "No fields to update" });
       return;
     }
-    updates.username = normalizedUsername;
-  }
-  if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
-  if (pushToken !== undefined && typeof pushToken === "string") updates.pushToken = pushToken;
 
-  if (Object.keys(updates).length === 0) {
-    res.status(400).json({ error: "No fields to update" });
-    return;
-  }
+    const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, userId)).returning();
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
 
-  const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, userId)).returning();
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
+    res.json({
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      avatarUrl: user.avatarUrl ?? null,
+      createdAt: user.createdAt,
+      lastSeenAt: user.lastSeenAt,
+    });
+  } catch (err) {
+    console.error("[PUT /users/me] Error:", err);
+    res.status(500).json({ error: "Failed to update profile" });
   }
-
-  res.json({
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    avatarUrl: user.avatarUrl ?? null,
-    createdAt: user.createdAt,
-    lastSeenAt: user.lastSeenAt,
-  });
 });
 
 router.post("/users/heartbeat", async (req, res): Promise<void> => {
@@ -206,9 +216,14 @@ router.post("/users/heartbeat", async (req, res): Promise<void> => {
     return;
   }
 
-  const now = new Date();
-  await db.update(usersTable).set({ lastSeenAt: now }).where(eq(usersTable.id, userId));
-  res.json({ ok: true, lastSeenAt: now });
+  try {
+    const now = new Date();
+    await db.update(usersTable).set({ lastSeenAt: now }).where(eq(usersTable.id, userId));
+    res.json({ ok: true, lastSeenAt: now });
+  } catch (err) {
+    console.error("[POST /users/heartbeat] Error:", err);
+    res.status(500).json({ error: "Heartbeat failed" });
+  }
 });
 
 router.get("/users/search", async (req, res): Promise<void> => {
@@ -253,60 +268,58 @@ router.delete("/users/me/data", async (req, res): Promise<void> => {
     return;
   }
 
-  // Sessions this user created
-  const createdSessions = await db.select({ id: sessionsTable.id })
-    .from(sessionsTable)
-    .where(eq(sessionsTable.creatorId, userId));
+  try {
+    const createdSessions = await db.select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.creatorId, userId));
 
-  // Sessions this user is a participant in (created or joined)
-  const participantSessions = await db
-    .select({ sessionId: sessionParticipantsTable.sessionId })
-    .from(sessionParticipantsTable)
-    .where(eq(sessionParticipantsTable.userId, userId));
-
-  // Handle each session the user created
-  for (const session of createdSessions) {
-    // Find other joined participants who can take ownership
-    const otherParticipants = await db
-      .select({ userId: sessionParticipantsTable.userId })
+    const participantSessions = await db
+      .select({ sessionId: sessionParticipantsTable.sessionId })
       .from(sessionParticipantsTable)
-      .where(and(
-        eq(sessionParticipantsTable.sessionId, session.id),
-        eq(sessionParticipantsTable.status, "joined"),
-        ne(sessionParticipantsTable.userId, userId),
-      ));
+      .where(eq(sessionParticipantsTable.userId, userId));
 
-    if (otherParticipants.length > 0) {
-      // Transfer ownership to the first remaining participant — session survives untouched
-      const newOwnerId = otherParticipants[0].userId;
-      await db.update(sessionsTable)
-        .set({ creatorId: newOwnerId })
-        .where(eq(sessionsTable.id, session.id));
-      // Notify remaining participants so their session list refreshes
-      emitToSession(session.id, "participant_left", { sessionId: session.id, userId });
-    } else {
-      // No one else in the session — safe to delete it entirely
-      await db.delete(messagesTable).where(eq(messagesTable.sessionId, session.id));
-      await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.sessionId, session.id));
-      await db.delete(sessionsTable).where(eq(sessionsTable.id, session.id));
+    for (const session of createdSessions) {
+      const otherParticipants = await db
+        .select({ userId: sessionParticipantsTable.userId })
+        .from(sessionParticipantsTable)
+        .where(and(
+          eq(sessionParticipantsTable.sessionId, session.id),
+          eq(sessionParticipantsTable.status, "joined"),
+          ne(sessionParticipantsTable.userId, userId),
+        ));
+
+      if (otherParticipants.length > 0) {
+        const newOwnerId = otherParticipants[0].userId;
+        await db.update(sessionsTable)
+          .set({ creatorId: newOwnerId })
+          .where(eq(sessionsTable.id, session.id));
+        emitToSession(session.id, "participant_left", { sessionId: session.id, userId });
+      } else {
+        await db.delete(sessionsTable).where(eq(sessionsTable.id, session.id));
+      }
     }
-  }
 
-  // Remove the user from all sessions (created or joined) — removes it from their view
-  await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
+    await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
+    await db.delete(sessionReadCursorsTable).where(eq(sessionReadCursorsTable.userId, userId));
+    await db.delete(notificationsTable).where(eq(notificationsTable.userId, userId));
+    await db.delete(contactsTable).where(eq(contactsTable.userId, userId));
+    await db.delete(contactsTable).where(eq(contactsTable.contactUserId, userId));
 
-  // Notify sessions the user was a joined member of (but didn't create)
-  for (const { sessionId } of participantSessions) {
-    if (!createdSessions.some(s => s.id === sessionId)) {
-      emitToSession(sessionId, "participant_left", { sessionId, userId });
+    for (const { sessionId } of participantSessions) {
+      if (!createdSessions.some(s => s.id === sessionId)) {
+        emitToSession(sessionId, "participant_left", { sessionId, userId });
+      }
     }
+
+    await db.update(usersTable)
+      .set({ avatarUrl: null, pushToken: null })
+      .where(eq(usersTable.id, userId));
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[DELETE /users/me/data] Error:", err);
+    res.status(500).json({ error: "Failed to clear user data" });
   }
-
-  await db.update(usersTable)
-    .set({ avatarUrl: null, pushToken: null })
-    .where(eq(usersTable.id, userId));
-
-  res.json({ ok: true });
 });
 
 router.delete("/users/me", async (req, res): Promise<void> => {
@@ -317,21 +330,29 @@ router.delete("/users/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const createdSessions = await db.select({ id: sessionsTable.id })
-    .from(sessionsTable)
-    .where(eq(sessionsTable.creatorId, userId));
+  try {
+    const createdSessions = await db.select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.creatorId, userId));
 
-  for (const session of createdSessions) {
-    await db.delete(messagesTable).where(eq(messagesTable.sessionId, session.id));
-    await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.sessionId, session.id));
-    await db.delete(sessionsTable).where(eq(sessionsTable.id, session.id));
+    for (const session of createdSessions) {
+      await db.delete(sessionsTable).where(eq(sessionsTable.id, session.id));
+    }
+
+    await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
+    await db.delete(sessionReadCursorsTable).where(eq(sessionReadCursorsTable.userId, userId));
+    await db.delete(messagesTable).where(eq(messagesTable.senderId, userId));
+    await db.delete(notificationsTable).where(eq(notificationsTable.userId, userId));
+    await db.delete(contactsTable).where(eq(contactsTable.userId, userId));
+    await db.delete(contactsTable).where(eq(contactsTable.contactUserId, userId));
+    await db.delete(uploadsTable).where(eq(uploadsTable.uploadedBy, userId));
+    await db.delete(usersTable).where(eq(usersTable.id, userId));
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[DELETE /users/me] Error:", err);
+    res.status(500).json({ error: "Failed to delete account" });
   }
-
-  await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
-  await db.delete(messagesTable).where(eq(messagesTable.senderId, userId));
-  await db.delete(usersTable).where(eq(usersTable.id, userId));
-
-  res.json({ ok: true });
 });
 
 export { isOnline };

@@ -7,7 +7,6 @@ import {
   userDndSettingsTable,
   dndWhitelistTable,
 } from "@workspace/db";
-import { verifyToken } from "../lib/auth";
 import { saveNotification } from "../lib/pushNotifications";
 
 const router: IRouter = Router();
@@ -25,7 +24,9 @@ function scheduleDndEndingAlert(userId: number, dndDurationMinutes: number) {
     dndEndingTimers.delete(userId);
     try {
       await saveNotification(userId, "dnd_ending", "Do Not Disturb Ending Soon", "Your Do Not Disturb will turn off in 5 minutes.");
-    } catch {}
+    } catch (err) {
+      console.error("[dnd] Failed to send DND ending notification:", err);
+    }
   }, alertAfterMs);
   dndEndingTimers.set(userId, timer);
 }
@@ -38,9 +39,7 @@ function cancelDndEndingAlert(userId: number) {
 }
 
 function authMiddleware(req: any, res: any, next: any) {
-  const token = req.headers["authorization"]?.replace("Bearer ", "");
-  if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const userId = verifyToken(token);
+  const userId = parseInt(req.headers["x-user-id"] as string, 10);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
   req.userId = userId;
   next();

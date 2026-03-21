@@ -131,7 +131,7 @@ WebSocket server runs alongside Express on the same HTTP server. Auth via JWT to
 
 ## Auth mechanism
 
-HMAC-signed token: `${userId}:${timestamp}.${hmac_signature}`. Token is generated on login/register and sent by the mobile client as `Authorization: Bearer <token>`. The API middleware validates the token, extracts userId, and sets `x-user-id` header for the routes.
+HMAC-signed token: `${userId}:${timestamp}.${hmac_signature}`. Token is generated on login/register and sent by the mobile client as `Authorization: Bearer <token>`. The API middleware validates the token, extracts userId, and sets `x-user-id` header for the routes. Tokens expire after 30 days (TOKEN_MAX_AGE_MS in auth.ts).
 
 ## Mobile App Structure
 

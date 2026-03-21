@@ -303,7 +303,9 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
       if (tokens.length === 0) return;
 
       await sendPushNotifications(tokens, sessionName, notifBody, { sessionId });
-    } catch {}
+    } catch (err) {
+      console.error("[messages] Failed to send message notification:", err);
+    }
   })();
 });
 
@@ -457,7 +459,9 @@ router.post("/sessions/:sessionId/messages/:messageId/react", async (req, res): 
       if (senderRow.pushToken) {
         await sendPushNotification(senderRow.pushToken, sessionName, notifBody, { sessionId, messageId });
       }
-    } catch {}
+    } catch (err) {
+      console.error("[messages] Failed to send reaction notification:", err);
+    }
   })();
 });
 

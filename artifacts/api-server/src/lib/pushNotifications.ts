@@ -29,7 +29,8 @@ export async function saveNotification(
       isRead: saved.isRead,
       createdAt: saved.createdAt,
     });
-  } catch {
+  } catch (err) {
+    console.error("[saveNotification] Failed to save notification:", err);
   }
 }
 
@@ -56,7 +57,8 @@ export async function sendPushNotification(
     for (const chunk of chunks) {
       await expo.sendPushNotificationsAsync(chunk);
     }
-  } catch {
+  } catch (err) {
+    console.error("[sendPushNotification] Failed:", err);
   }
 }
 
@@ -82,6 +84,7 @@ export async function sendPushNotifications(
     for (const chunk of chunks) {
       await expo.sendPushNotificationsAsync(chunk);
     }
-  } catch {
+  } catch (err) {
+    console.error("[sendPushNotifications] Failed:", err);
   }
 }

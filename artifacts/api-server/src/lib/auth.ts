@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "focus_token_secret_2024";
 const BCRYPT_ROUNDS = 10;
+const TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
@@ -37,9 +38,16 @@ export function verifyToken(token: string): number | null {
       .update(payload)
       .digest("hex");
     if (sig !== expected) return null;
-    const [userIdStr] = payload.split(":");
+    const parts = payload.split(":");
+    const userIdStr = parts[0];
+    const timestampStr = parts[1];
     const userId = parseInt(userIdStr, 10);
-    return isNaN(userId) ? null : userId;
+    if (isNaN(userId)) return null;
+    const timestamp = parseInt(timestampStr, 10);
+    if (!isNaN(timestamp) && Date.now() - timestamp > TOKEN_MAX_AGE_MS) {
+      return null;
+    }
+    return userId;
   } catch {
     return null;
   }
