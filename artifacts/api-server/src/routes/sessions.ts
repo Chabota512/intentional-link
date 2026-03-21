@@ -12,58 +12,68 @@ import { sendPushNotification, saveNotification } from "../lib/pushNotifications
 const router: IRouter = Router();
 
 async function getSessionWithParticipants(sessionId: number) {
-  const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
-  if (!session) return null;
+  try {
+    const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+    if (!session) return null;
 
-  const participants = await db
-    .select({
-      id: sessionParticipantsTable.id,
-      userId: sessionParticipantsTable.userId,
-      sessionId: sessionParticipantsTable.sessionId,
-      status: sessionParticipantsTable.status,
-      userName: usersTable.name,
-      userUsername: usersTable.username,
-      userAvatarUrl: usersTable.avatarUrl,
-      userCreatedAt: usersTable.createdAt,
-      userLastSeenAt: usersTable.lastSeenAt,
-    })
-    .from(sessionParticipantsTable)
-    .innerJoin(usersTable, eq(sessionParticipantsTable.userId, usersTable.id))
-    .where(eq(sessionParticipantsTable.sessionId, sessionId));
+    const participants = await db
+      .select({
+        id: sessionParticipantsTable.id,
+        userId: sessionParticipantsTable.userId,
+        sessionId: sessionParticipantsTable.sessionId,
+        status: sessionParticipantsTable.status,
+        userName: usersTable.name,
+        userUsername: usersTable.username,
+        userAvatarUrl: usersTable.avatarUrl,
+        userCreatedAt: usersTable.createdAt,
+        userLastSeenAt: usersTable.lastSeenAt,
+      })
+      .from(sessionParticipantsTable)
+      .innerJoin(usersTable, eq(sessionParticipantsTable.userId, usersTable.id))
+      .where(eq(sessionParticipantsTable.sessionId, sessionId));
 
-  const [creator] = await db.select({
-    id: usersTable.id,
-    name: usersTable.name,
-    username: usersTable.username,
-    avatarUrl: usersTable.avatarUrl,
-    lastSeenAt: usersTable.lastSeenAt,
-  }).from(usersTable).where(eq(usersTable.id, session.creatorId)).limit(1);
+    const [creator] = await db.select({
+      id: usersTable.id,
+      name: usersTable.name,
+      username: usersTable.username,
+      avatarUrl: usersTable.avatarUrl,
+      lastSeenAt: usersTable.lastSeenAt,
+    }).from(usersTable).where(eq(usersTable.id, session.creatorId)).limit(1);
 
-  const parsed = GetSessionResponse.parse({
-    ...session,
-    participants: participants.map(p => ({
-      id: p.id,
-      userId: p.userId,
-      sessionId: p.sessionId,
-      status: p.status,
-      user: { id: p.userId, name: p.userName, username: p.userUsername, avatarUrl: p.userAvatarUrl ?? null, createdAt: p.userCreatedAt, lastSeenAt: p.userLastSeenAt },
-    })),
-  });
+    const parsed = GetSessionResponse.parse({
+      ...session,
+      participants: participants.map(p => ({
+        id: p.id,
+        userId: p.userId,
+        sessionId: p.sessionId,
+        status: p.status,
+        user: { id: p.userId, name: p.userName, username: p.userUsername, avatarUrl: p.userAvatarUrl ?? null, createdAt: p.userCreatedAt, lastSeenAt: p.userLastSeenAt },
+      })),
+    });
 
-  return { ...parsed, creator: creator ? { ...creator, avatarUrl: creator.avatarUrl ?? null } : null };
+    return { ...parsed, creator: creator ? { ...creator, avatarUrl: creator.avatarUrl ?? null } : null };
+  } catch (err) {
+    console.error("[getSessionWithParticipants] Error:", err);
+    throw err;
+  }
 }
 
 async function getSessionMembership(sessionId: number, userId: number) {
-  const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
-  if (!session) return null;
+  try {
+    const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+    if (!session) return null;
 
-  const isCreator = session.creatorId === userId;
+    const isCreator = session.creatorId === userId;
 
-  const [participant] = await db.select().from(sessionParticipantsTable)
-    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)))
-    .limit(1);
+    const [participant] = await db.select().from(sessionParticipantsTable)
+      .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)))
+      .limit(1);
 
-  return { session, isCreator, participant: participant ?? null };
+    return { session, isCreator, participant: participant ?? null };
+  } catch (err) {
+    console.error("[getSessionMembership] Error:", err);
+    throw err;
+  }
 }
 
 router.get("/sessions", async (req, res): Promise<void> => {

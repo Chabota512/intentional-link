@@ -301,6 +301,7 @@ router.delete("/users/me/data", async (req, res): Promise<void> => {
 
     await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
     await db.delete(sessionReadCursorsTable).where(eq(sessionReadCursorsTable.userId, userId));
+    await db.delete(messageReactionsTable).where(eq(messageReactionsTable.userId, userId));
     await db.delete(notificationsTable).where(eq(notificationsTable.userId, userId));
     await db.delete(contactsTable).where(eq(contactsTable.userId, userId));
     await db.delete(contactsTable).where(eq(contactsTable.contactUserId, userId));
@@ -341,6 +342,7 @@ router.delete("/users/me", async (req, res): Promise<void> => {
 
     await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
     await db.delete(sessionReadCursorsTable).where(eq(sessionReadCursorsTable.userId, userId));
+    await db.delete(messageReactionsTable).where(eq(messageReactionsTable.userId, userId));
     await db.delete(messagesTable).where(eq(messagesTable.senderId, userId));
     await db.delete(notificationsTable).where(eq(notificationsTable.userId, userId));
     await db.delete(contactsTable).where(eq(contactsTable.userId, userId));
