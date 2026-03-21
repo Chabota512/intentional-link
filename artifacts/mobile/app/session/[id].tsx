@@ -511,6 +511,7 @@ export default function SessionScreen() {
   const [actionMenuMessage, setActionMenuMessage] = useState<Message | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [callDialogVisible, setCallDialogVisible] = useState(false);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -1203,6 +1204,15 @@ export default function SessionScreen() {
             style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setCallDialogVisible(true);
+            }}
+          >
+            <Feather name="phone" size={20} color={colors.text} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setMoreMenuVisible(true);
             }}
           >
@@ -1564,6 +1574,59 @@ export default function SessionScreen() {
             <Pressable
               style={({ pressed }) => [styles.attachCancelBtn, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
               onPress={() => setAttachMenuVisible(false)}
+            >
+              <Text style={[styles.attachCancelText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={callDialogVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCallDialogVisible(false)}
+      >
+        <Pressable style={styles.attachOverlay} onPress={() => setCallDialogVisible(false)}>
+          <View style={[styles.attachSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.attachTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+              Start a call
+            </Text>
+            <Pressable
+              style={({ pressed }) => [styles.attachOption, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
+              onPress={() => {
+                setCallDialogVisible(false);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(`/session/call/${sessionId}?mode=voice` as any);
+              }}
+            >
+              <View style={[styles.attachOptionIcon, { backgroundColor: "#E8F5E9" }]}>
+                <Feather name="phone" size={22} color="#2E7D32" />
+              </View>
+              <View>
+                <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Voice Call</Text>
+                <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Audio only</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.attachOption, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
+              onPress={() => {
+                setCallDialogVisible(false);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(`/session/call/${sessionId}?mode=video` as any);
+              }}
+            >
+              <View style={[styles.attachOptionIcon, { backgroundColor: "#E3F2FD" }]}>
+                <Feather name="video" size={22} color="#1565C0" />
+              </View>
+              <View>
+                <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Video Call</Text>
+                <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Camera + audio</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.attachCancelBtn, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
+              onPress={() => setCallDialogVisible(false)}
             >
               <Text style={[styles.attachCancelText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>Cancel</Text>
             </Pressable>
