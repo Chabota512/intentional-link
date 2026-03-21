@@ -1244,7 +1244,7 @@ export default function SessionScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/sessions");
     },
     onError: (e: any) => {
       Alert.alert("Error", e.message || "Failed to delete chat");
