@@ -1,8 +1,10 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { verifyToken } from "./auth";
-import { db, usersTable, sessionsTable, sessionParticipantsTable, sessionReadCursorsTable, messagesTable } from "@workspace/db";
+import { db, usersTable, sessionsTable, sessionParticipantsTable, sessionReadCursorsTable, messagesTable, userPrivacySettingsTable, presenceWhitelistTable } from "@workspace/db";
 import { eq, and, ne, desc, lte, inArray } from "drizzle-orm";
+
+const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000;
 
 let io: Server | null = null;
 
@@ -65,11 +67,41 @@ export function initSocketIO(httpServer: HttpServer): Server {
     }
     onlineUsers.get(userId)!.add(socket.id);
 
+    const [prevUser] = await db
+      .select({ lastSeenAt: usersTable.lastSeenAt })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    const prevLastSeenAt = prevUser?.lastSeenAt ?? null;
+    const wasOfflineLong = prevLastSeenAt
+      ? Date.now() - new Date(prevLastSeenAt).getTime() > OFFLINE_THRESHOLD_MS
+      : true;
+
     await db.update(usersTable).set({ lastSeenAt: new Date() }).where(eq(usersTable.id, userId));
 
     await joinUserSessions(socket, userId);
 
-    broadcastPresence(userId, "online");
+    broadcastPresence(userId, "online", prevLastSeenAt);
+
+    if (wasOfflineLong) {
+      const [privSettings] = await db
+        .select()
+        .from(userPrivacySettingsTable)
+        .where(eq(userPrivacySettingsTable.userId, userId))
+        .limit(1);
+
+      const whitelist = await db
+        .select({ allowedContactId: presenceWhitelistTable.allowedContactId })
+        .from(presenceWhitelistTable)
+        .where(eq(presenceWhitelistTable.userId, userId));
+
+      socket.emit("show_presence_dialog", {
+        presenceVisibility: privSettings?.presenceVisibility ?? "all",
+        readReceiptsEnabled: privSettings?.readReceiptsEnabled ?? true,
+        whitelistedContactIds: whitelist.map(w => w.allowedContactId),
+      });
+    }
 
     socket.on("join_session", async (sessionId: unknown) => {
       if (typeof sessionId !== "number" || !Number.isFinite(sessionId)) return;
@@ -195,6 +227,14 @@ export function initSocketIO(httpServer: HttpServer): Server {
       const hasAccess = await canAccessSession(sessionId, userId);
       if (!hasAccess) return;
 
+      const [privSettings] = await db
+        .select({ readReceiptsEnabled: userPrivacySettingsTable.readReceiptsEnabled })
+        .from(userPrivacySettingsTable)
+        .where(eq(userPrivacySettingsTable.userId, userId))
+        .limit(1);
+
+      const receiptsEnabled = privSettings?.readReceiptsEnabled ?? true;
+
       const [latestMsg] = await db.select({ id: messagesTable.id })
         .from(messagesTable)
         .where(eq(messagesTable.sessionId, sessionId))
@@ -209,46 +249,60 @@ export function initSocketIO(httpServer: HttpServer): Server {
             set: { lastReadMessageId: latestMsg.id, updatedAt: new Date() },
           });
 
-        const participants = await db
-          .select({ userId: sessionParticipantsTable.userId })
-          .from(sessionParticipantsTable)
-          .where(and(
-            eq(sessionParticipantsTable.sessionId, sessionId),
-            eq(sessionParticipantsTable.status, "joined"),
-          ));
-
-        const participantIds = participants.map(p => p.userId);
-
-        const cursors = await db
-          .select({ userId: sessionReadCursorsTable.userId, lastReadMessageId: sessionReadCursorsTable.lastReadMessageId })
-          .from(sessionReadCursorsTable)
-          .where(and(
-            eq(sessionReadCursorsTable.sessionId, sessionId),
-            inArray(sessionReadCursorsTable.userId, participantIds),
-          ));
-
-        const cursorMap = new Map(cursors.map(c => [c.userId, c.lastReadMessageId]));
-        const allHaveCursor = participantIds.every(pid => cursorMap.has(pid));
-        const minCursor = allHaveCursor
-          ? Math.min(...participantIds.map(pid => cursorMap.get(pid)!))
-          : 0;
-
-        if (minCursor > 0) {
-          const readUpdated = await db.update(messagesTable)
-            .set({ status: "read" })
+        if (receiptsEnabled) {
+          const participants = await db
+            .select({ userId: sessionParticipantsTable.userId })
+            .from(sessionParticipantsTable)
             .where(and(
-              eq(messagesTable.sessionId, sessionId),
-              lte(messagesTable.id, minCursor),
-              ne(messagesTable.status, "read"),
-            ))
-            .returning({ id: messagesTable.id });
+              eq(sessionParticipantsTable.sessionId, sessionId),
+              eq(sessionParticipantsTable.status, "joined"),
+            ));
 
-          if (readUpdated.length > 0) {
-            emitToSession(sessionId, "message_status_update", {
-              sessionId,
-              messageIds: readUpdated.map(m => m.id),
-              status: "read",
-            });
+          const participantIds = participants.map(p => p.userId);
+
+          const allParticipantPrivacy = participantIds.length > 0
+            ? await db
+              .select({ userId: userPrivacySettingsTable.userId, readReceiptsEnabled: userPrivacySettingsTable.readReceiptsEnabled })
+              .from(userPrivacySettingsTable)
+              .where(inArray(userPrivacySettingsTable.userId, participantIds))
+            : [];
+
+          const privacyMap = new Map(allParticipantPrivacy.map(p => [p.userId, p.readReceiptsEnabled]));
+          const eligibleParticipantIds = participantIds.filter(pid => privacyMap.get(pid) !== false);
+
+          if (eligibleParticipantIds.length > 0) {
+            const cursors = await db
+              .select({ userId: sessionReadCursorsTable.userId, lastReadMessageId: sessionReadCursorsTable.lastReadMessageId })
+              .from(sessionReadCursorsTable)
+              .where(and(
+                eq(sessionReadCursorsTable.sessionId, sessionId),
+                inArray(sessionReadCursorsTable.userId, eligibleParticipantIds),
+              ));
+
+            const cursorMap = new Map(cursors.map(c => [c.userId, c.lastReadMessageId]));
+            const allHaveCursor = eligibleParticipantIds.every(pid => cursorMap.has(pid));
+            const minCursor = allHaveCursor
+              ? Math.min(...eligibleParticipantIds.map(pid => cursorMap.get(pid)!))
+              : 0;
+
+            if (minCursor > 0) {
+              const readUpdated = await db.update(messagesTable)
+                .set({ status: "read" })
+                .where(and(
+                  eq(messagesTable.sessionId, sessionId),
+                  lte(messagesTable.id, minCursor),
+                  ne(messagesTable.status, "read"),
+                ))
+                .returning({ id: messagesTable.id });
+
+              if (readUpdated.length > 0) {
+                emitToSession(sessionId, "message_status_update", {
+                  sessionId,
+                  messageIds: readUpdated.map(m => m.id),
+                  status: "read",
+                });
+              }
+            }
           }
         }
       }
@@ -350,18 +404,30 @@ async function joinUserSessions(socket: Socket, userId: number): Promise<void> {
   }
 }
 
-async function broadcastPresence(userId: number, status: "online" | "offline"): Promise<void> {
+async function broadcastPresence(userId: number, status: "online" | "offline", prevLastSeenAt?: Date | null): Promise<void> {
   if (!io) return;
+
+  const [privSettings] = await db
+    .select()
+    .from(userPrivacySettingsTable)
+    .where(eq(userPrivacySettingsTable.userId, userId))
+    .limit(1);
+
+  const presenceVisibility = privSettings?.presenceVisibility ?? "all";
+
+  let whitelistedIds = new Set<number>();
+  if (status === "online" && presenceVisibility === "specific") {
+    const whitelist = await db
+      .select({ allowedContactId: presenceWhitelistTable.allowedContactId })
+      .from(presenceWhitelistTable)
+      .where(eq(presenceWhitelistTable.userId, userId));
+    whitelistedIds = new Set(whitelist.map(w => w.allowedContactId));
+  }
 
   const participantRows = await db
     .select({ sessionId: sessionParticipantsTable.sessionId })
     .from(sessionParticipantsTable)
-    .where(
-      and(
-        eq(sessionParticipantsTable.userId, userId),
-        eq(sessionParticipantsTable.status, "joined")
-      )
-    );
+    .where(and(eq(sessionParticipantsTable.userId, userId), eq(sessionParticipantsTable.status, "joined")));
 
   const creatorRows = await db
     .select({ id: sessionsTable.id })
@@ -373,11 +439,51 @@ async function broadcastPresence(userId: number, status: "online" | "offline"): 
     ...creatorRows.map((r) => r.id),
   ]);
 
+  if (status === "offline" || presenceVisibility === "all") {
+    for (const sessionId of sessionIds) {
+      io.to(`session:${sessionId}`).emit("presence_update", {
+        userId,
+        status,
+        lastSeenAt: status === "offline" ? new Date().toISOString() : null,
+      });
+    }
+    return;
+  }
+
+  if (presenceVisibility === "none") {
+    return;
+  }
+
   for (const sessionId of sessionIds) {
-    io.to(`session:${sessionId}`).emit("presence_update", {
-      userId,
-      status,
-      lastSeenAt: status === "offline" ? new Date().toISOString() : null,
-    });
+    const sessionParticipants = await db
+      .select({ userId: sessionParticipantsTable.userId })
+      .from(sessionParticipantsTable)
+      .where(and(
+        eq(sessionParticipantsTable.sessionId, sessionId),
+        eq(sessionParticipantsTable.status, "joined"),
+        ne(sessionParticipantsTable.userId, userId),
+      ));
+
+    const [sessionInfo] = await db
+      .select({ creatorId: sessionsTable.creatorId })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.id, sessionId))
+      .limit(1);
+
+    const otherUserIds = new Set(sessionParticipants.map(p => p.userId));
+    if (sessionInfo?.creatorId && sessionInfo.creatorId !== userId) {
+      otherUserIds.add(sessionInfo.creatorId);
+    }
+
+    const hiddenLastSeenAt = prevLastSeenAt ? prevLastSeenAt.toISOString() : new Date().toISOString();
+
+    for (const otherUserId of otherUserIds) {
+      const canSee = whitelistedIds.has(otherUserId);
+      emitToUser(otherUserId, "presence_update", {
+        userId,
+        status: canSee ? "online" : "offline",
+        lastSeenAt: canSee ? null : hiddenLastSeenAt,
+      });
+    }
   }
 }

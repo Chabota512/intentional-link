@@ -337,6 +337,18 @@ export default function ProfileScreen() {
           />
         </View>
 
+        <SectionHeader title="PRIVACY" colors={colors} />
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SettingsRow
+            icon="eye"
+            label="Privacy Settings"
+            sublabel="Online visibility, read receipts"
+            onPress={() => router.push("/privacy" as any)}
+            colors={colors}
+            last
+          />
+        </View>
+
         <SectionHeader title="NOTIFICATIONS" colors={colors} />
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SettingsRow

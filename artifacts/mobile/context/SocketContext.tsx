@@ -11,6 +11,12 @@ interface TypingUser {
   sessionId: number;
 }
 
+export interface PresenceDialogData {
+  presenceVisibility: "all" | "specific" | "none";
+  readReceiptsEnabled: boolean;
+  whitelistedContactIds: number[];
+}
+
 interface SocketContextValue {
   socket: Socket | null;
   isConnected: boolean;
@@ -18,6 +24,8 @@ interface SocketContextValue {
   recordingUsers: Map<number, Set<number>>;
   onlineUserIds: Set<number>;
   unreadNotifCount: number;
+  presenceDialogData: PresenceDialogData | null;
+  dismissPresenceDialog: () => void;
   emitTypingStart: (sessionId: number) => void;
   emitTypingStop: (sessionId: number) => void;
   emitRecordingStart: (sessionId: number) => void;
@@ -38,6 +46,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [recordingUsers, setRecordingUsers] = useState<Map<number, Set<number>>>(new Map());
   const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [presenceDialogData, setPresenceDialogData] = useState<PresenceDialogData | null>(null);
   const appStateRef = useRef<AppStateStatus>("active");
 
   useEffect(() => {
@@ -206,6 +215,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on("messages_read", (_data: { userId: number; sessionId: number }) => {
     });
 
+    socket.on("show_presence_dialog", (data: PresenceDialogData) => {
+      setPresenceDialogData(data);
+    });
+
     socket.on("new_notification", (notif: any) => {
       queryClient.setQueryData(["notifications"], (old: any) => {
         const notifications = [notif, ...(old?.notifications ?? [])];
@@ -229,6 +242,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setIsConnected(false);
     };
   }, [user?.token, user?.id]);
+
+  const dismissPresenceDialog = useCallback(() => {
+    setPresenceDialogData(null);
+  }, []);
 
   const emitTypingStart = useCallback((sessionId: number) => {
     socketRef.current?.emit("typing_start", { sessionId });
@@ -267,6 +284,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         recordingUsers,
         onlineUserIds,
         unreadNotifCount,
+        presenceDialogData,
+        dismissPresenceDialog,
         emitTypingStart,
         emitTypingStop,
         emitRecordingStart,

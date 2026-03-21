@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, ne, or } from "drizzle-orm";
-import { db, usersTable, sessionsTable, sessionParticipantsTable, messagesTable } from "@workspace/db";
+import { db, usersTable, sessionsTable, sessionParticipantsTable, messagesTable, userPrivacySettingsTable } from "@workspace/db";
 import {
   RegisterUserBody,
   LoginUserBody,
@@ -52,6 +52,10 @@ router.post("/users/register", async (req, res): Promise<void> => {
     res.status(503).json({ error: "Service temporarily unavailable. Please try again." });
     return;
   }
+
+  await db.insert(userPrivacySettingsTable)
+    .values({ userId: user.id, presenceVisibility: "all", readReceiptsEnabled: true, updatedAt: new Date() })
+    .onConflictDoNothing();
 
   const token = generateToken(user.id);
   res.status(201).json(LoginUserResponse.parse({

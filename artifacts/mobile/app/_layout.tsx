@@ -17,6 +17,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import Feather from "@expo/vector-icons/Feather";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PresenceDialog } from "@/components/PresenceDialog";
 import { AuthProvider } from "@/context/AuthContext";
 import { LocalDiscoveryProvider } from "@/context/LocalDiscoveryContext";
 import { SocketProvider } from "@/context/SocketContext";
@@ -71,8 +72,10 @@ function RootLayoutNav() {
         <Stack.Screen name="session/[id]" options={{ presentation: "card" }} />
         <Stack.Screen name="session/new" options={{ presentation: "modal" }} />
         <Stack.Screen name="contacts/add" options={{ presentation: "modal" }} />
+        <Stack.Screen name="privacy" options={{ presentation: "card" }} />
       </Stack>
       <OfflineBanner />
+      <PresenceDialog />
     </>
   );
 }
