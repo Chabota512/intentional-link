@@ -2,7 +2,7 @@ import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { verifyToken } from "./auth";
 import { db, usersTable, sessionsTable, sessionParticipantsTable, sessionReadCursorsTable, messagesTable } from "@workspace/db";
-import { eq, and, ne, desc } from "drizzle-orm";
+import { eq, and, ne, desc, lte, inArray } from "drizzle-orm";
 
 let io: Server | null = null;
 
@@ -208,6 +208,49 @@ export function initSocketIO(httpServer: HttpServer): Server {
             target: [sessionReadCursorsTable.sessionId, sessionReadCursorsTable.userId],
             set: { lastReadMessageId: latestMsg.id, updatedAt: new Date() },
           });
+
+        const participants = await db
+          .select({ userId: sessionParticipantsTable.userId })
+          .from(sessionParticipantsTable)
+          .where(and(
+            eq(sessionParticipantsTable.sessionId, sessionId),
+            eq(sessionParticipantsTable.status, "joined"),
+          ));
+
+        const participantIds = participants.map(p => p.userId);
+
+        const cursors = await db
+          .select({ userId: sessionReadCursorsTable.userId, lastReadMessageId: sessionReadCursorsTable.lastReadMessageId })
+          .from(sessionReadCursorsTable)
+          .where(and(
+            eq(sessionReadCursorsTable.sessionId, sessionId),
+            inArray(sessionReadCursorsTable.userId, participantIds),
+          ));
+
+        const cursorMap = new Map(cursors.map(c => [c.userId, c.lastReadMessageId]));
+        const allHaveCursor = participantIds.every(pid => cursorMap.has(pid));
+        const minCursor = allHaveCursor
+          ? Math.min(...participantIds.map(pid => cursorMap.get(pid)!))
+          : 0;
+
+        if (minCursor > 0) {
+          const readUpdated = await db.update(messagesTable)
+            .set({ status: "read" })
+            .where(and(
+              eq(messagesTable.sessionId, sessionId),
+              lte(messagesTable.id, minCursor),
+              ne(messagesTable.status, "read"),
+            ))
+            .returning({ id: messagesTable.id });
+
+          if (readUpdated.length > 0) {
+            emitToSession(sessionId, "message_status_update", {
+              sessionId,
+              messageIds: readUpdated.map(m => m.id),
+              status: "read",
+            });
+          }
+        }
       }
 
       socket.to(`session:${sessionId}`).emit("messages_read", {

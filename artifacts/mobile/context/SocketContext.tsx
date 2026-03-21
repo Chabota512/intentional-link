@@ -203,15 +203,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    socket.on("messages_read", (data: { userId: number; sessionId: number }) => {
-      queryClient.setQueryData(["messages", data.sessionId], (old: any[] = []) =>
-        old.map((m) => {
-          if (m.senderId === user.id && m.status !== "read") {
-            return { ...m, status: "read" };
-          }
-          return m;
-        })
-      );
+    socket.on("messages_read", (_data: { userId: number; sessionId: number }) => {
     });
 
     socket.on("new_notification", (notif: any) => {
