@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -35,6 +35,17 @@ export default function AuthScreen() {
   const nameRef = useRef<TextInput>(null);
   const usernameRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setError(""), 3500);
+    }
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, [error]);
 
   const passwordStrength = password.length === 0
     ? null
@@ -231,9 +242,9 @@ export default function AuthScreen() {
               </View>
 
               {error !== "" && (
-                <View style={[styles.errorBox, { backgroundColor: "#FFF0F0", borderColor: colors.danger }]}>
-                  <Feather name="alert-circle" size={14} color={colors.danger} />
-                  <Text style={[styles.errorText, { color: colors.danger, fontFamily: "Inter_400Regular" }]}>{error}</Text>
+                <View style={[styles.errorBox, { backgroundColor: "#FFFBEB", borderColor: "#F59E0B" }]}>
+                  <Feather name="info" size={14} color="#D97706" />
+                  <Text style={[styles.errorText, { color: "#92400E", fontFamily: "Inter_400Regular" }]}>{error}</Text>
                 </View>
               )}
 
