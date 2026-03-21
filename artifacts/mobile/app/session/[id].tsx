@@ -1158,6 +1158,14 @@ export default function SessionScreen() {
   }
 
   const totalPeople = session.participants.length + 1;
+  const totalActive = 1 + onlineParticipants.length;
+  const activeLabel = isActive
+    ? localParticipants.length > 0
+      ? `${localParticipants.length + 1} nearby`
+      : totalActive === 1
+        ? "only you active"
+        : `${totalActive} active`
+    : "Completed";
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1184,7 +1192,7 @@ export default function SessionScreen() {
           <Pressable style={styles.navMeta} onPress={openParticipants}>
             <View style={[styles.statusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
             <Text style={[styles.navSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-              {isActive ? (localParticipants.length > 0 ? `${localParticipants.length} nearby` : onlineParticipants.length > 0 ? `${onlineParticipants.length} online` : "Active") : "Completed"} · {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
+              {activeLabel} · {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
             </Text>
             <Feather name="chevron-right" size={12} color={colors.textTertiary} />
           </Pressable>
