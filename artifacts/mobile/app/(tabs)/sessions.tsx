@@ -546,14 +546,14 @@ export default function SessionsScreen() {
         onRequestClose={() => setPreviewImageUrl(null)}
       >
         <Pressable
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" }}
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" }}
           onPress={() => setPreviewImageUrl(null)}
         >
           {previewImageUrl && (
             <Image
               source={{ uri: previewImageUrl }}
-              style={{ width: "88%", height: "88%", borderRadius: 12 }}
-              resizeMode="contain"
+              style={{ width: 240, height: 240, borderRadius: 120 }}
+              resizeMode="cover"
             />
           )}
         </Pressable>
