@@ -59,6 +59,7 @@ router.get("/users/dnd", authMiddleware, async (req: any, res): Promise<void> =>
     scheduledStartTime: settings.scheduledStartTime,
     scheduledEndTime: settings.scheduledEndTime,
     scheduledDays: settings.scheduledDays ?? [],
+    quietHourSchedules: settings.quietHourSchedules ? JSON.parse(settings.quietHourSchedules) : [],
     notificationVolume: settings.notificationVolume,
     activatedAt: settings.activatedAt,
     dndExpiresAt: settings.dndExpiresAt,
@@ -73,6 +74,7 @@ router.put("/users/dnd", authMiddleware, async (req: any, res): Promise<void> =>
     scheduledStartTime,
     scheduledEndTime,
     scheduledDays,
+    quietHourSchedules,
     notificationVolume,
     whitelistedContactIds,
     dndDurationMinutes, // null = indefinite, number = minutes until auto-off
@@ -107,6 +109,7 @@ router.put("/users/dnd", authMiddleware, async (req: any, res): Promise<void> =>
   if (scheduledStartTime !== undefined) setFields.scheduledStartTime = scheduledStartTime;
   if (scheduledEndTime !== undefined) setFields.scheduledEndTime = scheduledEndTime;
   if (scheduledDays !== undefined) setFields.scheduledDays = scheduledDays;
+  if (quietHourSchedules !== undefined) setFields.quietHourSchedules = JSON.stringify(quietHourSchedules);
   if (notificationVolume !== undefined) setFields.notificationVolume = Number(notificationVolume);
 
   await db

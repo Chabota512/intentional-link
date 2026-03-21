@@ -27,11 +27,18 @@ interface DndContact {
   isWhitelisted: boolean;
 }
 
+interface DaySchedule {
+  day: string;
+  startTime: string;
+  endTime: string;
+}
+
 interface DndSettings {
   isDndActive: boolean;
   scheduledStartTime: string | null;
   scheduledEndTime: string | null;
   scheduledDays: string[];
+  quietHourSchedules: DaySchedule[];
   notificationVolume: number;
   whitelistedContactIds: number[];
   activatedAt: string | null;
@@ -52,13 +59,13 @@ const DURATION_PRESETS: DurationPreset[] = [
 ];
 
 const DAYS = [
-  { key: "mon", label: "M" },
-  { key: "tue", label: "T" },
-  { key: "wed", label: "W" },
-  { key: "thu", label: "T" },
-  { key: "fri", label: "F" },
-  { key: "sat", label: "S" },
-  { key: "sun", label: "S" },
+  { key: "mon", label: "M", full: "Monday" },
+  { key: "tue", label: "T", full: "Tuesday" },
+  { key: "wed", label: "W", full: "Wednesday" },
+  { key: "thu", label: "T", full: "Thursday" },
+  { key: "fri", label: "F", full: "Friday" },
+  { key: "sat", label: "S", full: "Saturday" },
+  { key: "sun", label: "S", full: "Sunday" },
 ];
 
 
@@ -124,6 +131,7 @@ export default function NotificationsSettingsScreen() {
     scheduledStartTime: null,
     scheduledEndTime: null,
     scheduledDays: [],
+    quietHourSchedules: [],
     notificationVolume: 100,
     whitelistedContactIds: [],
     activatedAt: null,
@@ -137,6 +145,10 @@ export default function NotificationsSettingsScreen() {
   const [showWhitelistModal, setShowWhitelistModal] = useState(false);
   const [now, setNow] = useState(Date.now());
   const pendingDndOn = useRef(false);
+
+  const [editingDay, setEditingDay] = useState<string | null>(null);
+  const [editStart, setEditStart] = useState<string | null>(null);
+  const [editEnd, setEditEnd] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
@@ -233,6 +245,31 @@ export default function NotificationsSettingsScreen() {
 
   const scheduleConfigured = settings.scheduledStartTime && settings.scheduledEndTime && settings.scheduledDays.length > 0;
 
+  const openDayEditor = (day: string) => {
+    const existing = settings.quietHourSchedules.find(s => s.day === day);
+    setEditStart(existing?.startTime ?? null);
+    setEditEnd(existing?.endTime ?? null);
+    setEditingDay(day);
+  };
+
+  const saveDaySchedule = () => {
+    if (!editingDay || !editStart || !editEnd) return;
+    const next = [
+      ...settings.quietHourSchedules.filter(s => s.day !== editingDay),
+      { day: editingDay, startTime: editStart, endTime: editEnd },
+    ];
+    next.sort((a, b) => DAYS.findIndex(d => d.key === a.day) - DAYS.findIndex(d => d.key === b.day));
+    setSettings(prev => ({ ...prev, quietHourSchedules: next }));
+    save({ quietHourSchedules: next } as any);
+    setEditingDay(null);
+  };
+
+  const removeDaySchedule = (day: string) => {
+    const next = settings.quietHourSchedules.filter(s => s.day !== day);
+    setSettings(prev => ({ ...prev, quietHourSchedules: next }));
+    save({ quietHourSchedules: next } as any);
+  };
+
   return (
     <>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -307,38 +344,37 @@ export default function NotificationsSettingsScreen() {
             {/* ── QUIET HOURS ── */}
             <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>QUIET HOURS</Text>
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={styles.timeRow}>
-                <TimePicker value={settings.scheduledStartTime} onChange={v => setScheduleTime("scheduledStartTime", v)} label="From" colors={colors} />
-                <Feather name="arrow-right" size={15} color={colors.textTertiary} />
-                <TimePicker value={settings.scheduledEndTime} onChange={v => setScheduleTime("scheduledEndTime", v)} label="Until" colors={colors} />
-              </View>
-              <View style={[styles.daysRow, { borderTopColor: colors.border }]}>
-                {DAYS.map((d, i) => {
-                  const active = settings.scheduledDays.includes(d.key);
-                  return (
-                    <Pressable
-                      key={d.key}
-                      style={[
-                        styles.dayChip,
-                        { borderColor: active ? "#6366F1" : colors.border, backgroundColor: active ? "#6366F1" : "transparent" },
-                      ]}
-                      onPress={() => toggleDay(d.key)}
-                    >
-                      <Text style={[styles.dayChipText, { color: active ? "#fff" : colors.textSecondary }]}>{d.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {scheduleConfigured && (
-                <View style={[styles.scheduleNote, { borderTopColor: colors.border, backgroundColor: colors.accentSoft ?? colors.background }]}>
-                  <Feather name="clock" size={13} color={colors.accent} />
-                  <Text style={[styles.scheduleNoteText, { color: colors.textSecondary }]}>
-                    {settings.scheduledDays.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(" · ")}{" "}
-                    from {HOUR_OPTIONS.find(h => h.value === settings.scheduledStartTime)?.label}{" "}
-                    to {HOUR_OPTIONS.find(h => h.value === settings.scheduledEndTime)?.label}
-                  </Text>
-                </View>
-              )}
+              {DAYS.map((d, i) => {
+                const sched = settings.quietHourSchedules.find(s => s.day === d.key);
+                const isLast = i === DAYS.length - 1;
+                return (
+                  <Pressable
+                    key={d.key}
+                    style={[
+                      styles.quietDayRow,
+                      !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                    ]}
+                    onPress={() => openDayEditor(d.key)}
+                  >
+                    <Text style={[styles.quietDayName, { color: sched ? colors.text : colors.textSecondary }]}>{d.full}</Text>
+                    {sched ? (
+                      <>
+                        <Text style={[styles.quietDayTime, { color: colors.accent }]}>
+                          {HOUR_OPTIONS.find(h => h.value === sched.startTime)?.label} – {HOUR_OPTIONS.find(h => h.value === sched.endTime)?.label}
+                        </Text>
+                        <Pressable onPress={() => removeDaySchedule(d.key)} hitSlop={10} style={styles.quietDayRemove}>
+                          <Feather name="x" size={15} color={colors.textTertiary} />
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.quietDayOff, { color: colors.textTertiary }]}>Off</Text>
+                        <Feather name="plus" size={16} color={colors.textTertiary} />
+                      </>
+                    )}
+                  </Pressable>
+                );
+              })}
             </View>
 
             {/* ── VOLUME ── */}
@@ -369,6 +405,35 @@ export default function NotificationsSettingsScreen() {
           </ScrollView>
         )}
       </View>
+
+      {/* ── DAY SCHEDULE EDITOR MODAL ── */}
+      <Modal visible={!!editingDay} transparent animationType="fade" onRequestClose={() => setEditingDay(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setEditingDay(null)}>
+          <View style={[styles.pickerSheet, { backgroundColor: colors.surface, borderColor: colors.border, width: "90%" }]}>
+            <Text style={[styles.pickerTitle, { color: colors.text, marginBottom: 4 }]}>
+              {DAYS.find(d => d.key === editingDay)?.full} Quiet Hours
+            </Text>
+            <Text style={[styles.scheduleNoteText, { color: colors.textTertiary, marginBottom: 16 }]}>
+              Notifications will be silenced during this window.
+            </Text>
+            <View style={[styles.timeRow, { padding: 0, marginBottom: 20 }]}>
+              <TimePicker value={editStart} onChange={setEditStart} label="From" colors={colors} />
+              <Feather name="arrow-right" size={15} color={colors.textTertiary} />
+              <TimePicker value={editEnd} onChange={setEditEnd} label="Until" colors={colors} />
+            </View>
+            <Pressable
+              style={[
+                styles.saveBtn,
+                { backgroundColor: (!editStart || !editEnd) ? colors.border : colors.accent },
+              ]}
+              onPress={saveDaySchedule}
+              disabled={!editStart || !editEnd}
+            >
+              <Text style={[styles.saveBtnText, { color: (!editStart || !editEnd) ? colors.textTertiary : "#fff" }]}>Save</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* ── ENABLE DND MODAL ── */}
       <Modal visible={showWhitelistModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={cancelDndOn}>
@@ -562,6 +627,40 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   scheduleNoteText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+
+  quietDayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  quietDayName: {
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    flex: 1,
+  },
+  quietDayTime: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  quietDayOff: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  quietDayRemove: {
+    padding: 2,
+  },
+
+  saveBtn: {
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  saveBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+  },
 
   volumeRow: {
     flexDirection: "row",
