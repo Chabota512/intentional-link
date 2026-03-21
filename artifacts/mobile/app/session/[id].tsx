@@ -32,7 +32,6 @@ import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Audio, Video, ResizeMode, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
-import * as VideoThumbnails from "expo-video-thumbnails";
 import { LightSensor } from "expo-sensors";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
@@ -444,24 +443,6 @@ function VideoThumbnailCard({ url, name, isOwn, colors, onPress, onLongPress }: 
   onPress: () => void;
   onLongPress?: () => void;
 }) {
-  const [thumbUri, setThumbUri] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { uri } = await VideoThumbnails.getThumbnailAsync(url, { time: 500 });
-        if (!cancelled) setThumbUri(uri);
-      } catch {
-        // thumbnail generation failed — show fallback
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [url]);
-
   return (
     <Pressable
       onPress={onPress}
@@ -472,31 +453,29 @@ function VideoThumbnailCard({ url, name, isOwn, colors, onPress, onLongPress }: 
         height: THUMB_H,
         borderRadius: 12,
         overflow: "hidden",
-        backgroundColor: "#111",
+        backgroundColor: "#000",
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      {thumbUri ? (
-        <Image source={{ uri: thumbUri }} style={{ width: THUMB_W, height: THUMB_H }} resizeMode="cover" />
-      ) : (
-        <View style={{ width: THUMB_W, height: THUMB_H, alignItems: "center", justifyContent: "center", backgroundColor: "#1a1a1a" }}>
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Feather name="film" size={32} color="rgba(255,255,255,0.4)" />
-          }
-        </View>
-      )}
+      <Video
+        source={{ uri: url }}
+        style={{ width: THUMB_W, height: THUMB_H }}
+        resizeMode={ResizeMode.COVER}
+        shouldPlay={false}
+        isMuted
+        positionMillis={800}
+      />
       <View style={{
         position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
         alignItems: "center", justifyContent: "center",
-        backgroundColor: "rgba(0,0,0,0.25)",
+        backgroundColor: "rgba(0,0,0,0.2)",
       }}>
         <View style={{
-          width: 44, height: 44, borderRadius: 22,
-          backgroundColor: "rgba(0,0,0,0.6)",
+          width: 46, height: 46, borderRadius: 23,
+          backgroundColor: "rgba(0,0,0,0.65)",
           alignItems: "center", justifyContent: "center",
         }}>
-          <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+          <Feather name="play" size={22} color="#fff" style={{ marginLeft: 3 }} />
         </View>
       </View>
       <View style={{
@@ -808,6 +787,7 @@ export default function SessionScreen() {
   const [profileViewUser, setProfileViewUser] = useState<{ name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" } | null>(null);
   const [viewerImageIndex, setViewerImageIndex] = useState<number | null>(null);
   const [videoViewer, setVideoViewer] = useState<{ url: string; name: string } | null>(null);
+  const [videoNaturalSize, setVideoNaturalSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -2498,10 +2478,10 @@ export default function SessionScreen() {
         </View>
       </Modal>
 
-      <Modal visible={videoViewer !== null} transparent animationType="fade" onRequestClose={() => setVideoViewer(null)}>
-        <View style={{ flex: 1, backgroundColor: "#000" }}>
+      <Modal visible={videoViewer !== null} transparent animationType="fade" onRequestClose={() => { setVideoViewer(null); setVideoNaturalSize(null); }}>
+        <View style={{ flex: 1, backgroundColor: "#000", justifyContent: "center", alignItems: "center" }}>
           <View style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Pressable onPress={() => setVideoViewer(null)} style={{ padding: 6 }}>
+            <Pressable onPress={() => { setVideoViewer(null); setVideoNaturalSize(null); }} style={{ padding: 6 }}>
               <Feather name="x" size={24} color="#fff" />
             </Pressable>
             <Text style={{ flex: 1, color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
@@ -2511,10 +2491,19 @@ export default function SessionScreen() {
           {videoViewer && (
             <Video
               source={{ uri: videoViewer.url }}
-              style={{ flex: 1, width: "100%" }}
+              style={{
+                width: Dimensions.get("window").width,
+                height: videoNaturalSize
+                  ? Dimensions.get("window").width * (videoNaturalSize.height / videoNaturalSize.width)
+                  : Dimensions.get("window").width * (9 / 16),
+              }}
               resizeMode={ResizeMode.CONTAIN}
               useNativeControls
               shouldPlay
+              onReadyForDisplay={(e) => {
+                const { width, height } = e.naturalSize;
+                if (width && height) setVideoNaturalSize({ width, height });
+              }}
             />
           )}
         </View>
