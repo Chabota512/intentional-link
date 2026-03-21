@@ -432,44 +432,8 @@ function isVideoFile(name: string | null | undefined): boolean {
   return /\.(mp4|mov|m4v|avi|mkv|webm|3gp|wmv)$/i.test(name);
 }
 
-function InlineVideoPlayer({ url, isOwn, colors, onLongPress }: {
-  url: string;
-  isOwn: boolean;
-  colors: ReturnType<typeof import("@/hooks/useTheme").useTheme>["colors"];
-  onLongPress?: () => void;
-}) {
-  const videoRef = useRef<Video>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
 
-  return (
-    <Pressable
-      onLongPress={onLongPress}
-      delayLongPress={350}
-      style={{ borderRadius: 12, overflow: "hidden", width: 240, backgroundColor: "#000" }}
-    >
-      <Video
-        ref={videoRef}
-        source={{ uri: url }}
-        style={{ width: 240, height: 160 }}
-        resizeMode={ResizeMode.CONTAIN}
-        useNativeControls
-        onPlaybackStatusUpdate={(status) => {
-          if (status.isLoaded) {
-            setIsLoaded(true);
-          }
-        }}
-        shouldPlay={false}
-      />
-      {!isLoaded && (
-        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <ActivityIndicator color="#fff" />
-        </View>
-      )}
-    </Pressable>
-  );
-}
-
-function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, onReactionPress, senderPresenceStatus, onAvatarPress, onImagePress }: {
+function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, onReactionPress, senderPresenceStatus, onAvatarPress, onImagePress, onVideoPress }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
@@ -484,6 +448,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
   senderPresenceStatus?: "online" | "offline" | "local";
   onAvatarPress?: (user: { name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" }) => void;
   onImagePress?: (url: string) => void;
+  onVideoPress?: (url: string, name: string) => void;
 }) {
   const renderContent = () => {
     if (message.type === "image" && message.attachmentUrl) {
@@ -513,12 +478,27 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
 
       if (isVideoFile(message.attachmentName)) {
         return (
-          <InlineVideoPlayer
-            url={url}
-            isOwn={isOwn}
-            colors={colors}
+          <Pressable
+            onPress={() => onVideoPress?.(url, message.attachmentName || "Video")}
             onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onLongPress?.(); }}
-          />
+            delayLongPress={350}
+            style={({ pressed }) => [styles.fileCard, { opacity: pressed ? 0.85 : 1 }]}
+          >
+            <View style={[styles.fileIcon, { backgroundColor: isOwn ? "rgba(255,255,255,0.2)" : "#EDE7F6" }]}>
+              <Feather name="film" size={18} color={isOwn ? "#fff" : "#7C3AED"} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.fileName, { color: isOwn ? "#fff" : colors.text, fontFamily: "Inter_500Medium" }]} numberOfLines={1}>
+                {message.attachmentName || "Video"}
+              </Text>
+              <Text style={[styles.fileSize, { color: isOwn ? "rgba(255,255,255,0.7)" : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                Tap to play
+              </Text>
+            </View>
+            <View style={[{ width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: isOwn ? "rgba(255,255,255,0.25)" : colors.accentSoft }]}>
+              <Feather name="play" size={14} color={isOwn ? "#fff" : colors.accent} />
+            </View>
+          </Pressable>
         );
       }
 
@@ -763,6 +743,7 @@ export default function SessionScreen() {
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [profileViewUser, setProfileViewUser] = useState<{ name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" } | null>(null);
   const [viewerImageIndex, setViewerImageIndex] = useState<number | null>(null);
+  const [videoViewer, setVideoViewer] = useState<{ url: string; name: string } | null>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -1714,6 +1695,7 @@ export default function SessionScreen() {
                   senderPresenceStatus={isOwn ? "online" : getEffectivePresence(item.senderId, item.sender.lastSeenAt) as any}
                   onAvatarPress={setProfileViewUser}
                   onImagePress={openImageViewer}
+                  onVideoPress={(url, name) => setVideoViewer({ url, name })}
                 />
               );
             }}
@@ -2448,6 +2430,35 @@ export default function SessionScreen() {
                 ))
               )}
             </ScrollView>
+          )}
+        </View>
+      </Modal>
+
+      <Modal visible={videoViewer !== null} transparent animationType="fade" onRequestClose={() => setVideoViewer(null)}>
+        <View style={{ flex: 1, backgroundColor: "#000" }}>
+          <Pressable
+            style={{ position: "absolute", top: 60, right: 20, zIndex: 10, padding: 8 }}
+            onPress={() => setVideoViewer(null)}
+          >
+            <Feather name="x" size={26} color="#fff" />
+          </Pressable>
+          {videoViewer && (
+            <>
+              <View style={{ position: "absolute", top: 66, left: 0, right: 0, alignItems: "center", zIndex: 10 }}>
+                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+                  {videoViewer.name}
+                </Text>
+              </View>
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                <Video
+                  source={{ uri: videoViewer.url }}
+                  style={{ width: Dimensions.get("window").width, height: Dimensions.get("window").height * 0.7 }}
+                  resizeMode={ResizeMode.CONTAIN}
+                  useNativeControls
+                  shouldPlay
+                />
+              </View>
+            </>
           )}
         </View>
       </Modal>
