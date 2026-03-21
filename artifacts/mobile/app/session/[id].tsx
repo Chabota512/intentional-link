@@ -1229,12 +1229,6 @@ export default function SessionScreen() {
           {isActive && isCreator && (
             <>
               <Pressable
-                style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
-                onPress={openInvite}
-              >
-                <Feather name="user-plus" size={20} color={colors.accent} />
-              </Pressable>
-              <Pressable
                 style={({ pressed }) => [styles.endBtn, { backgroundColor: "#FFF0F0", opacity: pressed ? 0.7 : 1 }]}
                 onPress={handleEndSession}
               >
