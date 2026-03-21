@@ -725,9 +725,9 @@ const styles = StyleSheet.create({
   infoSheetHeaderTitle: { fontSize: 16 },
   infoBlock: { padding: 20, gap: 8, paddingBottom: 20 },
   infoAvatarWrap: { marginBottom: 4 },
-  infoAvatar: { width: 72, height: 72, borderRadius: 36 },
-  infoAvatarPlaceholder: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
-  infoAvatarLetter: { fontSize: 30, lineHeight: 36 },
+  infoAvatar: { width: 120, height: 120, borderRadius: 28 },
+  infoAvatarPlaceholder: { width: 120, height: 120, borderRadius: 28, alignItems: "center", justifyContent: "center" },
+  infoAvatarLetter: { fontSize: 48, lineHeight: 56 },
   infoTitle: { fontSize: 22, lineHeight: 28 },
   infoDesc: { fontSize: 14, lineHeight: 20 },
   infoMetaPill: {
