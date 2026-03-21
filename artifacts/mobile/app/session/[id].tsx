@@ -872,6 +872,42 @@ export default function SessionScreen() {
     setUploading(false);
   };
 
+  const handlePickVideo = async () => {
+    setAttachMenuVisible(false);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Allow access to your photo library to send videos.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      quality: 1,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const fileName = asset.fileName || `video_${Date.now()}.mp4`;
+    const fileSize = asset.fileSize || 0;
+    const contentType = asset.mimeType || "video/mp4";
+
+    setUploading(true);
+    try {
+      const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      sendMutation.mutate({
+        content: "",
+        type: "file",
+        attachmentUrl: uploaded.objectPath,
+        attachmentName: fileName,
+        attachmentSize: fileSize,
+      });
+    } catch (e: any) {
+      Alert.alert("Upload failed", e.message || "Could not upload video.");
+    }
+    setUploading(false);
+  };
+
   const handlePickFile = async () => {
     setAttachMenuVisible(false);
     try {
@@ -1413,6 +1449,16 @@ export default function SessionScreen() {
                     <Feather name="image" size={18} color="#1976D2" />
                   </View>
                   <Text style={[styles.attachIconLabel, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Photo</Text>
+                </Pressable>
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
+                <Pressable
+                  style={({ pressed }) => [styles.attachIconTile, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
+                  onPress={handlePickVideo}
+                >
+                  <View style={[styles.attachIconCircle, { backgroundColor: "#E8F5E9" }]}>
+                    <Feather name="video" size={18} color="#388E3C" />
+                  </View>
+                  <Text style={[styles.attachIconLabel, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Video</Text>
                 </Pressable>
                 <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
                 <Pressable
