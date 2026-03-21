@@ -88,7 +88,7 @@ export default function CallScreen() {
     if (Platform.OS !== "web") {
       InCallManager.stop();
     }
-    router.back();
+    router.replace(`/session/${sessionId}` as any);
   }
 
   function handleEnd() {
