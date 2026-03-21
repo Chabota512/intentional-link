@@ -1,0 +1,141 @@
+Also, from profile section, users must be allowed to controll which contact can see their read receipts and blue ticks too. is this possible, and which one can see if actively online. I want if they user has been offline for some time then they come back online, the ap to notice that they have come probabily they want to talk to someone, so it must open a dialog box where it will ask the user to tick allow all my contacts to see that i am online (which will do just that and even allow for read recipts and blue tick) or tick specific contacts who will see that they are online. the list of contacts will come after they tick the specific contats list with the most communicicated to and most recent contacts being first in the list (on top), those that wont be selected they will be shown the last time the user got online (not this time), no read recipts/blue tics too. LETS DISCUSS, HOW BEST CAN THIS BE MADE?
+
+Great topic — let me think through this with you before touching any code.
+
+What you're describing breaks into three distinct systems:
+
+1. Presence visibility (who sees you as "online")
+
+"All contacts" → everyone sees you online in real-time
+"Specific contacts" → only selected people see "online"; others see your last-seen timestamp from before this session
+The server would need to check this list before broadcasting your presence to each contact
+2. Read receipt visibility (who gets blue ticks)
+
+If someone can't see your presence, they also shouldn't get blue ticks from you
+Blue ticks only emit to people on your whitelist
+3. The "return online" dialog
+
+Triggered when you reconnect after being offline for X minutes (e.g., 5+ mins)
+Options: All contacts or Pick specific contacts
+Specific contacts list sorted by: most communicated first, then most recent
+After choosing, saves as your new preference going forward
+Things worth deciding before building:
+
+Offline threshold — how long must someone be gone before the dialog shows? 5 minutes? 30? Or every reconnect?
+
+Persistence — once you pick "specific contacts", does the dialog show again next time you reconnect? Or does it only ever ask once, and you change it later from Profile?
+
+Reciprocity — in WhatsApp, turning off read receipts means you also stop seeing others' blue ticks. Do you want that same trade-off here?
+
+Profile control — should users be able to adjust this at any time from the Profile screen, not just through the dialog?
+
+Default for new users — should new accounts start with "all contacts can see me" or prompt the dialog on first login?
+
+This is definitely buildable. The main moving parts are two new database tables (a privacy settings table and a contact whitelist), server-side checks before broadcasting presence and read receipts, and the client-side dialog. What are your thoughts on those questions above?
+
+Lets set the offline thresshold to default 5 inutes but we should add a screen in profile>privacy>profile visibity or read recipts> Privacy where All this we are discussing will be put. Persistence — once you pick "specific contacts", does the dialog show again next time you reconnect? - yes it does. Reciprocity — in WhatsApp, turning off read receipts means you also stop seeing others' blue ticks. Do you want that same trade-off here? - yes for fairness Profile control — should users be able to adjust this at any time from the Profile screen, not just through the dialog? - yes Default for new users — should new accounts start with "all contacts can see me" - yes all contacts can see
+
+Clear requirements. Let me map out the full build plan before starting:
+
+Database — two new tables: user_privacy_settings and presence_whitelist
+API — new privacy routes + socket changes (presence filtering, read receipt gating)
+Mobile — Privacy settings screen under Profile, plus the "return online" dialog
+Let me look at the existing database and routing structure first so I know exactly what to touch.
+
+Good. Now let me check the mobile navigation and profile screen so I know exactly where to plug the privacy screen in.
+
+I now have everything I need to build this. Let me write all the pieces in parallel — DB schema, API, and mobile screens.
+
+Now I have everything I need. Building all pieces in parallel — DB schema, API routes, socket logic, and mobile screens.
+
+Step 1: Database schema
+
+Now push the schema to the database and write the API privacy routes in parallel.
+
+DB tables created. Now wire up the API route, update user registration, and rewrite the socket logic.
+
+Step 2: API integration
+
+Now add privacy creation on user registration:
+
+Step 3: Update socket logic — presence filtering + offline dialog + read receipt gating.
+
+First let me read the full current socketio.ts:
+
+Now update socketio.ts with all three changes — presence dialog, privacy-aware broadcasting, and read receipt gating:
+
+Now gate read receipts in mark_read and rewrite broadcastPresence to respect privacy:
+
+Now rewrite broadcastPresence to filter by privacy settings:
+
+Step 4: Mobile — Privacy screen, dialog, and profile wiring
+
+Let me look at an existing screen for style reference and read SocketContext in full:
+
+Now writing all the mobile changes in parallel:
+
+Now update SocketContext to handle the show_presence_dialog event and expose dialog state:
+
+Now write the updated SocketContext that exposes the dialog state:
+
+Now write the PresenceDialog component and wire everything into the layout and profile:
+
+Now update the layout and profile in parallel:
+
+Let me find the settings section to add the Privacy row:
+
+Now apply all the changes — add Privacy row to profile and update the layout:
+
+Now update _layout.tsx to add the privacy screen and render the dialog:
+
+Now verify the DB package exports the new privacy tables, then check the useApi hook has put:
+
+The DB index doesn't export the privacy tables yet. Let me check and fix:
+
+Good — the privacy tables are exported. Let me verify the privacy routes are mounted on the API server:
+
+Need to register the privacy routes:
+
+Good — everything is already wired. Let me check the privacy routes file quickly, then restart both services:
+
+Let me quickly verify what verifyToken returns in the auth lib:
+
+There's a bug — the privacy route middleware treats verifyToken's return value as an object, but it returns a plain number. Let me fix that:
+
+Now restart both services to apply all the changes:
+
+Both services are running cleanly. The pre-existing useVideoPlayer crash in the logs is the known SDK mismatch from before — unrelated to these changes. Here's a summary of everything that was completed:
+
+Server (socketio.ts)
+
+Return-online dialog: On every reconnect, the server reads the user's previous lastSeenAt. If they were offline for more than 5 minutes, it emits show_presence_dialog carrying their current privacy settings and whitelist — so the client can immediately prompt them.
+Privacy-aware broadcastPresence: When broadcasting "online", it now reads presenceVisibility. If "all", it broadcasts to everyone as before. If "specific", it emits "online" only to whitelisted contacts and "offline + prevLastSeenAt" to everyone else. If "none", it silently skips.
+Read receipt gating in mark_read: Before advancing message status to "read", it checks the reading user's readReceiptsEnabled. If off, the cursor is still updated (so unread badge clears locally) but no blue ticks propagate. It also filters out any participant whose readReceiptsEnabled is false before computing the quorum.
+Fixed bug in privacy.ts: The auth middleware was incorrectly accessing .userId on verifyToken's return value (which is a plain number). Fixed.
+
+Mobile
+
+SocketContext: Listens for show_presence_dialog, stores the payload as presenceDialogData, exposes it and dismissPresenceDialog via context.
+components/PresenceDialog: Bottom-sheet modal that appears on reconnect. Step 1 offers "All contacts" or "Specific contacts". Step 2 (if specific) loads and shows the contact list sorted by most communicated, with checkboxes. Submits the choice to PUT /users/privacy then dismisses.
+app/privacy.tsx: Full settings screen accessible anytime from Profile. Has the three-option visibility selector, the contact whitelist editor (for "specific" mode), and a read receipts toggle.
+_layout.tsx: Added privacy route to the Stack and renders <PresenceDialog /> at the root so it appears over any screen.
+profile.tsx: New "PRIVACY" section with a "Privacy Settings" row that navigates to the screen.
+offline duration is not set, i want it to be set also in the same new screen you have added, and ensure you explain to the uer what they are abiut to change/set. then remove the redudant privacy section from profile page
+
+div
+The screenshot shows the profile page still has "Profile Visibility" and "Read Receipts" rows. Let me find those and understand the full picture before making changes:
+
+Found them — there are old "Profile Visibility" and "Read Receipts" rows in profile.tsx at lines ~327-333. Let me see them in context, and also read the DB migration setup:
+
+Clear picture now. There are two "PRIVACY" sections stacked in profile — the old static rows (the screenshot) and my new interactive link. I need to:
+
+Remove the old static "Profile Visibility / Read Receipts" section
+Add offlineThresholdMinutes to the DB schema + API + socket
+Add it to the privacy screen with clear explanations
+Let me check if Drizzle push or migrations are in use:
+
+Good — drizzle-kit push. Now I'll do everything in sequence: schema → push → API → socket → mobile UI.
+
+Step 1: Add offlineThresholdMinutes to the DB schema:
+
+You've reached your daily free quota limit. It will reset at 12:00 AM UTC.

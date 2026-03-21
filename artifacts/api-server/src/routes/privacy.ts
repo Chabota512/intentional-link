@@ -60,18 +60,27 @@ router.get("/users/privacy", authMiddleware, async (req: any, res): Promise<void
   res.json({
     presenceVisibility: settings.presenceVisibility,
     readReceiptsEnabled: settings.readReceiptsEnabled,
+    offlineThresholdMinutes: settings.offlineThresholdMinutes ?? 5,
     whitelistedContactIds: whitelist.map(w => w.allowedContactId),
   });
 });
 
 router.put("/users/privacy", authMiddleware, async (req: any, res): Promise<void> => {
   const userId = req.userId as number;
-  const { presenceVisibility, readReceiptsEnabled, whitelistedContactIds } = req.body;
+  const { presenceVisibility, readReceiptsEnabled, whitelistedContactIds, offlineThresholdMinutes } = req.body;
 
   const validVisibility = ["all", "specific", "none"];
   if (presenceVisibility !== undefined && !validVisibility.includes(presenceVisibility)) {
     res.status(400).json({ error: "Invalid presenceVisibility value" });
     return;
+  }
+
+  if (offlineThresholdMinutes !== undefined) {
+    const mins = Number(offlineThresholdMinutes);
+    if (!Number.isFinite(mins) || mins < 1 || mins > 1440) {
+      res.status(400).json({ error: "offlineThresholdMinutes must be between 1 and 1440" });
+      return;
+    }
   }
 
   await db
@@ -80,6 +89,7 @@ router.put("/users/privacy", authMiddleware, async (req: any, res): Promise<void
       userId,
       presenceVisibility: presenceVisibility ?? "all",
       readReceiptsEnabled: readReceiptsEnabled ?? true,
+      offlineThresholdMinutes: offlineThresholdMinutes ?? 5,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -87,6 +97,7 @@ router.put("/users/privacy", authMiddleware, async (req: any, res): Promise<void
       set: {
         ...(presenceVisibility !== undefined ? { presenceVisibility } : {}),
         ...(readReceiptsEnabled !== undefined ? { readReceiptsEnabled } : {}),
+        ...(offlineThresholdMinutes !== undefined ? { offlineThresholdMinutes: Number(offlineThresholdMinutes) } : {}),
         updatedAt: new Date(),
       },
     });

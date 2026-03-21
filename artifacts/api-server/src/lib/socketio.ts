@@ -4,7 +4,7 @@ import { verifyToken } from "./auth";
 import { db, usersTable, sessionsTable, sessionParticipantsTable, sessionReadCursorsTable, messagesTable, userPrivacySettingsTable, presenceWhitelistTable } from "@workspace/db";
 import { eq, and, ne, desc, lte, inArray } from "drizzle-orm";
 
-const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000;
+const DEFAULT_OFFLINE_THRESHOLD_MS = 5 * 60 * 1000;
 
 let io: Server | null = null;
 
@@ -74,8 +74,17 @@ export function initSocketIO(httpServer: HttpServer): Server {
       .limit(1);
 
     const prevLastSeenAt = prevUser?.lastSeenAt ?? null;
+
+    const [privForThreshold] = await db
+      .select({ offlineThresholdMinutes: userPrivacySettingsTable.offlineThresholdMinutes })
+      .from(userPrivacySettingsTable)
+      .where(eq(userPrivacySettingsTable.userId, userId))
+      .limit(1);
+
+    const thresholdMs = ((privForThreshold?.offlineThresholdMinutes ?? 5)) * 60 * 1000;
+
     const wasOfflineLong = prevLastSeenAt
-      ? Date.now() - new Date(prevLastSeenAt).getTime() > OFFLINE_THRESHOLD_MS
+      ? Date.now() - new Date(prevLastSeenAt).getTime() > thresholdMs
       : true;
 
     await db.update(usersTable).set({ lastSeenAt: new Date() }).where(eq(usersTable.id, userId));

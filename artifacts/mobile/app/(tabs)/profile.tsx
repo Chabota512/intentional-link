@@ -323,26 +323,9 @@ export default function ProfileScreen() {
         <SectionHeader title="PRIVACY" colors={colors} />
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SettingsRow
-            icon="eye-off"
-            label="Profile Visibility"
-            sublabel="Only contacts can see your status"
-            colors={colors}
-          />
-          <SettingsRow
-            icon="check-circle"
-            label="Read Receipts"
-            sublabel="Others can see when you read messages"
-            colors={colors}
-            last
-          />
-        </View>
-
-        <SectionHeader title="PRIVACY" colors={colors} />
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SettingsRow
             icon="eye"
             label="Privacy Settings"
-            sublabel="Online visibility, read receipts"
+            sublabel="Online visibility, read receipts, offline threshold"
             onPress={() => router.push("/privacy" as any)}
             colors={colors}
             last
