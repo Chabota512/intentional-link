@@ -993,28 +993,31 @@ export default function SessionScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
       allowsEditing: false,
+      allowsMultipleSelection: true,
     });
-    if (result.canceled || !result.assets[0]) return;
-
-    const asset = result.assets[0];
-    const fileName = asset.fileName || `image_${Date.now()}.jpg`;
-    const fileSize = asset.fileSize || 0;
-    const contentType = asset.mimeType || "image/jpeg";
+    if (result.canceled || !result.assets.length) return;
 
     setUploading(true);
-    try {
-      const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      sendMutation.mutate({
-        content: "",
-        type: "image",
-        attachmentUrl: uploaded.objectPath,
-        attachmentName: fileName,
-        attachmentSize: fileSize,
-      });
-    } catch (e: any) {
-      Alert.alert("Upload failed", e.message || "Could not upload image.");
+    let failed = 0;
+    for (const asset of result.assets) {
+      const fileName = asset.fileName || `image_${Date.now()}.jpg`;
+      const fileSize = asset.fileSize || 0;
+      const contentType = asset.mimeType || "image/jpeg";
+      try {
+        const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
+        sendMutation.mutate({
+          content: "",
+          type: "image",
+          attachmentUrl: uploaded.objectPath,
+          attachmentName: fileName,
+          attachmentSize: fileSize,
+        });
+      } catch {
+        failed++;
+      }
     }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (failed > 0) Alert.alert("Upload failed", `${failed} file(s) could not be uploaded.`);
     setUploading(false);
   };
 
@@ -1029,46 +1032,18 @@ export default function SessionScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       quality: 1,
       allowsEditing: false,
+      allowsMultipleSelection: true,
     });
-    if (result.canceled || !result.assets[0]) return;
-
-    const asset = result.assets[0];
-    const fileName = asset.fileName || `video_${Date.now()}.mp4`;
-    const fileSize = asset.fileSize || 0;
-    const contentType = asset.mimeType || "video/mp4";
+    if (result.canceled || !result.assets.length) return;
 
     setUploading(true);
-    try {
-      const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      sendMutation.mutate({
-        content: "",
-        type: "file",
-        attachmentUrl: uploaded.objectPath,
-        attachmentName: fileName,
-        attachmentSize: fileSize,
-      });
-    } catch (e: any) {
-      Alert.alert("Upload failed", e.message || "Could not upload video.");
-    }
-    setUploading(false);
-  };
-
-  const handlePickFile = async () => {
-    setAttachMenuVisible(false);
-    try {
-      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
-      if (result.canceled || !result.assets[0]) return;
-
-      const asset = result.assets[0];
-      const fileName = asset.name;
-      const fileSize = asset.size || 0;
-      const contentType = asset.mimeType || "application/octet-stream";
-
-      setUploading(true);
+    let failed = 0;
+    for (const asset of result.assets) {
+      const fileName = asset.fileName || `video_${Date.now()}.mp4`;
+      const fileSize = asset.fileSize || 0;
+      const contentType = asset.mimeType || "video/mp4";
       try {
         const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         sendMutation.mutate({
           content: "",
           type: "file",
@@ -1076,9 +1051,42 @@ export default function SessionScreen() {
           attachmentName: fileName,
           attachmentSize: fileSize,
         });
-      } catch (e: any) {
-        Alert.alert("Upload failed", e.message || "Could not upload file.");
+      } catch {
+        failed++;
       }
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (failed > 0) Alert.alert("Upload failed", `${failed} file(s) could not be uploaded.`);
+    setUploading(false);
+  };
+
+  const handlePickFile = async () => {
+    setAttachMenuVisible(false);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: true });
+      if (result.canceled || !result.assets.length) return;
+
+      setUploading(true);
+      let failed = 0;
+      for (const asset of result.assets) {
+        const fileName = asset.name;
+        const fileSize = asset.size || 0;
+        const contentType = asset.mimeType || "application/octet-stream";
+        try {
+          const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
+          sendMutation.mutate({
+            content: "",
+            type: "file",
+            attachmentUrl: uploaded.objectPath,
+            attachmentName: fileName,
+            attachmentSize: fileSize,
+          });
+        } catch {
+          failed++;
+        }
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (failed > 0) Alert.alert("Upload failed", `${failed} file(s) could not be uploaded.`);
       setUploading(false);
     } catch {
       setUploading(false);
