@@ -1344,6 +1344,14 @@ export default function SessionScreen() {
 
   const totalPeople = session.participants.length + 1;
   const totalActive = 1 + onlineParticipants.length;
+
+  const otherPeople = [
+    ...(session.creator && session.creator.id !== user?.id ? [{ id: session.creator.id, name: session.creator.name, username: session.creator.username, avatarUrl: session.creator.avatarUrl ?? null, lastSeenAt: session.creator.lastSeenAt ?? null }] : []),
+    ...session.participants.filter(p => p.userId !== user?.id).map(p => ({ id: p.userId, name: p.user.name, username: p.user.username, avatarUrl: p.user.avatarUrl ?? null, lastSeenAt: p.user.lastSeenAt ?? null })),
+  ];
+  const isDirect = totalPeople === 2;
+  const headerPerson = isDirect ? otherPeople[0] ?? null : null;
+
   const activeLabel = isActive
     ? localParticipants.length > 0
       ? `${localParticipants.length + 1} nearby`
@@ -1367,28 +1375,54 @@ export default function SessionScreen() {
         >
           <Feather name="arrow-left" size={22} color={colors.text} />
         </Pressable>
-        <View style={styles.navCenter}>
+        <Pressable
+          style={styles.navCenter}
+          onPress={() => {
+            if (headerPerson) {
+              setProfileViewUser({
+                name: headerPerson.name,
+                username: headerPerson.username,
+                avatarUrl: headerPerson.avatarUrl,
+                presenceStatus: getEffectivePresence(headerPerson.id, headerPerson.lastSeenAt) as any,
+              });
+            } else {
+              openParticipants();
+            }
+          }}
+        >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            {session.imageUrl ? (
+            {headerPerson ? (
+              <UserAvatar
+                name={headerPerson.name}
+                avatarUrl={headerPerson.avatarUrl}
+                size={34}
+                showDot={true}
+                presenceStatus={getEffectivePresence(headerPerson.id, headerPerson.lastSeenAt) as any}
+              />
+            ) : session.imageUrl ? (
               <Image
                 source={{ uri: getFileUrl(session.imageUrl) }}
-                style={{ width: 28, height: 28, borderRadius: 8 }}
+                style={{ width: 34, height: 34, borderRadius: 17 }}
                 resizeMode="cover"
               />
-            ) : null}
-            <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold", flex: 1 }]} numberOfLines={1}>
-              {session.title}
-            </Text>
+            ) : (
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center" }}>
+                <Feather name="users" size={16} color={colors.accent} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
+                {session.title}
+              </Text>
+              <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
+                <Text style={{ color: colors.textTertiary }}>{"› "}</Text>
+                <Text style={{ color: colors.textSecondary }}>{`${totalPeople} participant${totalPeople !== 1 ? "s" : ""}`}</Text>
+                <Text style={{ color: colors.textSecondary }}>{" · "}</Text>
+                <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
+              </Text>
+            </View>
           </View>
-          <Pressable style={styles.navMeta} onPress={openParticipants}>
-            <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]}>
-              <Text style={{ color: colors.textTertiary }}>{"› "}</Text>
-              <Text style={{ color: colors.textSecondary }}>{`${totalPeople} participant${totalPeople !== 1 ? "s" : ""}`}</Text>
-              <Text style={{ color: colors.textSecondary }}>{" · "}</Text>
-              <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
-            </Text>
-          </Pressable>
-        </View>
+        </Pressable>
         <View style={styles.navActions}>
           <Pressable
             style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
