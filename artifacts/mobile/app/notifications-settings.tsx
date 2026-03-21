@@ -391,7 +391,7 @@ export default function NotificationsSettingsScreen() {
     <>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* HEADER */}
-        <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: colors.border, borderBottomColor: colors.textTertiary }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
           <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
             <Feather name="arrow-left" size={22} color={colors.text} />
           </Pressable>

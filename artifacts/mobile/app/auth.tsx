@@ -130,7 +130,7 @@ export default function AuthScreen() {
             </Text>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.duration(500).springify()} style={[styles.card, { backgroundColor: "#fff" }]}>
+          <Animated.View entering={FadeInDown.duration(500).springify()} style={[styles.card, { backgroundColor: colors.surface }]}>
             <View style={styles.fields}>
               <Text style={[styles.cardTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>
                 {mode === "login" ? "Welcome back" : "Create account"}
@@ -230,9 +230,9 @@ export default function AuthScreen() {
               </View>
 
               {error !== "" && (
-                <View style={[styles.errorBox, { backgroundColor: "#FFFBEB", borderColor: "#F59E0B" }]}>
-                  <Feather name="info" size={14} color="#D97706" />
-                  <Text style={[styles.errorText, { color: "#92400E", fontFamily: "Inter_400Regular" }]}>{error}</Text>
+                <View style={[styles.errorBox, { backgroundColor: colors.warning + "22", borderColor: colors.warning }]}>
+                  <Feather name="info" size={14} color={colors.warning} />
+                  <Text style={[styles.errorText, { color: colors.text, fontFamily: "Inter_400Regular" }]}>{error}</Text>
                 </View>
               )}
 

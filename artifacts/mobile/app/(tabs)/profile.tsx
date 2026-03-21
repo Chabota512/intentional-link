@@ -271,7 +271,7 @@ export default function ProfileScreen() {
                 <Text style={[styles.avatarText, { fontFamily: "Inter_700Bold" }]}>{initial}</Text>
               </View>
             )}
-            <View style={[styles.avatarEditBadge, { backgroundColor: colors.accent }]}>
+            <View style={[styles.avatarEditBadge, { backgroundColor: colors.accent, borderColor: colors.background }]}>
               {uploadingAvatar
                 ? <ActivityIndicator size="small" color="#fff" />
                 : <Feather name="camera" size={12} color="#fff" />
@@ -360,7 +360,7 @@ export default function ProfileScreen() {
         </View>
 
         <SectionHeader title="DANGER ZONE" colors={colors} />
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: "#FFCCCC" }]}>
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.danger + "55" }]}>
           <SettingsRow
             icon="trash"
             label="Clear All Data"
@@ -530,7 +530,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#fff",
   },
   avatarText: { fontSize: 32, color: "#fff" },
   name: { fontSize: 22 },

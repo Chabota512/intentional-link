@@ -170,7 +170,7 @@ export default function NewSessionScreen() {
             ) : imageUri ? (
               <View style={styles.imagePreviewWrapper}>
                 <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-                <View style={[styles.imageEditBadge, { backgroundColor: colors.accent }]}>
+                <View style={[styles.imageEditBadge, { backgroundColor: colors.accent, borderColor: colors.background }]}>
                   <Feather name="camera" size={12} color="#fff" />
                 </View>
               </View>
@@ -298,25 +298,25 @@ export default function NewSessionScreen() {
           )}
 
           {showNoContactsWarning && (
-            <View style={[styles.warningBox, { backgroundColor: "#FFF8E1", borderColor: "#F59E0B" }]}>
+            <View style={[styles.warningBox, { backgroundColor: colors.warning + "22", borderColor: colors.warning }]}>
               <View style={styles.warningTop}>
-                <Feather name="alert-triangle" size={16} color="#F59E0B" />
-                <Text style={[styles.warningTitle, { fontFamily: "Inter_600SemiBold", color: "#92400E" }]}>
+                <Feather name="alert-triangle" size={16} color={colors.warning} />
+                <Text style={[styles.warningTitle, { fontFamily: "Inter_600SemiBold", color: colors.text }]}>
                   No contacts selected
                 </Text>
               </View>
-              <Text style={[styles.warningText, { fontFamily: "Inter_400Regular", color: "#78350F" }]}>
+              <Text style={[styles.warningText, { fontFamily: "Inter_400Regular", color: colors.textSecondary }]}>
                 You haven't added anyone to this chat. Create it anyway?
               </Text>
               <View style={styles.warningActions}>
                 <Pressable
-                  style={({ pressed }) => [styles.warningBtn, styles.warningBtnOutline, { borderColor: "#F59E0B", opacity: pressed ? 0.7 : 1 }]}
+                  style={({ pressed }) => [styles.warningBtn, styles.warningBtnOutline, { borderColor: colors.warning, opacity: pressed ? 0.7 : 1 }]}
                   onPress={() => setShowNoContactsWarning(false)}
                 >
-                  <Text style={[styles.warningBtnText, { color: "#92400E", fontFamily: "Inter_500Medium" }]}>Go back</Text>
+                  <Text style={[styles.warningBtnText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Go back</Text>
                 </Pressable>
                 <Pressable
-                  style={({ pressed }) => [styles.warningBtn, { backgroundColor: "#F59E0B", opacity: pressed ? 0.85 : 1 }]}
+                  style={({ pressed }) => [styles.warningBtn, { backgroundColor: colors.warning, opacity: pressed ? 0.85 : 1 }]}
                   onPress={() => { setShowNoContactsWarning(false); doCreate(); }}
                 >
                   {createMutation.isPending ? (
@@ -330,7 +330,7 @@ export default function NewSessionScreen() {
           )}
 
           {createMutation.isError && (
-            <View style={[styles.errorBox, { backgroundColor: "#FFF0F0", borderColor: colors.danger }]}>
+            <View style={[styles.errorBox, { backgroundColor: colors.danger + "18", borderColor: colors.danger }]}>
               <Text style={[styles.errorText, { color: colors.danger, fontFamily: "Inter_400Regular" }]}>
                 {(createMutation.error as Error).message}
               </Text>
