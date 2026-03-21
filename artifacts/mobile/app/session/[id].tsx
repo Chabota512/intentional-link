@@ -790,12 +790,15 @@ export default function SessionScreen() {
   const [profileViewUser, setProfileViewUser] = useState<{ name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" } | null>(null);
   const [viewerImageIndex, setViewerImageIndex] = useState<number | null>(null);
   const [videoViewer, setVideoViewer] = useState<{ url: string; name: string } | null>(null);
-  const inAppVideoPlayer = useVideoPlayer(null, (p) => { p.loop = false; });
+  const inAppVideoPlayer = useVideoPlayer(null);
   const vpAutoPlayRef = useRef(false);
 
   useEffect(() => {
     if (videoViewer?.url) {
       vpAutoPlayRef.current = true;
+      inAppVideoPlayer.loop = false;
+      inAppVideoPlayer.muted = false;
+      inAppVideoPlayer.playbackRate = 1;
       inAppVideoPlayer.replace({ uri: videoViewer.url });
       setVpRate(1);
       setVpMuted(false);
