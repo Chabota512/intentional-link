@@ -72,7 +72,7 @@ function getMessagePreview(msg: LastMessage | null | undefined, currentUserId: n
 export default function SessionsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { get } = useApi();
+  const { get, getFileUrl } = useApi();
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<"active" | "completed" | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -179,7 +179,7 @@ export default function SessionsScreen() {
             {item.imageUrl ? (
               <>
                 <Image
-                  source={{ uri: item.imageUrl }}
+                  source={{ uri: getFileUrl(item.imageUrl) }}
                   style={styles.sessionImage}
                 />
                 <View style={[styles.onlineDot, { backgroundColor: groupDotColor, borderColor: colors.surface }]} />
