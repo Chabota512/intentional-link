@@ -1190,9 +1190,9 @@ export default function SessionScreen() {
             </Text>
           </View>
           <Pressable style={styles.navMeta} onPress={openParticipants}>
-            <View style={[styles.statusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
-            <Text style={[styles.navSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-              {activeLabel} · {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
+            <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]}>
+              <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
+              <Text style={{ color: colors.textSecondary }}>{` · ${totalPeople} participant${totalPeople !== 1 ? "s" : ""}`}</Text>
             </Text>
             <Feather name="chevron-right" size={12} color={colors.textTertiary} />
           </Pressable>
