@@ -414,7 +414,6 @@ export default function SessionsScreen() {
         />
       )}
 
-      {/* Chat Info Sheet */}
       <Modal
         visible={previewSession !== null}
         animationType="slide"
