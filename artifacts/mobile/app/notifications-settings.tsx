@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   Platform,
+  TextInput,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
@@ -85,14 +86,79 @@ function Avatar({ name, avatarUrl, size = 38, colors }: { name: string; avatarUr
   );
 }
 
+function parseCustomTime(input: string): string | null {
+  const cleaned = input.trim().toUpperCase().replace(/\s+/g, " ");
+
+  const withMinAmPm = cleaned.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+  if (withMinAmPm) {
+    let h = parseInt(withMinAmPm[1]);
+    const m = parseInt(withMinAmPm[2]);
+    const pm = withMinAmPm[3] === "PM";
+    if (h < 1 || h > 12 || m < 0 || m > 59) return null;
+    if (h === 12) h = pm ? 12 : 0;
+    else if (pm) h += 12;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
+  const hourAmPm = cleaned.match(/^(\d{1,2})\s*(AM|PM)$/);
+  if (hourAmPm) {
+    let h = parseInt(hourAmPm[1]);
+    const pm = hourAmPm[2] === "PM";
+    if (h < 1 || h > 12) return null;
+    if (h === 12) h = pm ? 12 : 0;
+    else if (pm) h += 12;
+    return `${String(h).padStart(2, "0")}:00`;
+  }
+
+  const mil = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (mil) {
+    const h = parseInt(mil[1]);
+    const m = parseInt(mil[2]);
+    if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
+  return null;
+}
+
+function formatTimeValue(value: string): string {
+  const preset = HOUR_OPTIONS.find(h => h.value === value);
+  if (preset) return preset.label;
+  const [hStr, mStr] = value.split(":");
+  const h = parseInt(hStr);
+  const m = parseInt(mStr);
+  const ampm = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
 function TimePicker({ value, onChange, label, colors }: { value: string | null; onChange: (v: string | null) => void; label: string; colors: any }) {
   const [open, setOpen] = useState(false);
-  const display = value ? HOUR_OPTIONS.find(h => h.value === value)?.label ?? value : "—";
+  const [customInput, setCustomInput] = useState("");
+  const [customError, setCustomError] = useState(false);
+
+  const display = value ? formatTimeValue(value) : "—";
+
+  const handleCustomSubmit = () => {
+    const parsed = parseCustomTime(customInput);
+    if (!parsed) { setCustomError(true); return; }
+    setCustomError(false);
+    onChange(parsed);
+    setOpen(false);
+    setCustomInput("");
+  };
+
+  const handleOpen = () => {
+    setCustomInput("");
+    setCustomError(false);
+    setOpen(true);
+  };
+
   return (
     <>
       <Pressable
         style={[styles.timeTrigger, { borderColor: value ? colors.accent : colors.border, backgroundColor: value ? colors.accentSoft : colors.surface }]}
-        onPress={() => setOpen(true)}
+        onPress={handleOpen}
       >
         <Text style={[styles.timeLabel, { color: colors.textTertiary }]}>{label}</Text>
         <Text style={[styles.timeValue, { color: value ? colors.accent : colors.textSecondary }]}>{display}</Text>
@@ -102,7 +168,29 @@ function TimePicker({ value, onChange, label, colors }: { value: string | null; 
         <Pressable style={styles.modalBackdrop} onPress={() => setOpen(false)}>
           <View style={[styles.pickerSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.pickerTitle, { color: colors.text }]}>{label}</Text>
-            <ScrollView style={{ maxHeight: 280 }}>
+
+            {/* Custom time entry */}
+            <View style={[styles.customTimeRow, { borderColor: customError ? "#EF4444" : colors.border, backgroundColor: colors.background }]}>
+              <Feather name="clock" size={15} color={customError ? "#EF4444" : colors.textTertiary} />
+              <TextInput
+                style={[styles.customTimeInput, { color: colors.text }]}
+                placeholder="e.g. 3:45 PM or 15:45"
+                placeholderTextColor={colors.textTertiary}
+                value={customInput}
+                onChangeText={t => { setCustomInput(t); setCustomError(false); }}
+                onSubmitEditing={handleCustomSubmit}
+                returnKeyType="done"
+                autoCorrect={false}
+              />
+              <Pressable onPress={handleCustomSubmit} style={[styles.customTimeSet, { backgroundColor: colors.accent }]}>
+                <Text style={styles.customTimeSetText}>Set</Text>
+              </Pressable>
+            </View>
+            {customError && (
+              <Text style={styles.customTimeError}>Enter a time like "3:45 PM" or "15:45"</Text>
+            )}
+
+            <ScrollView style={{ maxHeight: 240 }}>
               <Pressable onPress={() => { onChange(null); setOpen(false); }}>
                 <Text style={[styles.pickerOption, { color: colors.textTertiary, borderBottomColor: colors.border }]}>Clear</Text>
               </Pressable>
@@ -705,6 +793,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  customTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 12,
+    marginBottom: 4,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingLeft: 10,
+    gap: 8,
+    overflow: "hidden",
+  },
+  customTimeInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    paddingVertical: 10,
+  },
+  customTimeSet: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignSelf: "stretch",
+    justifyContent: "center",
+  },
+  customTimeSetText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
+  customTimeError: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "#EF4444",
+    marginHorizontal: 14,
+    marginBottom: 8,
   },
 
   modalContainer: { flex: 1 },
