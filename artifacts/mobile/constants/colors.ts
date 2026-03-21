@@ -8,7 +8,7 @@ export default {
   light: {
     background: "#EEF3F8",
     surface: "#FFFFFF",
-    surfaceAlt: "#F2F7FC",
+    surfaceAlt: "#E8F1F8",
     border: "#D6E8F2",
     text: "#0D1820",
     textSecondary: "#4D6E7E",
