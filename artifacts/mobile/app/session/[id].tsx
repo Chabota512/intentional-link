@@ -1493,6 +1493,12 @@ export default function SessionScreen() {
         keyboardVerticalOffset={0}
         style={{ flex: 1 }}
       >
+        {attachMenuVisible && (
+          <Pressable
+            style={[StyleSheet.absoluteFillObject, { zIndex: 10 }]}
+            onPress={() => setAttachMenuVisible(false)}
+          />
+        )}
         {!socketConnected && isActive && (
           <View style={[styles.pollErrorBanner, { backgroundColor: "#FFF3CD", borderBottomColor: "#FFEAA7" }]}>
             <Feather name="wifi-off" size={14} color="#856404" />
