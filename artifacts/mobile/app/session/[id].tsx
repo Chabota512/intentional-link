@@ -1633,6 +1633,7 @@ export default function SessionScreen() {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             paddingBottom: bottomPad + 8,
+            zIndex: attachMenuVisible ? 20 : 1,
           }]}>
             {attachMenuVisible && (
               <Animated.View
