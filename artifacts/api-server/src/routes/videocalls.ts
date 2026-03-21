@@ -108,33 +108,86 @@ router.get("/sessions/:id/call-page", async (req, res) => {
   #status-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 5; background: #111; }
   #status-text { font-size: 15px; color: #aaa; }
 
-  /* Full-screen video layout */
+  /* Video container */
   #videos { position: absolute; inset: 0; display: none; }
 
-  /* Remote video fills entire screen */
-  #remote-video-wrap {
-    position: absolute;
-    inset: 0;
-    background: #1a1a1a;
-    overflow: hidden;
+  /* ── GRID MODE ────────────────────────────────── */
+  #remote-grid {
+    position: absolute; inset: 0;
+    display: grid; gap: 3px; background: #0a0a0a;
+    transition: grid-template-columns 0.3s, grid-template-rows 0.3s;
   }
-  #remote-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+  #remote-grid.count-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  #remote-grid.count-2 { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  #remote-grid.count-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  #remote-grid.count-many { grid-template-columns: 1fr 1fr; grid-auto-rows: 200px; overflow-y: auto; }
 
-  /* Local video as draggable PiP */
+  .remote-tile {
+    position: relative; overflow: hidden;
+    background: #1a1a1a; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .remote-tile:active { opacity: 0.85; }
+  .remote-tile.span-full { grid-column: 1 / -1; }
+  .remote-tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* tap-to-spotlight hint */
+  .tap-hint {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(0,0,0,0.5); border-radius: 10px;
+    padding: 3px 8px; font-size: 10px; color: rgba(255,255,255,0.7);
+    opacity: 0; animation: fadeHint 3s forwards;
+  }
+  @keyframes fadeHint { 0%,60%{opacity:1} 100%{opacity:0} }
+
+  /* ── SPOTLIGHT MODE ───────────────────────────── */
+  #spotlight-view {
+    position: absolute; inset: 0;
+    background: #1a1a1a; display: none; cursor: pointer;
+  }
+  #spotlight-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #spotlight-back-hint {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.55); border-radius: 20px;
+    padding: 5px 14px; font-size: 12px; color: rgba(255,255,255,0.8);
+    pointer-events: none;
+  }
+
+  /* Thumbnail strip at bottom (spotlight mode) */
+  #thumb-strip {
+    position: absolute; bottom: 100px; left: 0; right: 0;
+    height: 116px; display: none;
+    flex-direction: row; gap: 6px;
+    padding: 0 10px; overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    z-index: 7; align-items: center;
+  }
+  #thumb-strip::-webkit-scrollbar { display: none; }
+  .thumb-tile {
+    flex-shrink: 0; width: 72px; height: 104px;
+    border-radius: 12px; overflow: hidden;
+    background: #2a2a2a; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.15);
+    position: relative; transition: border-color 0.2s, transform 0.15s;
+  }
+  .thumb-tile:active { transform: scale(0.95); }
+  .thumb-tile.is-spotlight { border-color: #FF6B9D; }
+  .thumb-tile video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+  .thumb-label {
+    position: absolute; bottom: 4px; left: 0; right: 0;
+    text-align: center; font-size: 9px; color: rgba(255,255,255,0.75);
+    background: rgba(0,0,0,0.45); padding: 2px 0;
+  }
+
+  /* ── LOCAL VIDEO PiP ──────────────────────────── */
   #local-video-wrap {
-    position: absolute;
-    top: 16px;
-    right: 14px;
-    width: 96px;
-    height: 148px;
-    border-radius: 14px;
-    overflow: hidden;
+    position: absolute; top: 16px; right: 14px;
+    width: 96px; height: 148px;
+    border-radius: 14px; overflow: hidden;
     background: #333;
     box-shadow: 0 4px 18px rgba(0,0,0,0.6);
     border: 2px solid rgba(255,255,255,0.15);
-    z-index: 6;
-    cursor: grab;
-    touch-action: none;
+    z-index: 6; cursor: grab; touch-action: none;
     transition: box-shadow 0.15s, transform 0.15s;
     user-select: none;
   }
@@ -145,19 +198,6 @@ router.get("/sessions/:id/call-page", async (req, res) => {
     transition: box-shadow 0.15s;
   }
   #local-video-wrap video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-
-  /* No-one-yet placeholder for remote video */
-  #remote-placeholder {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-  }
-  .ph-avatar { width: 88px; height: 88px; border-radius: 44px; background: #333; display: flex; align-items: center; justify-content: center; font-size: 34px; }
-  .ph-name { font-size: 16px; color: #aaa; }
 
   .video-label { position: absolute; bottom: 6px; left: 8px; font-size: 11px; color: #fff; background: rgba(0,0,0,0.55); padding: 2px 8px; border-radius: 10px; }
 
@@ -239,11 +279,11 @@ router.get("/sessions/:id/call-page", async (req, res) => {
 
 <div id="${isVoiceOnly ? "voice-ui" : "videos"}">
   ${isVoiceOnly ? `<div class="avatar">👤</div><div id="caller-name">Connecting…</div>` : `
-  <div id="remote-video-wrap">
-    <div id="remote-placeholder">
-      <div class="ph-avatar">👤</div>
-    </div>
+  <div id="remote-grid" class="count-1"></div>
+  <div id="spotlight-view">
+    <div id="spotlight-back-hint">Tap to go back to grid</div>
   </div>
+  <div id="thumb-strip"></div>
   <div id="local-video-wrap">
     <span class="video-label">You</span>
   </div>
@@ -377,12 +417,126 @@ async function init() {
   }
 }
 
+let spotlightUid = null;
+
 function addLocalVideo() {
   const wrap = document.getElementById('local-video-wrap');
   if (wrap) {
     localVideoTrack?.play(wrap);
     initPipDrag(wrap);
   }
+}
+
+/* ── GRID / SPOTLIGHT LAYOUT ─────────────────────── */
+
+function updateVideoLayout() {
+  if (spotlightUid !== null && !remoteUsers[spotlightUid]) spotlightUid = null;
+  if (spotlightUid !== null) {
+    buildSpotlight();
+  } else {
+    buildGrid();
+  }
+}
+
+function buildGrid() {
+  const grid = document.getElementById('remote-grid');
+  const spotlightView = document.getElementById('spotlight-view');
+  const strip = document.getElementById('thumb-strip');
+  const pip = document.getElementById('local-video-wrap');
+
+  spotlightView.style.display = 'none';
+  strip.style.display = 'none';
+  grid.style.display = 'grid';
+  if (pip) pip.style.display = 'block';
+
+  grid.innerHTML = '';
+  const uids = Object.keys(remoteUsers);
+  const count = uids.length;
+
+  if (count === 0) { grid.className = 'count-1'; return; }
+  grid.className = count <= 4 ? 'count-' + count : 'count-many';
+
+  uids.forEach((uid, i) => {
+    const user = remoteUsers[uid];
+    const tile = document.createElement('div');
+    tile.className = 'remote-tile' + (count === 3 && i === 2 ? ' span-full' : '');
+    tile.id = 'tile-' + uid;
+    if (count > 1 && i === 0) {
+      const hint = document.createElement('span');
+      hint.className = 'tap-hint';
+      hint.textContent = 'Tap to expand';
+      tile.appendChild(hint);
+    }
+    const label = document.createElement('span');
+    label.className = 'video-label';
+    label.textContent = 'Participant';
+    tile.appendChild(label);
+    tile.onclick = () => setSpotlight(String(uid));
+    grid.appendChild(tile);
+    user.videoTrack?.play(tile);
+  });
+}
+
+function buildSpotlight() {
+  const grid = document.getElementById('remote-grid');
+  const spotlightView = document.getElementById('spotlight-view');
+  const strip = document.getElementById('thumb-strip');
+  const pip = document.getElementById('local-video-wrap');
+
+  grid.style.display = 'none';
+  spotlightView.style.display = 'block';
+  strip.style.display = 'flex';
+  if (pip) pip.style.display = 'none';
+
+  // Clear spotlight video area (keep the back hint)
+  const hint = document.getElementById('spotlight-back-hint');
+  spotlightView.innerHTML = '';
+  spotlightView.appendChild(hint);
+  spotlightView.onclick = exitSpotlight;
+  remoteUsers[spotlightUid]?.videoTrack?.play(spotlightView);
+
+  // Build thumb strip
+  strip.innerHTML = '';
+
+  // Local camera thumb
+  const localThumb = makeThumb('You', false, () => setLocalSpotlight());
+  strip.appendChild(localThumb);
+  localVideoTrack?.play(localThumb);
+
+  // Other remote participants
+  Object.keys(remoteUsers).forEach(uid => {
+    const isActive = uid == spotlightUid;
+    const thumb = makeThumb('Participant', isActive, isActive ? null : () => setSpotlight(String(uid)));
+    strip.appendChild(thumb);
+    remoteUsers[uid]?.videoTrack?.play(thumb);
+  });
+}
+
+function makeThumb(label, isActive, onClick) {
+  const div = document.createElement('div');
+  div.className = 'thumb-tile' + (isActive ? ' is-spotlight' : '');
+  const lbl = document.createElement('span');
+  lbl.className = 'thumb-label';
+  lbl.textContent = label;
+  div.appendChild(lbl);
+  if (onClick) div.onclick = onClick;
+  return div;
+}
+
+function setSpotlight(uid) {
+  spotlightUid = uid;
+  updateVideoLayout();
+}
+
+function exitSpotlight() {
+  spotlightUid = null;
+  updateVideoLayout();
+}
+
+function setLocalSpotlight() {
+  // Swap: put local video full screen, remote goes to strip
+  // For simplicity, exit spotlight (grid shows all)
+  exitSpotlight();
 }
 
 function initPipDrag(el) {
@@ -469,22 +623,12 @@ function initPipDrag(el) {
 
 function addRemoteVideo(user) {
   remoteUsers[user.uid] = user;
-  const wrap = document.getElementById('remote-video-wrap');
-  if (!wrap) return;
-  // Hide placeholder
-  const placeholder = document.getElementById('remote-placeholder');
-  if (placeholder) placeholder.style.display = 'none';
-  // Play into the wrap (first remote takes full screen)
-  user.videoTrack?.play(wrap);
+  updateVideoLayout();
 }
 
 function removeRemoteVideo(uid) {
   delete remoteUsers[uid];
-  // If no more remote users, show placeholder again
-  if (Object.keys(remoteUsers).length === 0) {
-    const placeholder = document.getElementById('remote-placeholder');
-    if (placeholder) placeholder.style.display = 'flex';
-  }
+  updateVideoLayout();
 }
 
 function toggleMute() {
