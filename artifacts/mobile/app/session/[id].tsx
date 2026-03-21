@@ -1495,7 +1495,7 @@ export default function SessionScreen() {
               const prev = messages[index - 1];
               const next = messages[index + 1];
               const showSender = !prev || prev.senderId !== item.senderId;
-              const showAvatar = !next || next.senderId !== item.senderId;
+              const showAvatar = !prev || prev.senderId !== item.senderId;
               return (
                 <MessageBubble
                   message={item}
