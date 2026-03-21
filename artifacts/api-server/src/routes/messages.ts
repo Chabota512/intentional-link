@@ -51,6 +51,13 @@ async function formatMessages(msgs: (typeof messagesTable.$inferSelect)[]) {
 
   const senderMap = new Map(senders.map(s => [s.id, s]));
 
+  // Fetch names for any reactor not already in senderMap
+  const reactorIds = [...new Set(allReactions.map(r => r.userId))].filter(id => !senderMap.has(id));
+  if (reactorIds.length > 0) {
+    const reactorUsers = await db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable).where(inArray(usersTable.id, reactorIds));
+    for (const u of reactorUsers) senderMap.set(u.id, u as any);
+  }
+
   const reactionsMap = new Map<number, Map<string, number[]>>();
   for (const r of allReactions) {
     if (!reactionsMap.has(r.messageId)) reactionsMap.set(r.messageId, new Map());
@@ -84,7 +91,12 @@ async function formatMessages(msgs: (typeof messagesTable.$inferSelect)[]) {
   return msgs.map(m => {
     const emojiMap = reactionsMap.get(m.id);
     const reactions = emojiMap
-      ? Array.from(emojiMap.entries()).map(([emoji, userIds]) => ({ emoji, count: userIds.length, userIds }))
+      ? Array.from(emojiMap.entries()).map(([emoji, userIds]) => ({
+          emoji,
+          count: userIds.length,
+          userIds,
+          reactors: userIds.map(id => ({ id, name: senderMap.get(id)?.name ?? "Unknown" })),
+        }))
       : [];
 
     const base: any = {
@@ -383,36 +395,31 @@ router.post("/sessions/:sessionId/messages/:messageId/react", async (req, res): 
     return;
   }
 
-  const [existing] = await db.select({ id: messageReactionsTable.id })
+  // Find any existing reaction this user has on this message (any emoji)
+  const [anyExisting] = await db.select({ id: messageReactionsTable.id, emoji: messageReactionsTable.emoji })
     .from(messageReactionsTable)
     .where(and(
       eq(messageReactionsTable.messageId, messageId),
       eq(messageReactionsTable.userId, userId),
-      eq(messageReactionsTable.emoji, emoji)
     ))
     .limit(1);
 
-  if (existing) {
-    await db.delete(messageReactionsTable).where(eq(messageReactionsTable.id, existing.id));
-    res.json({ action: "removed" });
+  if (anyExisting) {
+    // Remove the existing reaction first
+    await db.delete(messageReactionsTable).where(eq(messageReactionsTable.id, anyExisting.id));
+    emitToSession(sessionId, "reaction_removed", { messageId, userId, emoji: anyExisting.emoji, sessionId });
 
-    emitToSession(sessionId, "reaction_removed", {
-      messageId,
-      userId,
-      emoji,
-      sessionId,
-    });
-  } else {
-    await db.insert(messageReactionsTable).values({ messageId, userId, emoji });
-    res.json({ action: "added" });
-
-    emitToSession(sessionId, "reaction_added", {
-      messageId,
-      userId,
-      emoji,
-      sessionId,
-    });
+    if (anyExisting.emoji === emoji) {
+      // Same emoji tapped again → toggle off, done
+      res.json({ action: "removed" });
+      return;
+    }
   }
+
+  // Add the new reaction
+  await db.insert(messageReactionsTable).values({ messageId, userId, emoji });
+  res.json({ action: "added" });
+  emitToSession(sessionId, "reaction_added", { messageId, userId, emoji, sessionId });
 });
 
 router.get("/messages/search", async (req, res): Promise<void> => {

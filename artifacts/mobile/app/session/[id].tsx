@@ -54,6 +54,7 @@ interface Reaction {
   emoji: string;
   count: number;
   userIds: number[];
+  reactors?: { id: number; name: string }[];
 }
 
 interface ReplyTo {
