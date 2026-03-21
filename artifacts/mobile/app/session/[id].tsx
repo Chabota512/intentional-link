@@ -238,7 +238,10 @@ function VoicePlayer({
     return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
   };
 
-  const displayTime = playing && duration > 0 ? formatDur(duration - position) : duration > 0 ? formatDur(duration) : "Voice note";
+  const progress = duration > 0 ? Math.min(position / duration, 1) : 0;
+  const timeLabel = duration > 0
+    ? `${formatDur(position)} / ${formatDur(duration)}`
+    : "Voice note";
 
   return (
     <View style={[styles.voicePlayerRow]}>
@@ -256,24 +259,21 @@ function VoicePlayer({
             <Feather name={playing ? "pause" : "play"} size={14} color={isOwn ? "#fff" : colors.accent} />
           </View>
         )}
-        <View style={{ flex: 1 }}>
-          <View style={[styles.voiceWaveform]}>
-            {[4, 8, 12, 6, 10, 14, 8, 5, 11, 7, 13, 9].map((h, i) => (
-              <View
-                key={i}
-                style={{
-                  width: 2.5,
-                  height: h,
-                  borderRadius: 2,
-                  backgroundColor: isOwn
-                    ? playing ? "#fff" : "rgba(255,255,255,0.5)"
-                    : playing ? colors.accent : colors.textTertiary,
-                }}
-              />
-            ))}
+        <View style={{ flex: 1, gap: 5 }}>
+          {/* Progress track */}
+          <View style={[styles.voiceProgressTrack, { backgroundColor: isOwn ? "rgba(255,255,255,0.25)" : colors.border }]}>
+            <View
+              style={[
+                styles.voiceProgressFill,
+                {
+                  backgroundColor: isOwn ? "#fff" : colors.accent,
+                  width: `${Math.round(progress * 100)}%`,
+                },
+              ]}
+            />
           </View>
           <Text style={[styles.voiceLabel, { color: isOwn ? "rgba(255,255,255,0.8)" : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-            {displayTime}
+            {timeLabel}
           </Text>
         </View>
         {Platform.OS !== "web" && (
@@ -2207,26 +2207,30 @@ const styles = StyleSheet.create({
   voicePlayer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 20,
-    minWidth: 160,
+    minWidth: 220,
     flex: 1,
   },
   voicePlayBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
-  voiceWaveform: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    height: 16,
-    flex: 1,
+  voiceProgressTrack: {
+    height: 3,
+    borderRadius: 2,
+    overflow: "hidden",
+    width: "100%",
+  },
+  voiceProgressFill: {
+    height: "100%",
+    borderRadius: 2,
+    minWidth: 3,
   },
   voiceLabel: { fontSize: 11 },
   bubbleMeta: { flexDirection: "row", alignItems: "center", gap: 3 },
