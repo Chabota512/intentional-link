@@ -142,8 +142,8 @@ export default function ActivityScreen() {
           styles.header,
           {
             paddingTop: topPad + 12,
-            backgroundColor: colors.surfaceAlt,
-            borderBottomColor: colors.border,
+            backgroundColor: colors.border,
+            borderBottomColor: colors.textTertiary,
           },
         ]}
       >
