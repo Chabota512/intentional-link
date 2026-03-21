@@ -476,9 +476,9 @@ export default function NotificationsSettingsScreen() {
                     <Text style={[styles.quietDayName, { color: sched ? colors.text : colors.textSecondary }]}>{d.full}</Text>
                     {sched ? (
                       <>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flex: 1, justifyContent: "flex-end" }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                           {isOvernight(sched.startTime, sched.endTime) && (
-                            <Text style={{ fontSize: 12 }}>🌙</Text>
+                            <Text style={{ fontSize: 11 }}>🌙</Text>
                           )}
                           <Text style={[styles.quietDayTime, { color: colors.accent }]}>
                             {formatTimeValue(sched.startTime)} – {formatTimeValue(sched.endTime)}
