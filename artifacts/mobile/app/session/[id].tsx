@@ -131,6 +131,7 @@ function VoicePlayer({
   isOwn,
   onPlayed,
   durationHint,
+  onLongPress,
 }: {
   url: string;
   colors: any;
@@ -139,6 +140,7 @@ function VoicePlayer({
   isOwn?: boolean;
   onPlayed?: () => void;
   durationHint?: number;
+  onLongPress?: () => void;
 }) {
   const soundRef = useRef<Audio.Sound | null>(null);
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -338,6 +340,8 @@ function VoicePlayer({
       )}
       <Pressable
         onPress={togglePlay}
+        onLongPress={onLongPress}
+        delayLongPress={350}
         style={[styles.voicePlayer, { backgroundColor: isOwn ? "rgba(255,255,255,0.18)" : colors.surfaceAlt }]}
       >
         {loading ? (
@@ -440,7 +444,11 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
     if (message.type === "image" && message.attachmentUrl) {
       const url = getFileUrl(message.attachmentUrl);
       return (
-        <Pressable onPress={() => onImagePress ? onImagePress(url) : Linking.openURL(url)}>
+        <Pressable
+          onPress={() => onImagePress ? onImagePress(url) : Linking.openURL(url)}
+          onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onLongPress?.(); }}
+          delayLongPress={350}
+        >
           <Image
             source={{ uri: url }}
             style={styles.imageBubble}
@@ -458,7 +466,12 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
     if (message.type === "file" && message.attachmentUrl) {
       const url = getFileUrl(message.attachmentUrl);
       return (
-        <Pressable onPress={() => Linking.openURL(url)} style={styles.fileCard}>
+        <Pressable
+          onPress={() => Linking.openURL(url)}
+          onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onLongPress?.(); }}
+          delayLongPress={350}
+          style={styles.fileCard}
+        >
           <View style={[styles.fileIcon, { backgroundColor: isOwn ? "rgba(255,255,255,0.2)" : colors.accentSoft }]}>
             <Feather name="file" size={18} color={isOwn ? "#fff" : colors.accent} />
           </View>
@@ -489,6 +502,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
           isOwn={isOwn}
           onPlayed={!isOwn ? onPlayed : undefined}
           durationHint={isNaN(durationHint) ? 0 : durationHint}
+          onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onLongPress?.(); }}
         />
       );
     }
