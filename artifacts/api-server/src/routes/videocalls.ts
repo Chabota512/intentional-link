@@ -108,10 +108,49 @@ router.get("/sessions/:id/call-page", async (req, res) => {
   #status-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 5; background: #111; }
   #status-text { font-size: 15px; color: #aaa; }
 
-  #videos { position: absolute; inset: 0; display: none; flex-wrap: wrap; gap: 4px; padding: 4px; }
-  .video-container { flex: 1; min-width: 48%; background: #1a1a1a; border-radius: 10px; overflow: hidden; position: relative; min-height: 180px; }
-  .video-container video { width: 100%; height: 100%; object-fit: cover; }
-  .video-label { position: absolute; bottom: 6px; left: 8px; font-size: 12px; color: #fff; background: rgba(0,0,0,0.55); padding: 2px 8px; border-radius: 10px; }
+  /* Full-screen video layout */
+  #videos { position: absolute; inset: 0; display: none; }
+
+  /* Remote video fills entire screen */
+  #remote-video-wrap {
+    position: absolute;
+    inset: 0;
+    background: #1a1a1a;
+    overflow: hidden;
+  }
+  #remote-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Local video as PiP in top-right corner */
+  #local-video-wrap {
+    position: absolute;
+    top: 16px;
+    right: 14px;
+    width: 96px;
+    height: 148px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #333;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+    border: 2px solid rgba(255,255,255,0.15);
+    z-index: 6;
+    cursor: pointer;
+  }
+  #local-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+
+  /* No-one-yet placeholder for remote video */
+  #remote-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .ph-avatar { width: 88px; height: 88px; border-radius: 44px; background: #333; display: flex; align-items: center; justify-content: center; font-size: 34px; }
+  .ph-name { font-size: 16px; color: #aaa; }
+
+  .video-label { position: absolute; bottom: 6px; left: 8px; font-size: 11px; color: #fff; background: rgba(0,0,0,0.55); padding: 2px 8px; border-radius: 10px; }
 
   #voice-ui { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
   .avatar { width: 100px; height: 100px; border-radius: 50px; background: #FF6B9D; display: flex; align-items: center; justify-content: center; font-size: 38px; font-weight: bold; }
@@ -193,7 +232,17 @@ router.get("/sessions/:id/call-page", async (req, res) => {
 </div>
 
 <div id="${isVoiceOnly ? "voice-ui" : "videos"}">
-  ${isVoiceOnly ? `<div class="avatar">👤</div><div id="caller-name">Connecting…</div>` : ""}
+  ${isVoiceOnly ? `<div class="avatar">👤</div><div id="caller-name">Connecting…</div>` : `
+  <div id="remote-video-wrap">
+    <div id="remote-placeholder">
+      <div class="ph-avatar">👤</div>
+      <div class="ph-name">No one connected yet</div>
+    </div>
+  </div>
+  <div id="local-video-wrap">
+    <span class="video-label">You</span>
+  </div>
+  `}
 </div>
 
 <!-- Waiting for others overlay (shown after connected but no one else yet) -->
@@ -324,34 +373,28 @@ async function init() {
 }
 
 function addLocalVideo() {
-  const videos = document.getElementById('videos');
-  let el = document.getElementById('local-video');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'local-video';
-    el.className = 'video-container';
-    el.innerHTML = '<span class="video-label">You</span>';
-    videos.appendChild(el);
-  }
-  localVideoTrack?.play(el);
+  const wrap = document.getElementById('local-video-wrap');
+  if (wrap) localVideoTrack?.play(wrap);
 }
 
 function addRemoteVideo(user) {
-  const videos = document.getElementById('videos');
-  let el = document.getElementById('remote-' + user.uid);
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'remote-' + user.uid;
-    el.className = 'video-container';
-    el.innerHTML = '<span class="video-label">Participant</span>';
-    videos.appendChild(el);
-  }
-  user.videoTrack?.play(el);
+  remoteUsers[user.uid] = user;
+  const wrap = document.getElementById('remote-video-wrap');
+  if (!wrap) return;
+  // Hide placeholder
+  const placeholder = document.getElementById('remote-placeholder');
+  if (placeholder) placeholder.style.display = 'none';
+  // Play into the wrap (first remote takes full screen)
+  user.videoTrack?.play(wrap);
 }
 
 function removeRemoteVideo(uid) {
-  const el = document.getElementById('remote-' + uid);
-  if (el) el.remove();
+  delete remoteUsers[uid];
+  // If no more remote users, show placeholder again
+  if (Object.keys(remoteUsers).length === 0) {
+    const placeholder = document.getElementById('remote-placeholder');
+    if (placeholder) placeholder.style.display = 'flex';
+  }
 }
 
 function toggleMute() {
