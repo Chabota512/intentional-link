@@ -259,18 +259,26 @@ function VoicePlayer({
             <Feather name={playing ? "pause" : "play"} size={14} color={isOwn ? "#fff" : colors.accent} />
           </View>
         )}
-        <View style={{ flex: 1, gap: 5 }}>
-          {/* Progress track */}
-          <View style={[styles.voiceProgressTrack, { backgroundColor: isOwn ? "rgba(255,255,255,0.25)" : colors.border }]}>
-            <View
-              style={[
-                styles.voiceProgressFill,
-                {
-                  backgroundColor: isOwn ? "#fff" : colors.accent,
-                  width: `${Math.round(progress * 100)}%`,
-                },
-              ]}
-            />
+        <View style={{ flex: 1, gap: 4 }}>
+          {/* Waveform bars — filled up to current playback position */}
+          <View style={styles.voiceWaveform}>
+            {[4, 8, 12, 6, 10, 14, 8, 5, 11, 7, 13, 9, 6, 10, 7].map((h, i, arr) => {
+              const barProgress = (i + 1) / arr.length;
+              const played = barProgress <= progress;
+              return (
+                <View
+                  key={i}
+                  style={{
+                    width: 2.5,
+                    height: h,
+                    borderRadius: 2,
+                    backgroundColor: isOwn
+                      ? played ? "#fff" : "rgba(255,255,255,0.3)"
+                      : played ? colors.accent : colors.border,
+                  }}
+                />
+              );
+            })}
           </View>
           <Text style={[styles.voiceLabel, { color: isOwn ? "rgba(255,255,255,0.8)" : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
             {timeLabel}
@@ -2220,6 +2228,13 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+  },
+  voiceWaveform: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2.5,
+    height: 16,
+    flex: 1,
   },
   voiceProgressTrack: {
     height: 3,
