@@ -64,6 +64,16 @@ function getMessagePreview(msg: LastMessage | null | undefined, currentUserId: n
     case "image": return `${prefix}Sent a photo`;
     case "file": return `${prefix}Sent a file`;
     case "voice": return `${prefix}Voice note`;
+    case "call": {
+      try {
+        const data = JSON.parse(msg.content || "{}");
+        const mode = data.mode === "voice" ? "Voice" : "Video";
+        const status = data.status === "missed" ? "Missed" : data.status === "declined" ? "Declined" : "Completed";
+        return `${prefix}${status} ${mode.toLowerCase()} call`;
+      } catch {
+        return `${prefix}Call`;
+      }
+    }
     default: {
       const text = msg.content || "";
       return `${prefix}${text.length > 60 ? text.slice(0, 60) + "…" : text}`;
