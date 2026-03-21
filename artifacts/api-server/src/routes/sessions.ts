@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, inArray, ne, desc, count as drizzleCount, sql, gt } from "drizzle-orm";
-import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable, sessionReadCursorsTable } from "@workspace/db";
+import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable, sessionReadCursorsTable, messageReactionsTable } from "@workspace/db";
 import {
   CreateSessionBody,
   UpdateSessionBody,
@@ -346,7 +346,13 @@ router.delete("/sessions/:sessionId", async (req, res): Promise<void> => {
     return;
   }
 
+  const sessionMessages = await db.select({ id: messagesTable.id }).from(messagesTable).where(eq(messagesTable.sessionId, sessionId));
+  const messageIds = sessionMessages.map((m) => m.id);
+  if (messageIds.length > 0) {
+    await db.delete(messageReactionsTable).where(inArray(messageReactionsTable.messageId, messageIds));
+  }
   await db.delete(messagesTable).where(eq(messagesTable.sessionId, sessionId));
+  await db.delete(sessionReadCursorsTable).where(eq(sessionReadCursorsTable.sessionId, sessionId));
   await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.sessionId, sessionId));
   await db.delete(sessionsTable).where(eq(sessionsTable.id, sessionId));
 
