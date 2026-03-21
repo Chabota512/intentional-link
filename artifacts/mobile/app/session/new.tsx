@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-  Alert,
   FlatList,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -48,6 +47,7 @@ export default function NewSessionScreen() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showNoContactsWarning, setShowNoContactsWarning] = useState(false);
 
   const { data: contacts = [], isLoading: loadingContacts } = useQuery<Contact[]>({
     queryKey: ["contacts"],
@@ -56,6 +56,7 @@ export default function NewSessionScreen() {
 
   const toggleContact = (id: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowNoContactsWarning(false);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -112,32 +113,22 @@ export default function NewSessionScreen() {
     }
   };
 
-  const handleCreate = () => {
-    if (!title.trim()) return;
-    if (selectedIds.size === 0) {
-      Alert.alert(
-        "No contacts selected",
-        "You haven't added anyone to this chat. Create it anyway?",
-        [
-          { text: "Go back", style: "cancel" },
-          {
-            text: "Create anyway",
-            onPress: () =>
-              createMutation.mutate({
-                title: title.trim(),
-                description: description.trim() || undefined,
-                imageUrl: imageUrl ?? undefined,
-              }),
-          },
-        ]
-      );
-      return;
-    }
+  const doCreate = () => {
     createMutation.mutate({
       title: title.trim(),
       description: description.trim() || undefined,
       imageUrl: imageUrl ?? undefined,
     });
+  };
+
+  const handleCreate = () => {
+    if (!title.trim()) return;
+    if (selectedIds.size === 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setShowNoContactsWarning(true);
+      return;
+    }
+    doCreate();
   };
 
   const selectedContacts = contacts.filter((c) => selectedIds.has(c.contactUser.id));
@@ -306,6 +297,38 @@ export default function NewSessionScreen() {
             </View>
           )}
 
+          {showNoContactsWarning && (
+            <View style={[styles.warningBox, { backgroundColor: "#FFF8E1", borderColor: "#F59E0B" }]}>
+              <View style={styles.warningTop}>
+                <Feather name="alert-triangle" size={16} color="#F59E0B" />
+                <Text style={[styles.warningTitle, { fontFamily: "Inter_600SemiBold", color: "#92400E" }]}>
+                  No contacts selected
+                </Text>
+              </View>
+              <Text style={[styles.warningText, { fontFamily: "Inter_400Regular", color: "#78350F" }]}>
+                You haven't added anyone to this chat. Create it anyway?
+              </Text>
+              <View style={styles.warningActions}>
+                <Pressable
+                  style={({ pressed }) => [styles.warningBtn, styles.warningBtnOutline, { borderColor: "#F59E0B", opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => setShowNoContactsWarning(false)}
+                >
+                  <Text style={[styles.warningBtnText, { color: "#92400E", fontFamily: "Inter_500Medium" }]}>Go back</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.warningBtn, { backgroundColor: "#F59E0B", opacity: pressed ? 0.85 : 1 }]}
+                  onPress={() => { setShowNoContactsWarning(false); doCreate(); }}
+                >
+                  {createMutation.isPending ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={[styles.warningBtnText, { color: "#fff", fontFamily: "Inter_600SemiBold" }]}>Create anyway</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          )}
+
           {createMutation.isError && (
             <View style={[styles.errorBox, { backgroundColor: "#FFF0F0", borderColor: colors.danger }]}>
               <Text style={[styles.errorText, { color: colors.danger, fontFamily: "Inter_400Regular" }]}>
@@ -384,4 +407,12 @@ const styles = StyleSheet.create({
   },
   errorBox: { padding: 12, borderRadius: 10, borderWidth: 1 },
   errorText: { fontSize: 13 },
+  warningBox: { padding: 14, borderRadius: 12, borderWidth: 1, gap: 8 },
+  warningTop: { flexDirection: "row", alignItems: "center", gap: 8 },
+  warningTitle: { fontSize: 14 },
+  warningText: { fontSize: 13, lineHeight: 18 },
+  warningActions: { flexDirection: "row", gap: 10, marginTop: 4 },
+  warningBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  warningBtnOutline: { borderWidth: 1 },
+  warningBtnText: { fontSize: 14 },
 });
