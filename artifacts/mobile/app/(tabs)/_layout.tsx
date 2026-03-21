@@ -10,6 +10,7 @@ import Colors from "@/constants/colors";
 import { usePendingInvites } from "@/hooks/usePendingInvites";
 import { usePendingContacts } from "@/hooks/usePendingContacts";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
+import { useUnreadNotifCount } from "@/hooks/useNotifications";
 
 function NativeTabLayout() {
   return (
@@ -21,6 +22,10 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="contacts">
         <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
         <Label>Contacts</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="activity">
+        <Icon sf={{ default: "bell", selected: "bell.fill" }} />
+        <Label>Activity</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
@@ -39,6 +44,7 @@ function ClassicTabLayout() {
   const pendingInvites = usePendingInvites();
   const pendingContacts = usePendingContacts();
   const totalUnread = useUnreadCount();
+  const unreadNotifs = useUnreadNotifCount();
 
   return (
     <Tabs
@@ -92,6 +98,20 @@ function ClassicTabLayout() {
               <SymbolView name="person.2" tintColor={color} size={22} />
             ) : (
               <Feather name="users" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="activity"
+        options={{
+          title: "Activity",
+          tabBarBadge: unreadNotifs > 0 ? unreadNotifs : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 10 },
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="bell" tintColor={color} size={22} />
+            ) : (
+              <Feather name="bell" size={22} color={color} />
             ),
         }}
       />

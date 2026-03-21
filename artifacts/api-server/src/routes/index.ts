@@ -6,6 +6,7 @@ import sessionsRouter from "./sessions";
 import messagesRouter from "./messages";
 import storageRouter from "./storage";
 import videocallsRouter from "./videocalls";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(sessionsRouter);
 router.use(messagesRouter);
 router.use(storageRouter);
 router.use(videocallsRouter);
+router.use(notificationsRouter);
 
 export default router;

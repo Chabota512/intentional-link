@@ -47,7 +47,10 @@ artifacts-monorepo/
 - **Media messages**: Send images (photo picker), files (document picker), voice notes (recorded audio)
 - **Online/last seen**: Heartbeat every 30s updates `lastSeenAt`; contacts show "Online" or "Xm ago"
 - **Archive**: Past completed sessions are retained for review
-- **Tab navigation**: Sessions, Contacts, Profile
+- **Tab navigation**: Sessions, Contacts, Activity, Profile
+- **Notification History**: In-app Activity tab shows all past notifications (messages, calls, invites) with unread badges and read/mark-all-read support. Stored in `notifications` DB table, delivered in real-time via Socket.IO `new_notification` event.
+- **Call history in chat**: Voice/video calls are logged as special message bubbles in the session chat showing call type, status (answered/missed), and duration.
+- **Real-time messaging**: Full Socket.IO WebSocket integration for instant message delivery, typing indicators, read receipts, reactions, and presence status.
 - **Invite UI**: Creator can invite contacts from inside a session via a People sheet
 - **Participants panel**: Tap participant count to see all participants, their status and online presence
 - **Profile editing**: Users can edit their name, username, and profile picture from the Profile tab

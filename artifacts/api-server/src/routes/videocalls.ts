@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq, and, ne, inArray } from "drizzle-orm";
 import agoraToken from "agora-token";
 import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable } from "@workspace/db";
-import { sendPushNotifications } from "../lib/pushNotifications.js";
+import { sendPushNotifications, saveNotification } from "../lib/pushNotifications.js";
 import { emitToSession } from "../lib/socketio.js";
 const { RtcTokenBuilder, RtcRole } = agoraToken;
 
@@ -64,23 +64,26 @@ router.post("/sessions/:id/video-call", async (req, res) => {
       if (session.creatorId !== uid) otherUserIds.push(session.creatorId);
 
       if (otherUserIds.length > 0) {
-        const memberTokenRows = await db
-          .select({ pushToken: usersTable.pushToken })
+        const callLabel = mode === "voice" ? "voice call" : "video call";
+        const notifTitle = `Incoming ${callLabel}`;
+        const notifBody = `${caller.name} is calling you`;
+        const notifData = { sessionId, mode, type: "incoming-call" };
+
+        const memberRows = await db
+          .select({ id: usersTable.id, pushToken: usersTable.pushToken })
           .from(usersTable)
           .where(inArray(usersTable.id, otherUserIds));
 
-        const pushTokens = memberTokenRows
+        await Promise.all(memberRows.map(u =>
+          saveNotification(u.id, "call", notifTitle, notifBody, notifData)
+        ));
+
+        const pushTokens = memberRows
           .map(r => r.pushToken)
           .filter((t): t is string => !!t);
 
         if (pushTokens.length > 0) {
-          const callLabel = mode === "voice" ? "voice call" : "video call";
-          await sendPushNotifications(
-            pushTokens,
-            `📞 Incoming ${callLabel}`,
-            `${caller.name} is calling you`,
-            { sessionId, mode, type: "incoming-call" },
-          );
+          await sendPushNotifications(pushTokens, `📞 ${notifTitle}`, notifBody, notifData);
         }
       }
     }

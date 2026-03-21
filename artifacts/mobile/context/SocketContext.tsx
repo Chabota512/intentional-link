@@ -17,6 +17,7 @@ interface SocketContextValue {
   typingUsers: Map<number, Set<number>>;
   recordingUsers: Map<number, Set<number>>;
   onlineUserIds: Set<number>;
+  unreadNotifCount: number;
   emitTypingStart: (sessionId: number) => void;
   emitTypingStop: (sessionId: number) => void;
   emitRecordingStart: (sessionId: number) => void;
@@ -36,6 +37,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [typingUsers, setTypingUsers] = useState<Map<number, Set<number>>>(new Map());
   const [recordingUsers, setRecordingUsers] = useState<Map<number, Set<number>>>(new Map());
   const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const appStateRef = useRef<AppStateStatus>("active");
 
   useEffect(() => {
@@ -212,6 +214,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       );
     });
 
+    socket.on("new_notification", (notif: any) => {
+      queryClient.setQueryData(["notifications"], (old: any) => {
+        const notifications = [notif, ...(old?.notifications ?? [])];
+        const unreadCount = notifications.filter((n: any) => !n.isRead).length;
+        return { notifications, unreadCount };
+      });
+      setUnreadNotifCount((prev) => prev + 1);
+    });
+
     const appStateSub = AppState.addEventListener("change", (state) => {
       appStateRef.current = state;
       if (state === "active" && !socket.connected) {
@@ -263,6 +274,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         typingUsers,
         recordingUsers,
         onlineUserIds,
+        unreadNotifCount,
         emitTypingStart,
         emitTypingStop,
         emitRecordingStart,

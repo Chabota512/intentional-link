@@ -1,6 +1,37 @@
 import Expo from "expo-server-sdk";
+import { db, notificationsTable } from "@workspace/db";
+import { emitToUser } from "./socketio";
 
 const expo = new Expo();
+
+export async function saveNotification(
+  userId: number,
+  type: "message" | "call" | "invite",
+  title: string,
+  body: string,
+  data?: Record<string, unknown>
+): Promise<void> {
+  try {
+    const [saved] = await db.insert(notificationsTable).values({
+      userId,
+      type,
+      title,
+      body,
+      data: data ?? {},
+    }).returning();
+
+    emitToUser(userId, "new_notification", {
+      id: saved.id,
+      type: saved.type,
+      title: saved.title,
+      body: saved.body,
+      data: saved.data,
+      isRead: saved.isRead,
+      createdAt: saved.createdAt,
+    });
+  } catch {
+  }
+}
 
 export async function sendPushNotification(
   pushToken: string,

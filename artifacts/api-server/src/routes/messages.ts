@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, lt, gt, ne, desc, inArray, ilike } from "drizzle-orm";
 import { db, messagesTable, usersTable, sessionsTable, sessionParticipantsTable, messageReactionsTable } from "@workspace/db";
 import { SendMessageBody, GetMessagesResponseItem } from "@workspace/api-zod";
-import { sendPushNotifications } from "../lib/pushNotifications";
+import { sendPushNotifications, saveNotification } from "../lib/pushNotifications";
 import { emitToSession, isUserOnline } from "../lib/socketio";
 
 const router: IRouter = Router();
@@ -256,14 +256,6 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
       }
 
       const offlineUserIds = otherUserIds.filter(id => !isUserOnline(id));
-      if (offlineUserIds.length === 0) return;
-
-      const others = await db.select({ pushToken: usersTable.pushToken })
-        .from(usersTable)
-        .where(inArray(usersTable.id, offlineUserIds));
-
-      const tokens = others.map(u => u.pushToken).filter(Boolean) as string[];
-      if (tokens.length === 0) return;
 
       const [sender] = await db.select({ name: usersTable.name })
         .from(usersTable)
@@ -284,6 +276,19 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
           : type === "file"
             ? `${senderName} sent a file`
             : `${senderName}: ${(content || "").slice(0, 80)}`;
+
+      if (offlineUserIds.length === 0) return;
+
+      const others = await db.select({ id: usersTable.id, pushToken: usersTable.pushToken })
+        .from(usersTable)
+        .where(inArray(usersTable.id, offlineUserIds));
+
+      await Promise.all(others.map(u =>
+        saveNotification(u.id, "message", sessionName, notifBody, { sessionId })
+      ));
+
+      const tokens = others.map(u => u.pushToken).filter(Boolean) as string[];
+      if (tokens.length === 0) return;
 
       await sendPushNotifications(tokens, sessionName, notifBody, { sessionId });
     } catch {}
