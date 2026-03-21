@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "focus_token_secret_2024";
 const BCRYPT_ROUNDS = 10;
-const TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const TOKEN_MAX_AGE_MS = parseInt(process.env.TOKEN_MAX_AGE_MS || "", 10) || 30 * 24 * 60 * 60 * 1000;
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
