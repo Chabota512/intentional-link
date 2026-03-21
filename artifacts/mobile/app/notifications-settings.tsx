@@ -86,28 +86,6 @@ function Avatar({ name, avatarUrl, size = 38, colors }: { name: string; avatarUr
   );
 }
 
-function parseCustomDuration(input: string): number | null {
-  const cleaned = input.trim().toLowerCase().replace(/\s+/g, "");
-  let total = 0;
-  const hMatch = cleaned.match(/(\d+)h/);
-  const mMatch = cleaned.match(/(\d+)m/);
-  if (hMatch) total += parseInt(hMatch[1]) * 60;
-  if (mMatch) total += parseInt(mMatch[1]);
-  if (!hMatch && !mMatch) {
-    const num = parseInt(cleaned);
-    if (isNaN(num)) return null;
-    total = num;
-  }
-  return total > 0 && total <= 1440 ? total : null;
-}
-
-function formatDurationLabel(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h > 0 && m > 0) return `${h}h ${m}m`;
-  if (h > 0) return `${h}h`;
-  return `${m}m`;
-}
 
 function parseCustomTime(input: string): string | null {
   const cleaned = input.trim().toUpperCase().replace(/\s+/g, " ");
@@ -252,8 +230,8 @@ export default function NotificationsSettingsScreen() {
   const [selectedWhitelist, setSelectedWhitelist] = useState<Set<number>>(new Set());
   const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<number | null>(60);
   const [showCustomDuration, setShowCustomDuration] = useState(false);
-  const [customDurationInput, setCustomDurationInput] = useState("");
-  const [customDurationError, setCustomDurationError] = useState(false);
+  const [customHours, setCustomHours] = useState(0);
+  const [customMinutes, setCustomMinutes] = useState(30);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showWhitelistModal, setShowWhitelistModal] = useState(false);
@@ -330,8 +308,8 @@ export default function NotificationsSettingsScreen() {
     setSelectedWhitelist(new Set(settings.whitelistedContactIds));
     setSelectedDurationMinutes(60);
     setShowCustomDuration(false);
-    setCustomDurationInput("");
-    setCustomDurationError(false);
+    setCustomHours(0);
+    setCustomMinutes(30);
   };
 
   const toggleWhitelistContact = (id: number) => {
@@ -602,51 +580,64 @@ export default function NotificationsSettingsScreen() {
             </View>
 
             {showCustomDuration && (
-              <View style={{ marginHorizontal: 16, marginTop: 10 }}>
-                <View style={[styles.customTimeRow, { borderColor: customDurationError ? "#EF4444" : "#6366F1", backgroundColor: colors.background }]}>
-                  <Feather name="clock" size={15} color={customDurationError ? "#EF4444" : colors.textTertiary} />
-                  <TextInput
-                    style={[styles.customTimeInput, { color: colors.text }]}
-                    placeholder="e.g. 45m, 3h, 1h 30m"
-                    placeholderTextColor={colors.textTertiary}
-                    value={customDurationInput}
-                    onChangeText={t => { setCustomDurationInput(t); setCustomDurationError(false); }}
-                    keyboardType="default"
-                    returnKeyType="done"
-                    autoFocus
-                    onSubmitEditing={() => {
-                      const mins = parseCustomDuration(customDurationInput);
-                      if (!mins) { setCustomDurationError(true); return; }
-                      setSelectedDurationMinutes(mins);
-                      setCustomDurationError(false);
-                    }}
-                  />
-                  {selectedDurationMinutes !== null && showCustomDuration && !customDurationError && customDurationInput === "" && (
-                    <Text style={{ fontSize: 13, color: "#6366F1", fontFamily: "Inter_600SemiBold", paddingRight: 10 }}>
-                      {formatDurationLabel(selectedDurationMinutes)}
-                    </Text>
-                  )}
-                  <Pressable
-                    style={[styles.customTimeSet, { backgroundColor: "#6366F1" }]}
-                    onPress={() => {
-                      const mins = parseCustomDuration(customDurationInput);
-                      if (!mins) { setCustomDurationError(true); return; }
-                      setSelectedDurationMinutes(mins);
-                      setCustomDurationError(false);
-                    }}
-                  >
-                    <Text style={styles.customTimeSetText}>Set</Text>
-                  </Pressable>
+              <View style={[styles.durationStepperCard, { backgroundColor: colors.surface, borderColor: colors.border, marginHorizontal: 16 }]}>
+                {/* Hours stepper */}
+                <View style={styles.durationStepperCol}>
+                  <Text style={[styles.durationStepperLabel, { color: colors.textTertiary }]}>Hours</Text>
+                  <View style={styles.durationStepperRow}>
+                    <Pressable
+                      style={[styles.durationStepBtn, { borderColor: colors.border }]}
+                      onPress={() => {
+                        const next = Math.max(0, customHours - 1);
+                        setCustomHours(next);
+                        setSelectedDurationMinutes(next * 60 + customMinutes || 1);
+                      }}
+                    >
+                      <Feather name="minus" size={16} color={customHours === 0 ? colors.textTertiary : colors.text} />
+                    </Pressable>
+                    <Text style={[styles.durationStepValue, { color: colors.text }]}>{customHours}h</Text>
+                    <Pressable
+                      style={[styles.durationStepBtn, { borderColor: colors.border }]}
+                      onPress={() => {
+                        const next = Math.min(23, customHours + 1);
+                        setCustomHours(next);
+                        setSelectedDurationMinutes(next * 60 + customMinutes);
+                      }}
+                    >
+                      <Feather name="plus" size={16} color={colors.text} />
+                    </Pressable>
+                  </View>
                 </View>
-                {customDurationError ? (
-                  <Text style={styles.customTimeError}>Enter a duration like "45m", "3h", or "1h 30m"</Text>
-                ) : (
-                  selectedDurationMinutes !== null && showCustomDuration && (
-                    <Text style={{ fontSize: 11, color: colors.textTertiary, fontFamily: "Inter_400Regular", marginTop: 5 }}>
-                      DND will turn off after {formatDurationLabel(selectedDurationMinutes)}
-                    </Text>
-                  )
-                )}
+
+                <View style={[styles.durationStepperDivider, { backgroundColor: colors.border }]} />
+
+                {/* Minutes stepper */}
+                <View style={styles.durationStepperCol}>
+                  <Text style={[styles.durationStepperLabel, { color: colors.textTertiary }]}>Minutes</Text>
+                  <View style={styles.durationStepperRow}>
+                    <Pressable
+                      style={[styles.durationStepBtn, { borderColor: colors.border }]}
+                      onPress={() => {
+                        const next = Math.max(0, customMinutes - 5);
+                        setCustomMinutes(next);
+                        setSelectedDurationMinutes(customHours * 60 + next || 1);
+                      }}
+                    >
+                      <Feather name="minus" size={16} color={customMinutes === 0 ? colors.textTertiary : colors.text} />
+                    </Pressable>
+                    <Text style={[styles.durationStepValue, { color: colors.text }]}>{customMinutes}m</Text>
+                    <Pressable
+                      style={[styles.durationStepBtn, { borderColor: colors.border }]}
+                      onPress={() => {
+                        const next = Math.min(55, customMinutes + 5);
+                        setCustomMinutes(next);
+                        setSelectedDurationMinutes(customHours * 60 + next);
+                      }}
+                    >
+                      <Feather name="plus" size={16} color={customMinutes === 55 ? colors.textTertiary : colors.text} />
+                    </Pressable>
+                  </View>
+                </View>
               </View>
             )}
 
@@ -931,6 +922,49 @@ const styles = StyleSheet.create({
   modalEmoji: { fontSize: 18 },
   modalTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
   modalAction: { fontSize: 15, fontFamily: "Inter_400Regular" },
+
+  durationStepperCard: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 10,
+    overflow: "hidden",
+  },
+  durationStepperCol: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 14,
+    gap: 10,
+  },
+  durationStepperLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  durationStepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  durationStepBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  durationStepValue: {
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    minWidth: 44,
+    textAlign: "center",
+  },
+  durationStepperDivider: {
+    width: StyleSheet.hairlineWidth,
+    marginVertical: 12,
+  },
 
   durationChipRow: {
     flexDirection: "row",
