@@ -120,7 +120,7 @@ router.get("/sessions/:id/call-page", async (req, res) => {
   }
   #remote-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
 
-  /* Local video as PiP in top-right corner */
+  /* Local video as draggable PiP */
   #local-video-wrap {
     position: absolute;
     top: 16px;
@@ -133,9 +133,18 @@ router.get("/sessions/:id/call-page", async (req, res) => {
     box-shadow: 0 4px 18px rgba(0,0,0,0.6);
     border: 2px solid rgba(255,255,255,0.15);
     z-index: 6;
-    cursor: pointer;
+    cursor: grab;
+    touch-action: none;
+    transition: box-shadow 0.15s, transform 0.15s;
+    user-select: none;
   }
-  #local-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+  #local-video-wrap.dragging {
+    cursor: grabbing;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.75);
+    transform: scale(1.04);
+    transition: box-shadow 0.15s;
+  }
+  #local-video-wrap video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 
   /* No-one-yet placeholder for remote video */
   #remote-placeholder {
@@ -370,7 +379,92 @@ async function init() {
 
 function addLocalVideo() {
   const wrap = document.getElementById('local-video-wrap');
-  if (wrap) localVideoTrack?.play(wrap);
+  if (wrap) {
+    localVideoTrack?.play(wrap);
+    initPipDrag(wrap);
+  }
+}
+
+function initPipDrag(el) {
+  const W = 96, H = 148, MARGIN = 12;
+  let startX, startY, startLeft, startTop, isDragging = false;
+
+  // Convert from right-based to left-based positioning once
+  function ensureLeftTop() {
+    const rect = el.getBoundingClientRect();
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.left = rect.left + 'px';
+    el.style.top = rect.top + 'px';
+  }
+
+  function snapToCorner() {
+    const sw = window.innerWidth, sh = window.innerHeight;
+    const curL = parseFloat(el.style.left) || 0;
+    const curT = parseFloat(el.style.top) || 0;
+    const cx = curL + W / 2, cy = curT + H / 2;
+    const snapLeft = cx < sw / 2 ? MARGIN : sw - W - MARGIN;
+    const snapTop  = cy < sh / 2 ? MARGIN : sh - H - MARGIN - 90; // leave room for controls
+    el.style.transition = 'left 0.25s cubic-bezier(.25,.8,.25,1), top 0.25s cubic-bezier(.25,.8,.25,1), box-shadow 0.15s, transform 0.15s';
+    el.style.left = snapLeft + 'px';
+    el.style.top  = snapTop  + 'px';
+    setTimeout(() => { el.style.transition = 'box-shadow 0.15s, transform 0.15s'; }, 260);
+  }
+
+  // Touch events (mobile)
+  el.addEventListener('touchstart', e => {
+    ensureLeftTop();
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+    startLeft = parseFloat(el.style.left); startTop = parseFloat(el.style.top);
+    isDragging = false;
+    el.style.transition = 'box-shadow 0.15s, transform 0.15s';
+  }, { passive: true });
+
+  el.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    const dx = t.clientX - startX, dy = t.clientY - startY;
+    if (!isDragging && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+    isDragging = true;
+    e.preventDefault();
+    el.classList.add('dragging');
+    const sw = window.innerWidth, sh = window.innerHeight;
+    el.style.left = Math.min(Math.max(startLeft + dx, MARGIN), sw - W - MARGIN) + 'px';
+    el.style.top  = Math.min(Math.max(startTop  + dy, MARGIN), sh - H - MARGIN) + 'px';
+  }, { passive: false });
+
+  el.addEventListener('touchend', () => {
+    el.classList.remove('dragging');
+    if (isDragging) snapToCorner();
+  });
+
+  // Pointer events (desktop / fallback)
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return;
+    ensureLeftTop();
+    startX = e.clientX; startY = e.clientY;
+    startLeft = parseFloat(el.style.left); startTop = parseFloat(el.style.top);
+    isDragging = false;
+    el.setPointerCapture(e.pointerId);
+    el.style.transition = 'box-shadow 0.15s, transform 0.15s';
+  });
+
+  el.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch' || !el.hasPointerCapture(e.pointerId)) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (!isDragging && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+    isDragging = true;
+    el.classList.add('dragging');
+    const sw = window.innerWidth, sh = window.innerHeight;
+    el.style.left = Math.min(Math.max(startLeft + dx, MARGIN), sw - W - MARGIN) + 'px';
+    el.style.top  = Math.min(Math.max(startTop  + dy, MARGIN), sh - H - MARGIN) + 'px';
+  });
+
+  el.addEventListener('pointerup', e => {
+    if (e.pointerType === 'touch') return;
+    el.classList.remove('dragging');
+    if (isDragging) snapToCorner();
+  });
 }
 
 function addRemoteVideo(user) {
