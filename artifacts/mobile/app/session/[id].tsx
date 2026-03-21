@@ -32,6 +32,7 @@ import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Audio, Video, ResizeMode, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { LightSensor } from "expo-sensors";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
@@ -787,7 +788,15 @@ export default function SessionScreen() {
   const [profileViewUser, setProfileViewUser] = useState<{ name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" } | null>(null);
   const [viewerImageIndex, setViewerImageIndex] = useState<number | null>(null);
   const [videoViewer, setVideoViewer] = useState<{ url: string; name: string } | null>(null);
-  const [videoNaturalSize, setVideoNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  const inAppVideoPlayer = useVideoPlayer(null, (p) => { p.loop = false; });
+  useEffect(() => {
+    if (videoViewer?.url) {
+      inAppVideoPlayer.replace({ uri: videoViewer.url });
+      inAppVideoPlayer.play();
+    } else {
+      inAppVideoPlayer.pause();
+    }
+  }, [videoViewer?.url]);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -2478,34 +2487,22 @@ export default function SessionScreen() {
         </View>
       </Modal>
 
-      <Modal visible={videoViewer !== null} transparent animationType="fade" onRequestClose={() => { setVideoViewer(null); setVideoNaturalSize(null); }}>
-        <View style={{ flex: 1, backgroundColor: "#000", justifyContent: "center", alignItems: "center" }}>
+      <Modal visible={videoViewer !== null} transparent animationType="fade" onRequestClose={() => setVideoViewer(null)}>
+        <View style={{ flex: 1, backgroundColor: "#000" }}>
           <View style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Pressable onPress={() => { setVideoViewer(null); setVideoNaturalSize(null); }} style={{ padding: 6 }}>
+            <Pressable onPress={() => setVideoViewer(null)} style={{ padding: 6 }}>
               <Feather name="x" size={24} color="#fff" />
             </Pressable>
             <Text style={{ flex: 1, color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
               {videoViewer?.name}
             </Text>
           </View>
-          {videoViewer && (
-            <Video
-              source={{ uri: videoViewer.url }}
-              style={{
-                width: Dimensions.get("window").width,
-                height: videoNaturalSize
-                  ? Dimensions.get("window").width * (videoNaturalSize.height / videoNaturalSize.width)
-                  : Dimensions.get("window").width * (9 / 16),
-              }}
-              resizeMode={ResizeMode.CONTAIN}
-              useNativeControls
-              shouldPlay
-              onReadyForDisplay={(e) => {
-                const { width, height } = e.naturalSize;
-                if (width && height) setVideoNaturalSize({ width, height });
-              }}
-            />
-          )}
+          <VideoView
+            player={inAppVideoPlayer}
+            style={{ flex: 1, width: "100%" }}
+            contentFit="contain"
+            nativeControls
+          />
         </View>
       </Modal>
 
