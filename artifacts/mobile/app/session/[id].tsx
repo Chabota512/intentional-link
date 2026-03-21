@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -392,7 +393,33 @@ function VoicePlayer({
   );
 }
 
-const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🙏", "👍"];
+const ALL_REACTION_EMOJIS = [
+  "❤️", "😂", "😮", "😢", "🙏", "👍",
+  "😍", "🥺", "😭", "🤣", "😊", "🥳",
+  "🤔", "😬", "🤯", "🤗", "😏", "😎",
+  "🙃", "😒", "😀", "😤", "😈", "🤌",
+  "👎", "🙌", "💪", "👏", "✌️", "👋",
+  "🧡", "💛", "💚", "💙", "💜", "🖤",
+  "💔", "💯", "🔥", "✨", "⭐", "💫",
+  "🎉", "🎊", "👀", "💀", "💩", "🫡",
+  "🥹", "😅", "🫶", "🤙", "🫠", "🤓",
+];
+
+const EMOJI_USAGE_KEY = "focus_emoji_usage_v1";
+
+type EmojiUsage = Record<string, { count: number; lastUsed: number }>;
+
+function getSortedEmojis(usage: EmojiUsage): string[] {
+  return [...ALL_REACTION_EMOJIS].sort((a, b) => {
+    const ua = usage[a];
+    const ub = usage[b];
+    if (!ua && !ub) return 0;
+    if (!ua) return 1;
+    if (!ub) return -1;
+    if (ub.count !== ua.count) return ub.count - ua.count;
+    return ub.lastUsed - ua.lastUsed;
+  });
+}
 
 function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, senderPresenceStatus, onAvatarPress, onImagePress }: {
   message: Message;
@@ -659,6 +686,7 @@ export default function SessionScreen() {
   const [customEmojiInput, setCustomEmojiInput] = useState("");
   const [showCustomEmoji, setShowCustomEmoji] = useState(false);
   const [reactionKeyboardHeight, setReactionKeyboardHeight] = useState(0);
+  const [emojiUsage, setEmojiUsage] = useState<EmojiUsage>({});
   const [actionMenuMessage, setActionMenuMessage] = useState<Message | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
@@ -674,6 +702,28 @@ export default function SessionScreen() {
     const hideSub = Keyboard.addListener(hideEvent, () => setReactionKeyboardHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, [reactionPickerMessage]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(EMOJI_USAGE_KEY).then((raw) => {
+      if (raw) {
+        try { setEmojiUsage(JSON.parse(raw)); } catch {}
+      }
+    });
+  }, []);
+
+  const trackEmojiUsage = useCallback((emoji: string) => {
+    setEmojiUsage((prev) => {
+      const updated = {
+        ...prev,
+        [emoji]: {
+          count: (prev[emoji]?.count ?? 0) + 1,
+          lastUsed: Date.now(),
+        },
+      };
+      AsyncStorage.setItem(EMOJI_USAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -1859,14 +1909,21 @@ export default function SessionScreen() {
                 </Text>
               </View>
             )}
-            <View style={styles.actionMenuRow}>
-              {REACTION_EMOJIS.map((emoji) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.actionMenuRow}
+              contentContainerStyle={{ paddingHorizontal: 8, gap: 4 }}
+              keyboardShouldPersistTaps="always"
+            >
+              {getSortedEmojis(emojiUsage).map((emoji) => (
                 <Pressable
                   key={emoji}
                   style={({ pressed }) => [styles.reactionPickerEmoji, { opacity: pressed ? 0.6 : 1 }]}
                   onPress={() => {
                     if (actionMenuMessage) {
                       reactMutation.mutate({ messageId: actionMenuMessage.id, emoji });
+                      trackEmojiUsage(emoji);
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }
                     setActionMenuMessage(null);
@@ -1875,25 +1932,7 @@ export default function SessionScreen() {
                   <Text style={{ fontSize: 26 }}>{emoji}</Text>
                 </Pressable>
               ))}
-              <Pressable
-                style={({ pressed }) => [styles.reactionPickerEmoji, {
-                  opacity: pressed ? 0.6 : 1,
-                  backgroundColor: colors.surfaceAlt,
-                  borderRadius: 18,
-                  width: 38,
-                  height: 38,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }]}
-                onPress={() => {
-                  const msg = actionMenuMessage;
-                  setActionMenuMessage(null);
-                  if (msg) setTimeout(() => setReactionPickerMessage(msg), 200);
-                }}
-              >
-                <Feather name="plus" size={18} color={colors.textSecondary} />
-              </Pressable>
-            </View>
+            </ScrollView>
             <View style={[styles.actionMenuDivider, { backgroundColor: colors.border }]} />
             {actionMenuMessage?.type === "text" && actionMenuMessage.content && (
               <Pressable
@@ -1965,14 +2004,21 @@ export default function SessionScreen() {
             <Text style={[styles.attachTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
               React to message
             </Text>
-            <View style={styles.reactionPickerRow}>
-              {REACTION_EMOJIS.map((emoji) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.reactionPickerRow}
+              contentContainerStyle={{ gap: 4, paddingHorizontal: 4 }}
+              keyboardShouldPersistTaps="always"
+            >
+              {getSortedEmojis(emojiUsage).map((emoji) => (
                 <Pressable
                   key={emoji}
                   style={({ pressed }) => [styles.reactionPickerEmoji, { opacity: pressed ? 0.6 : 1 }]}
                   onPress={() => {
                     if (reactionPickerMessage) {
                       reactMutation.mutate({ messageId: reactionPickerMessage.id, emoji });
+                      trackEmojiUsage(emoji);
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }
                     setReactionPickerMessage(null);
@@ -1983,67 +2029,7 @@ export default function SessionScreen() {
                   <Text style={{ fontSize: 30 }}>{emoji}</Text>
                 </Pressable>
               ))}
-              <Pressable
-                style={({ pressed }) => [styles.reactionPickerEmoji, {
-                  opacity: pressed ? 0.6 : 1,
-                  backgroundColor: showCustomEmoji ? colors.accentSoft : colors.surfaceAlt,
-                  borderRadius: 20,
-                  width: 44,
-                  height: 44,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }]}
-                onPress={() => setShowCustomEmoji(v => !v)}
-              >
-                <Feather name="plus" size={22} color={showCustomEmoji ? colors.accent : colors.textSecondary} />
-              </Pressable>
-            </View>
-            {showCustomEmoji && (
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12, gap: 8, paddingHorizontal: 4 }}>
-                <TextInput
-                  style={{
-                    flex: 1,
-                    fontSize: 26,
-                    textAlign: "center",
-                    borderWidth: 1.5,
-                    borderColor: colors.border,
-                    borderRadius: 12,
-                    paddingVertical: 8,
-                    backgroundColor: colors.surfaceAlt,
-                    color: colors.text,
-                    maxHeight: 52,
-                  }}
-                  placeholder="Type emoji…"
-                  placeholderTextColor={colors.textTertiary}
-                  value={customEmojiInput}
-                  onChangeText={setCustomEmojiInput}
-                  autoFocus
-                  maxLength={8}
-                />
-                <Pressable
-                  style={({ pressed }) => ({
-                    backgroundColor: customEmojiInput.trim() ? colors.accent : colors.surfaceAlt,
-                    borderRadius: 12,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    opacity: pressed ? 0.8 : 1,
-                  })}
-                  onPress={() => {
-                    const emoji = customEmojiInput.trim();
-                    if (!emoji || !reactionPickerMessage) return;
-                    reactMutation.mutate({ messageId: reactionPickerMessage.id, emoji });
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setReactionPickerMessage(null);
-                    setShowCustomEmoji(false);
-                    setCustomEmojiInput("");
-                  }}
-                >
-                  <Text style={{ color: customEmojiInput.trim() ? "#fff" : colors.textTertiary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
-                    React
-                  </Text>
-                </Pressable>
-              </View>
-            )}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -2844,8 +2830,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   reactionPickerRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
     paddingVertical: 4,
   },
   reactionPickerEmoji: {
@@ -2909,8 +2893,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   actionMenuRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
     paddingVertical: 4,
   },
   actionMenuDivider: {
