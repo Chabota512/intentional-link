@@ -18,7 +18,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
 import { useApi } from "@/hooks/useApi";
@@ -84,8 +84,9 @@ function SectionHeader({ title, colors }: { title: string; colors: any }) {
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, updateUser, refreshUser } = useAuth();
   const { get, put, del, uploadFile } = useApi();
+  const queryClient = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? "");
   const [editUsername, setEditUsername] = useState(user?.username ?? "");
@@ -194,6 +195,10 @@ export default function ProfileScreen() {
             setDeletingData(true);
             try {
               await del("/users/me/data");
+              // Clear all cached queries so chats, messages, and contacts refresh immediately
+              await queryClient.invalidateQueries();
+              // Re-fetch user from server to pick up cleared avatar and push token
+              await refreshUser();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert("Done", "Your data has been cleared.");
             } catch (e: any) {

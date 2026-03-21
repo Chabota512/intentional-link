@@ -25,6 +25,7 @@ interface AuthContextValue {
   register: (username: string, name: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updates: { name?: string; username?: string; avatarUrl?: string | null }) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -110,8 +111,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updated);
   };
 
+  const refreshUser = async () => {
+    if (!user) return;
+    const res = await fetch(`${BASE_URL}/api/users/me`, {
+      headers: {
+        "x-user-id": String(user.id),
+        Authorization: `Bearer ${user.token}`,
+      },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const updated: AuthUser = {
+      ...user,
+      name: data.name ?? user.name,
+      username: data.username ?? user.username,
+      avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl : user.avatarUrl,
+    };
+    await AsyncStorage.setItem("focus_user", JSON.stringify(updated));
+    setUser(updated);
+  };
+
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout, updateUser }),
+    () => ({ user, isLoading, login, register, logout, updateUser, refreshUser }),
     [user, isLoading]
   );
 
