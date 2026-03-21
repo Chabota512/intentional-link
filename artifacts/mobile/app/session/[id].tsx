@@ -2500,29 +2500,22 @@ export default function SessionScreen() {
 
       <Modal visible={videoViewer !== null} transparent animationType="fade" onRequestClose={() => setVideoViewer(null)}>
         <View style={{ flex: 1, backgroundColor: "#000" }}>
-          <Pressable
-            style={{ position: "absolute", top: 60, right: 20, zIndex: 10, padding: 8 }}
-            onPress={() => setVideoViewer(null)}
-          >
-            <Feather name="x" size={26} color="#fff" />
-          </Pressable>
+          <View style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Pressable onPress={() => setVideoViewer(null)} style={{ padding: 6 }}>
+              <Feather name="x" size={24} color="#fff" />
+            </Pressable>
+            <Text style={{ flex: 1, color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+              {videoViewer?.name}
+            </Text>
+          </View>
           {videoViewer && (
-            <>
-              <View style={{ position: "absolute", top: 66, left: 0, right: 0, alignItems: "center", zIndex: 10 }}>
-                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
-                  {videoViewer.name}
-                </Text>
-              </View>
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                <Video
-                  source={{ uri: videoViewer.url }}
-                  style={{ width: Dimensions.get("window").width, height: Dimensions.get("window").height * 0.7 }}
-                  resizeMode={ResizeMode.CONTAIN}
-                  useNativeControls
-                  shouldPlay
-                />
-              </View>
-            </>
+            <Video
+              source={{ uri: videoViewer.url }}
+              style={{ flex: 1, width: "100%" }}
+              resizeMode={ResizeMode.CONTAIN}
+              useNativeControls
+              shouldPlay
+            />
           )}
         </View>
       </Modal>
