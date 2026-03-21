@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ScrollView,
   Image,
   Modal,
+  useWindowDimensions,
 } from "react-native";
 import UserAvatar from "@/components/UserAvatar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -72,6 +73,8 @@ export default function ContactsScreen() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("contacts");
   const [avatarPreview, setAvatarPreview] = useState<ContactUser | null>(null);
+  const { width } = useWindowDimensions();
+  const pagerRef = useRef<ScrollView>(null);
 
   const { data: contacts = [], isLoading: contactsLoading, isRefetching, refetch } = useQuery<Contact[]>({
     queryKey: ["contacts"],
@@ -294,7 +297,10 @@ export default function ContactsScreen() {
       <View style={[styles.tabRow, { borderBottomColor: colors.border }]}>
         <Pressable
           style={[styles.tab, activeTab === "contacts" && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
-          onPress={() => setActiveTab("contacts")}
+          onPress={() => {
+            setActiveTab("contacts");
+            pagerRef.current?.scrollTo({ x: 0, animated: true });
+          }}
         >
           <View style={styles.tabInner}>
             <Text style={[styles.tabText, { color: activeTab === "contacts" ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
@@ -309,7 +315,10 @@ export default function ContactsScreen() {
         </Pressable>
         <Pressable
           style={[styles.tab, activeTab === "requests" && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
-          onPress={() => setActiveTab("requests")}
+          onPress={() => {
+            setActiveTab("requests");
+            pagerRef.current?.scrollTo({ x: width, animated: true });
+          }}
         >
           <View style={styles.tabInner}>
             <Text style={[styles.tabText, { color: activeTab === "requests" ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
@@ -324,106 +333,124 @@ export default function ContactsScreen() {
         </Pressable>
       </View>
 
-      {activeTab === "contacts" ? (
-        contactsLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={colors.accent} />
-          </View>
-        ) : (
-          <FlatList
-            data={contacts}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderContact}
-            contentContainerStyle={[
-              styles.list,
-              { paddingBottom: bottomPad + 80 },
-              contacts.length === 0 && styles.listEmpty,
-            ]}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
-                  <Feather name="users" size={36} color={colors.textTertiary} />
-                </View>
-                <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-                  No contacts yet
-                </Text>
-                <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                  Send a request to someone — they'll need to accept before you're connected.
-                </Text>
-                <Pressable
-                  style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
-                  onPress={() => router.push("/contacts/add")}
-                >
-                  <Feather name="user-plus" size={16} color="#fff" />
-                  <Text style={[styles.emptyBtnText, { fontFamily: "Inter_600SemiBold" }]}>Find People</Text>
-                </Pressable>
-              </View>
-            }
-          />
-        )
-      ) : (
-        requestsLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={colors.accent} />
-          </View>
-        ) : (
-          <ScrollView
-            contentContainerStyle={[styles.list, { paddingBottom: bottomPad + 80 }]}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={false}
-                onRefresh={() => refetchRequests()}
-                tintColor={colors.accent}
-              />
-            }
-          >
-            {(requests?.incoming.length ?? 0) > 0 && (
-              <>
-                <Text style={[styles.sectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-                  INCOMING
-                </Text>
-                {(requests?.incoming ?? []).map((item) => (
-                  <View key={item.id} style={{ marginBottom: 8 }}>
-                    {renderIncoming({ item })}
+      <ScrollView
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={(e) => {
+          const page = Math.round(e.nativeEvent.contentOffset.x / width);
+          setActiveTab(page === 0 ? "contacts" : "requests");
+        }}
+        style={{ flex: 1 }}
+      >
+        {/* Contacts page */}
+        <View style={{ width }}>
+          {contactsLoading ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
+          ) : (
+            <FlatList
+              data={contacts}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={renderContact}
+              contentContainerStyle={[
+                styles.list,
+                { paddingBottom: bottomPad + 80 },
+                contacts.length === 0 && styles.listEmpty,
+              ]}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={true}
+              refreshControl={
+                <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accent} />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
+                    <Feather name="users" size={36} color={colors.textTertiary} />
                   </View>
-                ))}
-              </>
-            )}
-
-            {(requests?.outgoing.length ?? 0) > 0 && (
-              <>
-                <Text style={[styles.sectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", marginTop: 16 }]}>
-                  SENT
-                </Text>
-                {(requests?.outgoing ?? []).map((item) => (
-                  <View key={item.id} style={{ marginBottom: 8 }}>
-                    {renderOutgoing({ item })}
-                  </View>
-                ))}
-              </>
-            )}
-
-            {(requests?.incoming.length ?? 0) === 0 && (requests?.outgoing.length ?? 0) === 0 && (
-              <View style={[styles.emptyState, { marginTop: 60 }]}>
-                <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
-                  <Feather name="bell" size={36} color={colors.textTertiary} />
+                  <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                    No contacts yet
+                  </Text>
+                  <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    Send a request to someone — they'll need to accept before you're connected.
+                  </Text>
+                  <Pressable
+                    style={({ pressed }) => [styles.emptyBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
+                    onPress={() => router.push("/contacts/add")}
+                  >
+                    <Feather name="user-plus" size={16} color="#fff" />
+                    <Text style={[styles.emptyBtnText, { fontFamily: "Inter_600SemiBold" }]}>Find People</Text>
+                  </Pressable>
                 </View>
-                <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-                  No pending requests
-                </Text>
-                <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                  Contact requests you send or receive will appear here.
-                </Text>
-              </View>
-            )}
-          </ScrollView>
-        )
-      )}
+              }
+            />
+          )}
+        </View>
+
+        {/* Requests page */}
+        <View style={{ width }}>
+          {requestsLoading ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
+          ) : (
+            <ScrollView
+              contentContainerStyle={[styles.list, { paddingBottom: bottomPad + 80 }]}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={false}
+                  onRefresh={() => refetchRequests()}
+                  tintColor={colors.accent}
+                />
+              }
+            >
+              {(requests?.incoming.length ?? 0) > 0 && (
+                <>
+                  <Text style={[styles.sectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+                    INCOMING
+                  </Text>
+                  {(requests?.incoming ?? []).map((item) => (
+                    <View key={item.id} style={{ marginBottom: 8 }}>
+                      {renderIncoming({ item })}
+                    </View>
+                  ))}
+                </>
+              )}
+
+              {(requests?.outgoing.length ?? 0) > 0 && (
+                <>
+                  <Text style={[styles.sectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold", marginTop: 16 }]}>
+                    SENT
+                  </Text>
+                  {(requests?.outgoing ?? []).map((item) => (
+                    <View key={item.id} style={{ marginBottom: 8 }}>
+                      {renderOutgoing({ item })}
+                    </View>
+                  ))}
+                </>
+              )}
+
+              {(requests?.incoming.length ?? 0) === 0 && (requests?.outgoing.length ?? 0) === 0 && (
+                <View style={[styles.emptyState, { marginTop: 60 }]}>
+                  <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceAlt }]}>
+                    <Feather name="bell" size={36} color={colors.textTertiary} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                    No pending requests
+                  </Text>
+                  <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    Contact requests you send or receive will appear here.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          )}
+        </View>
+      </ScrollView>
       <Modal
         visible={avatarPreview !== null}
         transparent
