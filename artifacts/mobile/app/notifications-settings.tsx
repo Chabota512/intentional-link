@@ -86,6 +86,29 @@ function Avatar({ name, avatarUrl, size = 38, colors }: { name: string; avatarUr
   );
 }
 
+function parseCustomDuration(input: string): number | null {
+  const cleaned = input.trim().toLowerCase().replace(/\s+/g, "");
+  let total = 0;
+  const hMatch = cleaned.match(/(\d+)h/);
+  const mMatch = cleaned.match(/(\d+)m/);
+  if (hMatch) total += parseInt(hMatch[1]) * 60;
+  if (mMatch) total += parseInt(mMatch[1]);
+  if (!hMatch && !mMatch) {
+    const num = parseInt(cleaned);
+    if (isNaN(num)) return null;
+    total = num;
+  }
+  return total > 0 && total <= 1440 ? total : null;
+}
+
+function formatDurationLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
 function parseCustomTime(input: string): string | null {
   const cleaned = input.trim().toUpperCase().replace(/\s+/g, " ");
 
@@ -228,6 +251,9 @@ export default function NotificationsSettingsScreen() {
   const [contacts, setContacts] = useState<DndContact[]>([]);
   const [selectedWhitelist, setSelectedWhitelist] = useState<Set<number>>(new Set());
   const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<number | null>(60);
+  const [showCustomDuration, setShowCustomDuration] = useState(false);
+  const [customDurationInput, setCustomDurationInput] = useState("");
+  const [customDurationError, setCustomDurationError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showWhitelistModal, setShowWhitelistModal] = useState(false);
@@ -303,6 +329,9 @@ export default function NotificationsSettingsScreen() {
     pendingDndOn.current = false;
     setSelectedWhitelist(new Set(settings.whitelistedContactIds));
     setSelectedDurationMinutes(60);
+    setShowCustomDuration(false);
+    setCustomDurationInput("");
+    setCustomDurationError(false);
   };
 
   const toggleWhitelistContact = (id: number) => {
@@ -547,7 +576,7 @@ export default function NotificationsSettingsScreen() {
             <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 24 }]}>DURATION</Text>
             <View style={[styles.durationChipRow, { marginHorizontal: 16 }]}>
               {DURATION_PRESETS.map(preset => {
-                const active = selectedDurationMinutes === preset.minutes;
+                const active = !showCustomDuration && selectedDurationMinutes === preset.minutes;
                 return (
                   <Pressable
                     key={preset.label}
@@ -555,13 +584,71 @@ export default function NotificationsSettingsScreen() {
                       styles.durationChip,
                       { borderColor: active ? "#6366F1" : colors.border, backgroundColor: active ? "#6366F1" : colors.surface },
                     ]}
-                    onPress={() => setSelectedDurationMinutes(preset.minutes)}
+                    onPress={() => { setShowCustomDuration(false); setSelectedDurationMinutes(preset.minutes); }}
                   >
                     <Text style={[styles.durationChipText, { color: active ? "#fff" : colors.text }]}>{preset.label}</Text>
                   </Pressable>
                 );
               })}
+              <Pressable
+                style={[
+                  styles.durationChip,
+                  { borderColor: showCustomDuration ? "#6366F1" : colors.border, backgroundColor: showCustomDuration ? "#6366F1" : colors.surface },
+                ]}
+                onPress={() => { setShowCustomDuration(true); setCustomDurationInput(""); setCustomDurationError(false); }}
+              >
+                <Text style={[styles.durationChipText, { color: showCustomDuration ? "#fff" : colors.text }]}>Custom</Text>
+              </Pressable>
             </View>
+
+            {showCustomDuration && (
+              <View style={{ marginHorizontal: 16, marginTop: 10 }}>
+                <View style={[styles.customTimeRow, { borderColor: customDurationError ? "#EF4444" : "#6366F1", backgroundColor: colors.background }]}>
+                  <Feather name="clock" size={15} color={customDurationError ? "#EF4444" : colors.textTertiary} />
+                  <TextInput
+                    style={[styles.customTimeInput, { color: colors.text }]}
+                    placeholder="e.g. 45m, 3h, 1h 30m"
+                    placeholderTextColor={colors.textTertiary}
+                    value={customDurationInput}
+                    onChangeText={t => { setCustomDurationInput(t); setCustomDurationError(false); }}
+                    keyboardType="default"
+                    returnKeyType="done"
+                    autoFocus
+                    onSubmitEditing={() => {
+                      const mins = parseCustomDuration(customDurationInput);
+                      if (!mins) { setCustomDurationError(true); return; }
+                      setSelectedDurationMinutes(mins);
+                      setCustomDurationError(false);
+                    }}
+                  />
+                  {selectedDurationMinutes !== null && showCustomDuration && !customDurationError && customDurationInput === "" && (
+                    <Text style={{ fontSize: 13, color: "#6366F1", fontFamily: "Inter_600SemiBold", paddingRight: 10 }}>
+                      {formatDurationLabel(selectedDurationMinutes)}
+                    </Text>
+                  )}
+                  <Pressable
+                    style={[styles.customTimeSet, { backgroundColor: "#6366F1" }]}
+                    onPress={() => {
+                      const mins = parseCustomDuration(customDurationInput);
+                      if (!mins) { setCustomDurationError(true); return; }
+                      setSelectedDurationMinutes(mins);
+                      setCustomDurationError(false);
+                    }}
+                  >
+                    <Text style={styles.customTimeSetText}>Set</Text>
+                  </Pressable>
+                </View>
+                {customDurationError ? (
+                  <Text style={styles.customTimeError}>Enter a duration like "45m", "3h", or "1h 30m"</Text>
+                ) : (
+                  selectedDurationMinutes !== null && showCustomDuration && (
+                    <Text style={{ fontSize: 11, color: colors.textTertiary, fontFamily: "Inter_400Regular", marginTop: 5 }}>
+                      DND will turn off after {formatDurationLabel(selectedDurationMinutes)}
+                    </Text>
+                  )
+                )}
+              </View>
+            )}
 
             {/* Whitelist */}
             <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 28 }]}>
