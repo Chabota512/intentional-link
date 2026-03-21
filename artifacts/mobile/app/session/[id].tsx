@@ -1382,18 +1382,7 @@ export default function SessionScreen() {
         </Pressable>
         <Pressable
           style={styles.navCenter}
-          onPress={() => {
-            if (!session.imageUrl && headerPerson) {
-              setProfileViewUser({
-                name: headerPerson.name,
-                username: headerPerson.username,
-                avatarUrl: headerPerson.avatarUrl,
-                presenceStatus: getEffectivePresence(headerPerson.id, headerPerson.lastSeenAt) as any,
-              });
-            } else {
-              openParticipants();
-            }
-          }}
+          onPress={() => openParticipants()}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             {session.imageUrl ? (
@@ -2185,6 +2174,34 @@ export default function SessionScreen() {
 
           {sheetView === "participants" ? (
             <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+              <View style={[styles.chatInfoBlock, { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+                <Text style={[styles.chatInfoTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>
+                  {session.title}
+                </Text>
+                {session.description ? (
+                  <Text style={[styles.chatInfoDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    {session.description}
+                  </Text>
+                ) : (
+                  <Text style={[styles.chatInfoDesc, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+                    No description
+                  </Text>
+                )}
+                <View style={[styles.chatInfoMeta, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                  <Feather name="users" size={13} color={colors.textSecondary} />
+                  <Text style={[styles.chatInfoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                    {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
+                  </Text>
+                  <Text style={[styles.chatInfoMetaSep, { color: colors.border }]}>·</Text>
+                  <View style={[styles.chatInfoStatusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
+                  <Text style={[styles.chatInfoMetaText, { color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }]}>
+                    {isActive ? "Active" : "Ended"}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.chatInfoSectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+                PARTICIPANTS
+              </Text>
               <View style={[styles.participantRow, { borderBottomColor: colors.border }]}>
                 {(() => {
                   const creatorId = session.creator?.id ?? session.creatorId;
@@ -2265,7 +2282,7 @@ export default function SessionScreen() {
               )}
             </ScrollView>
           ) : (
-            <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={[styles.sheetScroll, { padding: 16 }]} showsVerticalScrollIndicator={false}>
               <Pressable
                 style={({ pressed }) => [styles.shareTextBtn, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.8 : 1 }]}
                 onPress={shareSessionLink}
@@ -2736,12 +2753,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheetTitle: { fontSize: 16 },
-  sheetScroll: { padding: 16, gap: 0 },
+  sheetScroll: { padding: 0, gap: 0 },
+  chatInfoBlock: { padding: 20, gap: 8, paddingBottom: 20 },
+  chatInfoTitle: { fontSize: 22, lineHeight: 28 },
+  chatInfoDesc: { fontSize: 14, lineHeight: 20 },
+  chatInfoMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  chatInfoMetaText: { fontSize: 13 },
+  chatInfoMetaSep: { fontSize: 13 },
+  chatInfoStatusDot: { width: 7, height: 7, borderRadius: 4 },
+  chatInfoSectionLabel: { fontSize: 11, letterSpacing: 0.8, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
   participantRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingVertical: 12,
+    paddingHorizontal: 20,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   participantAvatar: {
