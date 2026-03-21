@@ -70,10 +70,16 @@ const DAYS = [
 ];
 
 
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => {
-  const h = i % 12 === 0 ? 12 : i % 12;
-  const ampm = i < 12 ? "AM" : "PM";
-  return { label: `${h}:00 ${ampm}`, value: `${String(i).padStart(2, "0")}:00` };
+const HOUR_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
+  const totalMin = i * 15;
+  const h24 = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  const ampm = h24 < 12 ? "AM" : "PM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return {
+    label: `${h12}:${String(m).padStart(2, "0")} ${ampm}`,
+    value: `${String(h24).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+  };
 });
 
 function Avatar({ name, avatarUrl, size = 38, colors }: { name: string; avatarUrl: string | null; size?: number; colors: any }) {
@@ -455,7 +461,7 @@ export default function NotificationsSettingsScreen() {
                     {sched ? (
                       <>
                         <Text style={[styles.quietDayTime, { color: colors.accent }]}>
-                          {HOUR_OPTIONS.find(h => h.value === sched.startTime)?.label} – {HOUR_OPTIONS.find(h => h.value === sched.endTime)?.label}
+                          {formatTimeValue(sched.startTime)} – {formatTimeValue(sched.endTime)}
                         </Text>
                         <Pressable onPress={() => removeDaySchedule(d.key)} hitSlop={10} style={styles.quietDayRemove}>
                           <Feather name="x" size={15} color={colors.textTertiary} />
@@ -618,7 +624,7 @@ export default function NotificationsSettingsScreen() {
                     <Pressable
                       style={[styles.durationStepBtn, { borderColor: colors.border }]}
                       onPress={() => {
-                        const next = Math.max(0, customMinutes - 5);
+                        const next = Math.max(0, customMinutes - 1);
                         setCustomMinutes(next);
                         setSelectedDurationMinutes(customHours * 60 + next || 1);
                       }}
@@ -629,12 +635,12 @@ export default function NotificationsSettingsScreen() {
                     <Pressable
                       style={[styles.durationStepBtn, { borderColor: colors.border }]}
                       onPress={() => {
-                        const next = Math.min(55, customMinutes + 5);
+                        const next = Math.min(59, customMinutes + 1);
                         setCustomMinutes(next);
                         setSelectedDurationMinutes(customHours * 60 + next);
                       }}
                     >
-                      <Feather name="plus" size={16} color={customMinutes === 55 ? colors.textTertiary : colors.text} />
+                      <Feather name="plus" size={16} color={customMinutes === 59 ? colors.textTertiary : colors.text} />
                     </Pressable>
                   </View>
                 </View>
