@@ -61,6 +61,8 @@
     "expo-av": "^16.0.8",
     "expo-clipboard": "^55.0.9",
     "expo-document-picker": "^55.0.9",
+    "expo-file-system": "^55.0.11",
+    "expo-media-library": "^55.0.10",
     "expo-notifications": "~0.32.16",
     "expo-sensors": "~15.0.8",
     "expo-sms": "^55.0.9",

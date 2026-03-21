@@ -31,6 +31,8 @@ import * as SMS from "expo-sms";
 import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import * as MediaLibrary from "expo-media-library";
+import * as FileSystem from "expo-file-system";
 import { Audio, Video, ResizeMode, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { LightSensor } from "expo-sensors";
@@ -841,16 +843,6 @@ export default function SessionScreen() {
     }, 3500);
   };
 
-  const vpHandleTap = () => {
-    if (vpControlsVisible) {
-      if (vpHideTimer.current) clearTimeout(vpHideTimer.current);
-      vpControlsOpacity.value = withTiming(0, { duration: 250 });
-      setVpControlsVisible(false);
-    } else {
-      vpShowControls();
-    }
-  };
-
   const vpTogglePlay = () => {
     if (vpIsPlaying) inAppVideoPlayer.pause();
     else inAppVideoPlayer.play();
@@ -876,6 +868,63 @@ export default function SessionScreen() {
     inAppVideoPlayer.loop = next;
     setVpLooping(next);
     vpShowControls();
+  };
+
+  const [vpDownloading, setVpDownloading] = useState(false);
+  const lastTapLeftRef = useRef(0);
+  const lastTapRightRef = useRef(0);
+
+  const vpHideControls = () => {
+    if (vpHideTimer.current) clearTimeout(vpHideTimer.current);
+    vpControlsOpacity.value = withTiming(0, { duration: 250 });
+    setVpControlsVisible(false);
+  };
+
+  const handleTapLeft = () => {
+    const now = Date.now();
+    if (now - lastTapLeftRef.current < 300) {
+      lastTapLeftRef.current = 0;
+      inAppVideoPlayer.seekBy(-5);
+      vpShowControls();
+    } else {
+      lastTapLeftRef.current = now;
+      if (vpControlsVisible) vpHideControls();
+      else vpShowControls();
+    }
+  };
+
+  const handleTapRight = () => {
+    const now = Date.now();
+    if (now - lastTapRightRef.current < 300) {
+      lastTapRightRef.current = 0;
+      inAppVideoPlayer.seekBy(5);
+      vpShowControls();
+    } else {
+      lastTapRightRef.current = now;
+      if (vpControlsVisible) vpHideControls();
+      else vpShowControls();
+    }
+  };
+
+  const vpDownloadVideo = async () => {
+    if (!videoViewer?.url || vpDownloading) return;
+    try {
+      setVpDownloading(true);
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Allow access to save videos to your gallery.");
+        return;
+      }
+      const filename = videoViewer.name.replace(/[^a-zA-Z0-9._-]/g, "_") || "video.mp4";
+      const localUri = FileSystem.cacheDirectory + filename;
+      const { uri } = await FileSystem.downloadAsync(videoViewer.url, localUri);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert("Saved", "Video saved to your gallery.");
+    } catch {
+      Alert.alert("Error", "Could not save the video.");
+    } finally {
+      setVpDownloading(false);
+    }
   };
 
   useEffect(() => {
@@ -2569,60 +2618,69 @@ export default function SessionScreen() {
 
       <Modal visible={videoViewer !== null} transparent animationType="fade" onRequestClose={() => setVideoViewer(null)}>
         <View style={{ flex: 1, backgroundColor: "#000" }}>
-          {/* Video layer — tapping toggles controls */}
-          <Pressable style={{ flex: 1 }} onPress={vpHandleTap}>
-            <VideoView
-              player={inAppVideoPlayer}
-              style={{ flex: 1, width: "100%" }}
-              contentFit="contain"
-              nativeControls={false}
-            />
-          </Pressable>
+          {/* Video fills the screen */}
+          <VideoView
+            player={inAppVideoPlayer}
+            style={{ flex: 1, width: "100%" }}
+            contentFit="contain"
+            nativeControls={false}
+          />
 
-          {/* Controls overlay */}
-          <Animated.View
-            style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, vpAnimStyle]}
-            pointerEvents={vpControlsVisible ? "box-none" : "none"}
-          >
-            {/* Top bar */}
-            <View style={{ position: "absolute", top: 0, left: 0, right: 0, paddingTop: insets.top + 8, paddingBottom: 16, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.55)" }}>
+          {/* Controls overlay — always box-none so all child touches go to their targets */}
+          <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, vpAnimStyle]} pointerEvents="box-none">
+
+            {/* TOP BAR */}
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, paddingTop: insets.top + 8, paddingBottom: 14, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.5)" }}>
               <Pressable onPress={() => setVideoViewer(null)} style={{ padding: 8 }}>
                 <Feather name="x" size={22} color="#fff" />
               </Pressable>
-              <Text style={{ flex: 1, color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
-                {videoViewer?.name}
-              </Text>
-              {/* Loop */}
+              <Text style={{ flex: 1, color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>{videoViewer?.name}</Text>
               <Pressable onPress={vpToggleLoop} style={{ padding: 8, backgroundColor: vpLooping ? "rgba(255,107,157,0.3)" : "rgba(255,255,255,0.12)", borderRadius: 8 }}>
-                <Feather name="repeat" size={17} color={vpLooping ? "#FF6B9D" : "#fff"} />
+                <Feather name="repeat" size={16} color={vpLooping ? "#FF6B9D" : "#fff"} />
               </Pressable>
-              {/* Mute */}
               <Pressable onPress={vpToggleMute} style={{ padding: 8, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8 }}>
-                <Feather name={vpMuted ? "volume-x" : "volume-2"} size={17} color="#fff" />
+                <Feather name={vpMuted ? "volume-x" : "volume-2"} size={16} color="#fff" />
               </Pressable>
-              {/* Speed */}
               <Pressable onPress={() => { setVpSpeedOpen(true); vpShowControls(); }} style={{ paddingVertical: 6, paddingHorizontal: 10, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8 }}>
                 <Text style={{ color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{vpRate}×</Text>
               </Pressable>
             </View>
 
-            {/* Centre playback controls */}
-            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 32 }} pointerEvents="box-none">
-              <Pressable onPress={() => { inAppVideoPlayer.seekBy(-10); vpShowControls(); }} style={{ alignItems: "center", gap: 4 }}>
-                <Feather name="rotate-ccw" size={28} color="#fff" />
-                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, fontFamily: "Inter_500Medium" }}>10s</Text>
-              </Pressable>
-              <Pressable onPress={vpTogglePlay} style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" }}>
-                <Feather name={vpIsPlaying ? "pause" : "play"} size={30} color="#fff" style={vpIsPlaying ? {} : { marginLeft: 4 }} />
-              </Pressable>
-              <Pressable onPress={() => { inAppVideoPlayer.seekBy(10); vpShowControls(); }} style={{ alignItems: "center", gap: 4 }}>
-                <Feather name="rotate-cw" size={28} color="#fff" />
-                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, fontFamily: "Inter_500Medium" }}>10s</Text>
-              </Pressable>
+            {/* MIDDLE: left zone | center buttons | right zone */}
+            <View style={{ position: "absolute", top: insets.top + 70, left: 0, right: 0, bottom: insets.bottom + 90, flexDirection: "row" }} pointerEvents="box-none">
+              {/* Left zone: single tap = toggle controls, double tap = seek -5s */}
+              <Pressable style={{ flex: 1 }} onPress={handleTapLeft} />
+
+              {/* Center buttons */}
+              <View style={{ width: 200, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 28 }}>
+                <Pressable
+                  onPress={() => { inAppVideoPlayer.seekBy(-5); vpShowControls(); }}
+                  style={{ alignItems: "center", gap: 4 }}
+                >
+                  <Feather name="rotate-ccw" size={26} color="#fff" />
+                  <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 10, fontFamily: "Inter_500Medium" }}>5s</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { if (vpIsPlaying) inAppVideoPlayer.pause(); else inAppVideoPlayer.play(); vpShowControls(); }}
+                  style={{ width: 62, height: 62, borderRadius: 31, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}
+                >
+                  <Feather name={vpIsPlaying ? "pause" : "play"} size={28} color="#fff" style={vpIsPlaying ? {} : { marginLeft: 4 }} />
+                </Pressable>
+                <Pressable
+                  onPress={() => { inAppVideoPlayer.seekBy(5); vpShowControls(); }}
+                  style={{ alignItems: "center", gap: 4 }}
+                >
+                  <Feather name="rotate-cw" size={26} color="#fff" />
+                  <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 10, fontFamily: "Inter_500Medium" }}>5s</Text>
+                </Pressable>
+              </View>
+
+              {/* Right zone: single tap = toggle controls, double tap = seek +5s */}
+              <Pressable style={{ flex: 1 }} onPress={handleTapRight} />
             </View>
 
-            {/* Bottom bar — seek bar + time */}
-            <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, paddingBottom: insets.bottom + 16, paddingHorizontal: 16, paddingTop: 16, backgroundColor: "rgba(0,0,0,0.55)", gap: 8 }}>
+            {/* BOTTOM BAR */}
+            <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, paddingBottom: insets.bottom + 14, paddingHorizontal: 16, paddingTop: 14, backgroundColor: "rgba(0,0,0,0.5)", gap: 8 }}>
               {/* Seek bar */}
               <View
                 style={{ height: 28, justifyContent: "center" }}
@@ -2644,9 +2702,13 @@ export default function SessionScreen() {
                 </View>
                 <View style={{ position: "absolute", left: `${Math.min(100, (vpCurrentTime / Math.max(vpDuration, 0.001)) * 100)}%`, width: 13, height: 13, borderRadius: 7, backgroundColor: "#fff", top: 7.5, marginLeft: -6.5 }} />
               </View>
-              {/* Time row */}
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              {/* Time + download row */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                 <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, fontFamily: "Inter_500Medium" }}>{vpFormatTime(vpCurrentTime)}</Text>
+                <Pressable onPress={vpDownloadVideo} style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8 }} disabled={vpDownloading}>
+                  <Feather name={vpDownloading ? "loader" : "download"} size={14} color={vpDownloading ? "rgba(255,255,255,0.5)" : "#fff"} />
+                  <Text style={{ color: vpDownloading ? "rgba(255,255,255,0.5)" : "#fff", fontSize: 12, fontFamily: "Inter_500Medium" }}>{vpDownloading ? "Saving…" : "Save to gallery"}</Text>
+                </Pressable>
                 <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, fontFamily: "Inter_500Medium" }}>{vpFormatTime(vpDuration)}</Text>
               </View>
             </View>
@@ -2654,7 +2716,7 @@ export default function SessionScreen() {
 
           {/* Speed picker sheet */}
           {vpSpeedOpen && (
-            <Pressable style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "flex-end" }} onPress={() => setVpSpeedOpen(false)}>
+            <Pressable style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "flex-end" }} onPress={() => setVpSpeedOpen(false)}>
               <View style={{ width: "100%", backgroundColor: "#1a1a1a", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: insets.bottom + 16, paddingTop: 12 }}>
                 <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_600SemiBold", textAlign: "center", marginBottom: 12, letterSpacing: 1 }}>PLAYBACK SPEED</Text>
                 {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
