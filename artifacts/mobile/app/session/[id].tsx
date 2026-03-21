@@ -139,6 +139,7 @@ function VoicePlayer({
   durationHint?: number;
 }) {
   const soundRef = useRef<Audio.Sound | null>(null);
+  const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
@@ -146,6 +147,7 @@ function VoicePlayer({
   const [position, setPosition] = useState(0);
   const [useEarpiece, setUseEarpiece] = useState(false);
   const lightSubRef = useRef<{ remove: () => void } | null>(null);
+  const positionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const applyAudioMode = async (earpiece: boolean) => {
     await Audio.setAudioModeAsync({
@@ -186,7 +188,62 @@ function VoicePlayer({
     await applyAudioMode(next);
   };
 
-  const togglePlay = async () => {
+  const togglePlayWeb = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      if (!htmlAudioRef.current) {
+        const audio = new (window as any).Audio() as HTMLAudioElement;
+        audio.preload = "auto";
+        audio.src = url;
+        htmlAudioRef.current = audio;
+        audio.ontimeupdate = () => {
+          setPosition(audio.currentTime * 1000);
+        };
+        audio.onloadedmetadata = () => {
+          if (isFinite(audio.duration)) {
+            setDuration(audio.duration * 1000);
+          }
+        };
+        audio.onended = () => {
+          setPlaying(false);
+          setPosition(0);
+          if (!hasPlayed) {
+            setHasPlayed(true);
+            onPlayed?.();
+          }
+        };
+        audio.onerror = () => {
+          setPlaying(false);
+          setLoading(false);
+          Alert.alert("Error", "Could not load voice note.");
+        };
+      }
+      const audio = htmlAudioRef.current!;
+      if (playing) {
+        audio.pause();
+        setPlaying(false);
+        setLoading(false);
+      } else {
+        try {
+          await audio.play();
+          setPlaying(true);
+          if (!hasPlayed) {
+            setHasPlayed(true);
+            onPlayed?.();
+          }
+        } catch {
+          Alert.alert("Error", "Could not play voice note.");
+        }
+        setLoading(false);
+      }
+    } catch {
+      Alert.alert("Error", "Could not play voice note.");
+      setLoading(false);
+    }
+  };
+
+  const togglePlayNative = async () => {
     if (loading) return;
     setLoading(true);
     try {
@@ -228,10 +285,18 @@ function VoicePlayer({
     setLoading(false);
   };
 
+  const togglePlay = Platform.OS === "web" ? togglePlayWeb : togglePlayNative;
+
   useEffect(() => {
     return () => {
+      if (htmlAudioRef.current) {
+        htmlAudioRef.current.pause();
+        htmlAudioRef.current.src = "";
+        htmlAudioRef.current = null;
+      }
       soundRef.current?.unloadAsync();
       stopLightSensor();
+      if (positionIntervalRef.current) clearInterval(positionIntervalRef.current);
     };
   }, []);
 
@@ -1085,8 +1150,10 @@ export default function SessionScreen() {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       if (!uri) return;
 
-      const fileName = `voice_${Date.now()}.m4a`;
-      const contentType = "audio/m4a";
+      const fileName = Platform.OS === "web"
+        ? `voice_${Date.now()}.webm`
+        : `voice_${Date.now()}.m4a`;
+      const contentType = Platform.OS === "web" ? "audio/webm" : "audio/m4a";
 
       setUploading(true);
       try {

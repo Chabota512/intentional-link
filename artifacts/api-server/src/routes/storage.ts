@@ -58,14 +58,42 @@ router.get("/storage/uploads/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    res.setHeader("Content-Type", record.contentType);
-    res.setHeader("Content-Length", record.fileSize);
+    const data: Buffer = Buffer.isBuffer(record.data)
+      ? record.data
+      : Buffer.from(record.data as any);
+    const totalSize = data.byteLength;
+    const contentType = record.contentType;
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Cache-Control", "private, max-age=86400");
     res.setHeader(
       "Content-Disposition",
       `inline; filename="${encodeURIComponent(record.filename)}"`
     );
-    res.send(record.data);
+
+    const rangeHeader = req.headers["range"];
+    if (rangeHeader) {
+      const parts = rangeHeader.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+      const chunkSize = end - start + 1;
+
+      if (start >= totalSize || end >= totalSize || start > end) {
+        res.setHeader("Content-Range", `bytes */${totalSize}`);
+        res.status(416).end();
+        return;
+      }
+
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${totalSize}`);
+      res.setHeader("Content-Length", chunkSize);
+      res.status(206);
+      res.end(data.subarray(start, end + 1));
+    } else {
+      res.setHeader("Content-Length", totalSize);
+      res.status(200);
+      res.end(data);
+    }
   } catch (error) {
     console.error("Download error:", error);
     res.status(500).json({ error: "Failed to retrieve file" });
