@@ -71,7 +71,7 @@ export default function MediaGalleryScreen() {
   });
 
   const images = data?.images ?? [];
-  const files = [...(data?.files ?? []), ...(data?.voiceNotes ?? [])];
+  const files = data?.files ?? [];
 
   const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);

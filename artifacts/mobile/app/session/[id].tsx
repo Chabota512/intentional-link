@@ -161,6 +161,20 @@ function VoicePlayer({
     });
   };
 
+  const resetAudioMode = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: false,
+        staysActiveInBackground: false,
+        interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+        shouldDuckAndroid: false,
+        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+        playThroughEarpieceAndroid: false,
+      });
+    } catch {}
+  };
+
   const startLightSensor = () => {
     if (Platform.OS !== "android") return;
     LightSensor.isAvailableAsync().then((available) => {
@@ -252,6 +266,7 @@ function VoicePlayer({
         await soundRef.current.pauseAsync();
         setPlaying(false);
         stopLightSensor();
+        resetAudioMode();
       } else {
         await applyAudioMode(useEarpiece);
         if (!soundRef.current) {
@@ -269,6 +284,7 @@ function VoicePlayer({
               setPlaying(false);
               setPosition(0);
               stopLightSensor();
+              resetAudioMode();
             }
           });
         }
@@ -298,6 +314,7 @@ function VoicePlayer({
       soundRef.current?.unloadAsync();
       stopLightSensor();
       if (positionIntervalRef.current) clearInterval(positionIntervalRef.current);
+      resetAudioMode();
     };
   }, []);
 
