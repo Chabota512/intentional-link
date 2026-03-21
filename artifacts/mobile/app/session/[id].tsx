@@ -32,6 +32,7 @@ import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Audio, Video, ResizeMode, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { LightSensor } from "expo-sensors";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
@@ -432,6 +433,82 @@ function isVideoFile(name: string | null | undefined): boolean {
   return /\.(mp4|mov|m4v|avi|mkv|webm|3gp|wmv)$/i.test(name);
 }
 
+const THUMB_W = 220;
+const THUMB_H = 140;
+
+function VideoThumbnailCard({ url, name, isOwn, colors, onPress, onLongPress }: {
+  url: string;
+  name: string;
+  isOwn: boolean;
+  colors: ReturnType<typeof import("@/hooks/useTheme").useTheme>["colors"];
+  onPress: () => void;
+  onLongPress?: () => void;
+}) {
+  const [thumbUri, setThumbUri] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { uri } = await VideoThumbnails.getThumbnailAsync(url, { time: 500 });
+        if (!cancelled) setThumbUri(uri);
+      } catch {
+        // thumbnail generation failed — show fallback
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [url]);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      style={({ pressed }) => ({
+        width: THUMB_W,
+        height: THUMB_H,
+        borderRadius: 12,
+        overflow: "hidden",
+        backgroundColor: "#111",
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      {thumbUri ? (
+        <Image source={{ uri: thumbUri }} style={{ width: THUMB_W, height: THUMB_H }} resizeMode="cover" />
+      ) : (
+        <View style={{ width: THUMB_W, height: THUMB_H, alignItems: "center", justifyContent: "center", backgroundColor: "#1a1a1a" }}>
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Feather name="film" size={32} color="rgba(255,255,255,0.4)" />
+          }
+        </View>
+      )}
+      <View style={{
+        position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+        alignItems: "center", justifyContent: "center",
+        backgroundColor: "rgba(0,0,0,0.25)",
+      }}>
+        <View style={{
+          width: 44, height: 44, borderRadius: 22,
+          backgroundColor: "rgba(0,0,0,0.6)",
+          alignItems: "center", justifyContent: "center",
+        }}>
+          <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+        </View>
+      </View>
+      <View style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        paddingHorizontal: 10, paddingVertical: 5,
+      }}>
+        <Text style={{ color: "#fff", fontSize: 11, fontFamily: "Inter_400Regular" }} numberOfLines={1}>{name}</Text>
+      </View>
+    </Pressable>
+  );
+}
 
 function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, onReactionPress, senderPresenceStatus, onAvatarPress, onImagePress, onVideoPress }: {
   message: Message;
@@ -478,27 +555,14 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
 
       if (isVideoFile(message.attachmentName)) {
         return (
-          <Pressable
+          <VideoThumbnailCard
+            url={url}
+            name={message.attachmentName || "Video"}
+            isOwn={isOwn}
+            colors={colors}
             onPress={() => onVideoPress?.(url, message.attachmentName || "Video")}
             onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onLongPress?.(); }}
-            delayLongPress={350}
-            style={({ pressed }) => [styles.fileCard, { opacity: pressed ? 0.85 : 1 }]}
-          >
-            <View style={[styles.fileIcon, { backgroundColor: isOwn ? "rgba(255,255,255,0.2)" : "#EDE7F6" }]}>
-              <Feather name="film" size={18} color={isOwn ? "#fff" : "#7C3AED"} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.fileName, { color: isOwn ? "#fff" : colors.text, fontFamily: "Inter_500Medium" }]} numberOfLines={1}>
-                {message.attachmentName || "Video"}
-              </Text>
-              <Text style={[styles.fileSize, { color: isOwn ? "rgba(255,255,255,0.7)" : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                Tap to play
-              </Text>
-            </View>
-            <View style={[{ width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: isOwn ? "rgba(255,255,255,0.25)" : colors.accentSoft }]}>
-              <Feather name="play" size={14} color={isOwn ? "#fff" : colors.accent} />
-            </View>
-          </Pressable>
+          />
         );
       }
 
