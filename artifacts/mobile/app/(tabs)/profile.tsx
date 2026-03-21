@@ -320,25 +320,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <SectionHeader title="ACCOUNT" colors={colors} />
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SettingsRow
-            icon="user"
-            label="Edit Profile"
-            sublabel="Name, username, and photo"
-            onPress={openEdit}
-            colors={colors}
-          />
-          <SettingsRow
-            icon="at-sign"
-            label="Username"
-            sublabel={`@${user?.username ?? ""}`}
-            onPress={openEdit}
-            colors={colors}
-            last
-          />
-        </View>
-
         <SectionHeader title="PRIVACY" colors={colors} />
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SettingsRow
@@ -374,25 +355,6 @@ export default function ProfileScreen() {
                 />
               ) : undefined
             }
-            last
-          />
-        </View>
-
-        <SectionHeader title="CHATS" colors={colors} />
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SettingsRow
-            icon="layers"
-            label="Active Chats"
-            sublabel={`${activeSessions} chat${activeSessions !== 1 ? "s" : ""} in progress`}
-            onPress={() => router.push("/(tabs)")}
-            colors={colors}
-          />
-          <SettingsRow
-            icon="archive"
-            label="Past Chats"
-            sublabel={`${totalSessions} total chats`}
-            onPress={() => router.push("/(tabs)")}
-            colors={colors}
             last
           />
         </View>
