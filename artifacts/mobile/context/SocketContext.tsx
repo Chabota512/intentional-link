@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppState, AppStateStatus } from "react-native";
+import { AppState, AppStateStatus, Alert } from "react-native";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -23,6 +23,7 @@ interface SocketContextValue {
   typingUsers: Map<number, Set<number>>;
   recordingUsers: Map<number, Set<number>>;
   onlineUserIds: Set<number>;
+  dndUserIds: Set<number>;
   unreadNotifCount: number;
   presenceDialogData: PresenceDialogData | null;
   dismissPresenceDialog: () => void;
@@ -45,6 +46,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [typingUsers, setTypingUsers] = useState<Map<number, Set<number>>>(new Map());
   const [recordingUsers, setRecordingUsers] = useState<Map<number, Set<number>>>(new Map());
   const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
+  const [dndUserIds, setDndUserIds] = useState<Set<number>>(new Set());
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [presenceDialogData, setPresenceDialogData] = useState<PresenceDialogData | null>(null);
   const appStateRef = useRef<AppStateStatus>("active");
@@ -199,17 +201,22 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    socket.on("presence_update", (data: { userId: number; status: string }) => {
+    socket.on("presence_update", (data: { userId: number; status: string; isDndActive?: boolean }) => {
       if (data.userId === user.id) return;
       setOnlineUserIds((prev) => {
         const next = new Set(prev);
-        if (data.status === "online") {
-          next.add(data.userId);
-        } else {
-          next.delete(data.userId);
-        }
+        if (data.status === "online") next.add(data.userId); else next.delete(data.userId);
         return next;
       });
+      setDndUserIds((prev) => {
+        const next = new Set(prev);
+        if (data.isDndActive) next.add(data.userId); else next.delete(data.userId);
+        return next;
+      });
+    });
+
+    socket.on("call_blocked_dnd", (data: { userId: number; message: string }) => {
+      Alert.alert("Do Not Disturb", data.message ?? "This contact is in Do Not Disturb mode and cannot receive calls right now.");
     });
 
     socket.on("messages_read", (_data: { userId: number; sessionId: number }) => {
@@ -283,6 +290,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         typingUsers,
         recordingUsers,
         onlineUserIds,
+        dndUserIds,
         unreadNotifCount,
         presenceDialogData,
         dismissPresenceDialog,

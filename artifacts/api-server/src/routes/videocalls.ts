@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { eq, and, ne, inArray } from "drizzle-orm";
 import agoraToken from "agora-token";
-import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable } from "@workspace/db";
+import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable, userDndSettingsTable, dndWhitelistTable } from "@workspace/db";
 import { sendPushNotifications, saveNotification } from "../lib/pushNotifications.js";
 import { emitToSession } from "../lib/socketio.js";
 const { RtcTokenBuilder, RtcRole } = agoraToken;
@@ -74,16 +74,58 @@ router.post("/sessions/:id/video-call", async (req, res) => {
           .from(usersTable)
           .where(inArray(usersTable.id, otherUserIds));
 
-        await Promise.all(memberRows.map(u =>
-          saveNotification(u.id, "call", notifTitle, notifBody, notifData)
-        ));
+        // Check DND status for each recipient
+        const dndRows = await db
+          .select({ userId: userDndSettingsTable.userId, isDndActive: userDndSettingsTable.isDndActive })
+          .from(userDndSettingsTable)
+          .where(inArray(userDndSettingsTable.userId, otherUserIds));
+        const dndMap = new Map(dndRows.map(d => [d.userId, d.isDndActive]));
 
-        const pushTokens = memberRows
-          .map(r => r.pushToken)
-          .filter((t): t is string => !!t);
+        // Check if caller is whitelisted by each DND user
+        const dndUserIds = otherUserIds.filter(id => dndMap.get(id) === true);
+        let whitelistedByDndMap = new Map<number, boolean>();
+        if (dndUserIds.length > 0) {
+          const whitelistRows = await db
+            .select({ userId: dndWhitelistTable.userId, contactUserId: dndWhitelistTable.contactUserId })
+            .from(dndWhitelistTable)
+            .where(inArray(dndWhitelistTable.userId, dndUserIds));
+          for (const row of whitelistRows) {
+            if (row.contactUserId === uid) {
+              whitelistedByDndMap.set(row.userId, true);
+            }
+          }
+        }
 
-        if (pushTokens.length > 0) {
-          await sendPushNotifications(pushTokens, `📞 ${notifTitle}`, notifBody, notifData);
+        const { emitToUser } = await import("../lib/socketio.js");
+        const notifiableUsers: typeof memberRows = [];
+
+        for (const member of memberRows) {
+          const inDnd = dndMap.get(member.id) === true;
+          const callerWhitelisted = whitelistedByDndMap.get(member.id) === true;
+
+          if (inDnd && !callerWhitelisted) {
+            // Notify the caller that this recipient is in DND
+            emitToUser(uid, "call_blocked_dnd", {
+              userId: member.id,
+              message: `${memberRows.find(m => m.id === member.id) ? caller.name : "This contact"} is in Do Not Disturb mode`,
+            });
+          } else {
+            notifiableUsers.push(member);
+          }
+        }
+
+        if (notifiableUsers.length > 0) {
+          await Promise.all(notifiableUsers.map(u =>
+            saveNotification(u.id, "call", notifTitle, notifBody, notifData)
+          ));
+
+          const pushTokens = notifiableUsers
+            .map(r => r.pushToken)
+            .filter((t): t is string => !!t);
+
+          if (pushTokens.length > 0) {
+            await sendPushNotifications(pushTokens, `📞 ${notifTitle}`, notifBody, notifData);
+          }
         }
       }
     }

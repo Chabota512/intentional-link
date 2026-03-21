@@ -8,6 +8,7 @@ import storageRouter from "./storage";
 import videocallsRouter from "./videocalls";
 import notificationsRouter from "./notifications";
 import privacyRouter from "./privacy";
+import dndRouter from "./dnd";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(storageRouter);
 router.use(videocallsRouter);
 router.use(notificationsRouter);
 router.use(privacyRouter);
+router.use(dndRouter);
 
 export default router;

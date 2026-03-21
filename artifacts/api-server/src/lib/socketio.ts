@@ -1,7 +1,7 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { verifyToken } from "./auth";
-import { db, usersTable, sessionsTable, sessionParticipantsTable, sessionReadCursorsTable, messagesTable, userPrivacySettingsTable, presenceWhitelistTable } from "@workspace/db";
+import { db, usersTable, sessionsTable, sessionParticipantsTable, sessionReadCursorsTable, messagesTable, userPrivacySettingsTable, presenceWhitelistTable, userDndSettingsTable } from "@workspace/db";
 import { eq, and, ne, desc, lte, inArray } from "drizzle-orm";
 
 const DEFAULT_OFFLINE_THRESHOLD_MS = 5 * 60 * 1000;
@@ -416,13 +416,13 @@ async function joinUserSessions(socket: Socket, userId: number): Promise<void> {
 async function broadcastPresence(userId: number, status: "online" | "offline", prevLastSeenAt?: Date | null): Promise<void> {
   if (!io) return;
 
-  const [privSettings] = await db
-    .select()
-    .from(userPrivacySettingsTable)
-    .where(eq(userPrivacySettingsTable.userId, userId))
-    .limit(1);
+  const [[privSettings], [dndSettings]] = await Promise.all([
+    db.select().from(userPrivacySettingsTable).where(eq(userPrivacySettingsTable.userId, userId)).limit(1),
+    db.select({ isDndActive: userDndSettingsTable.isDndActive }).from(userDndSettingsTable).where(eq(userDndSettingsTable.userId, userId)).limit(1),
+  ]);
 
   const presenceVisibility = privSettings?.presenceVisibility ?? "all";
+  const isDndActive = dndSettings?.isDndActive ?? false;
 
   let whitelistedIds = new Set<number>();
   if (status === "online" && presenceVisibility === "specific") {
@@ -453,6 +453,7 @@ async function broadcastPresence(userId: number, status: "online" | "offline", p
       io.to(`session:${sessionId}`).emit("presence_update", {
         userId,
         status,
+        isDndActive: status === "online" ? isDndActive : false,
         lastSeenAt: status === "offline" ? new Date().toISOString() : null,
       });
     }
@@ -491,6 +492,7 @@ async function broadcastPresence(userId: number, status: "online" | "offline", p
       emitToUser(otherUserId, "presence_update", {
         userId,
         status: canSee ? "online" : "offline",
+        isDndActive: canSee ? isDndActive : false,
         lastSeenAt: canSee ? null : hiddenLastSeenAt,
       });
     }
