@@ -19,6 +19,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
+import { useLocalDiscovery } from "@/context/LocalDiscoveryContext";
 import { formatRelative } from "@/utils/date";
 import UserAvatar from "@/components/UserAvatar";
 
@@ -77,6 +78,12 @@ export default function SessionsScreen() {
   const [searchVisible, setSearchVisible] = useState(false);
 
   const { isConnected: socketConnected, onlineUserIds } = useSocket();
+  const { getPresenceStatus } = useLocalDiscovery();
+
+  const getEffectivePresence = (userId: number, lastSeenAt?: string | null) => {
+    if (onlineUserIds.has(userId)) return "online";
+    return getPresenceStatus(userId, lastSeenAt);
+  };
 
   const { data: sessions = [], isLoading, isError, isRefetching, refetch } = useQuery<Session[]>({
     queryKey: ["sessions"],
@@ -132,6 +139,8 @@ export default function SessionsScreen() {
       : formatRelative(item.createdAt);
 
     const someOnline = others.some((p) => onlineUserIds.has(p.userId));
+    const someLocal = others.some((p) => getEffectivePresence(p.userId, p.user.lastSeenAt) === "local");
+    const groupDotColor = someLocal ? "#7C3AED" : someOnline ? "#34C759" : "#94A3B8";
 
     const avatarUser = others.length === 1 ? others[0].user : null;
     const nameStr = others.length > 0
@@ -171,13 +180,13 @@ export default function SessionsScreen() {
                 name={avatarUser.name}
                 avatarUrl={avatarUser.avatarUrl}
                 size={50}
-                presenceStatus={onlineUserIds.has(avatarUser.id) ? "online" : "offline"}
+                presenceStatus={getEffectivePresence(avatarUser.id, avatarUser.lastSeenAt) as any}
                 showDot={true}
               />
             ) : (
               <View style={[styles.groupAvatar, { backgroundColor: isActive ? colors.accentSoft : colors.surfaceAlt }]}>
                 <Feather name={isActive ? "zap" : "archive"} size={20} color={isActive ? colors.accent : colors.textSecondary} />
-                <View style={[styles.onlineDot, { backgroundColor: someOnline ? colors.success : colors.textTertiary, borderColor: colors.surface }]} />
+                <View style={[styles.onlineDot, { backgroundColor: groupDotColor, borderColor: colors.surface }]} />
               </View>
             )}
           </View>

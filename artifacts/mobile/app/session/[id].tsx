@@ -387,7 +387,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
     >
       {!isOwn && (
         showAvatar
-          ? <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} showDot={false} />
+          ? <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} presenceStatus={getEffectivePresence(message.sender.id, message.sender.lastSeenAt) as any} />
           : avatarPlaceholder
       )}
       <View style={{ maxWidth: "75%", gap: 3 }}>
@@ -475,7 +475,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
       </View>
       {isOwn && (
         showAvatar
-          ? <UserAvatar name={currentUser?.name ?? "?"} avatarUrl={currentUser?.avatarUrl} size={30} style={styles.senderAvatar} showDot={false} />
+          ? <UserAvatar name={currentUser?.name ?? "?"} avatarUrl={currentUser?.avatarUrl} size={30} style={styles.senderAvatar} presenceStatus="online" />
           : avatarPlaceholder
       )}
     </Animated.View>

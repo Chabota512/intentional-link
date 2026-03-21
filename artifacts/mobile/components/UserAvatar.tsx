@@ -5,7 +5,7 @@ import type { PresenceStatus } from "@/utils/localDiscovery";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
-const LOCAL_COLOR = "#FF6B9D";
+const LOCAL_COLOR = "#7C3AED";
 
 function resolveAvatarUrl(avatarUrl: string | null | undefined): string | null {
   if (!avatarUrl) return null;
@@ -56,7 +56,7 @@ export default function UserAvatar({
   const dotBorder = Math.max(1.5, Math.round(size * 0.04));
 
   const showPresenceDot = showDot;
-  const dot = dotColor(presenceStatus, isOnline, colors.success, colors.textTertiary);
+  const dot = dotColor(presenceStatus, isOnline, colors.success, "#94A3B8");
 
   return (
     <View style={[{ width: size, height: size, position: "relative" }, style]}>
