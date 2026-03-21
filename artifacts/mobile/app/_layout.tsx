@@ -10,11 +10,12 @@ import { Stack, router as expoRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Feather from "@expo/vector-icons/Feather";
+import Colors from "@/constants/colors";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PresenceDialog } from "@/components/PresenceDialog";
@@ -96,7 +97,10 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  const colorScheme = useColorScheme();
+  const bgColor = Colors[colorScheme === "dark" ? "dark" : "light"].background;
+
+  if (!fontsLoaded && !fontError) return <View style={{ flex: 1, backgroundColor: bgColor }} />;
 
   return (
     <SafeAreaProvider>
