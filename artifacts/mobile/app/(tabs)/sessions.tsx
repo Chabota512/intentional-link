@@ -139,9 +139,7 @@ export default function SessionsScreen() {
       ? formatRelative(item.lastMessage.createdAt)
       : formatRelative(item.createdAt);
 
-    const someOnline = others.some((p) => onlineUserIds.has(p.userId));
-    const someLocal = others.some((p) => getEffectivePresence(p.userId, p.user.lastSeenAt) === "local");
-    const groupDotColor = someLocal ? "#7C3AED" : someOnline ? "#34C759" : "#94A3B8";
+    const groupDotColor = isActive ? "#34C759" : "#94A3B8";
 
     const avatarUser = others.length === 1 ? others[0].user : null;
     const nameStr = others.length > 0
