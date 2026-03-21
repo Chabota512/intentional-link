@@ -2442,18 +2442,33 @@ export default function SessionScreen() {
           {sheetView === "participants" ? (
             <ScrollView contentContainerStyle={styles.sheetScroll} showsVerticalScrollIndicator={false}>
               <View style={[styles.chatInfoBlock, { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
-                <Text style={[styles.chatInfoTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>
-                  {session.title}
-                </Text>
-                {session.description ? (
-                  <Text style={[styles.chatInfoDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                    {session.description}
-                  </Text>
-                ) : (
-                  <Text style={[styles.chatInfoDesc, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
-                    No description
-                  </Text>
-                )}
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 10 }}>
+                  {session.imageUrl ? (
+                    <Image
+                      source={{ uri: getFileUrl(session.imageUrl) }}
+                      style={{ width: 64, height: 64, borderRadius: 16 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={{ width: 64, height: 64, borderRadius: 16, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" }}>
+                      <Feather name="message-circle" size={28} color={colors.textTertiary} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, paddingTop: 2 }}>
+                    <Text style={[styles.chatInfoTitle, { color: colors.text, fontFamily: "Inter_700Bold", marginBottom: 4 }]}>
+                      {session.title}
+                    </Text>
+                    {session.description ? (
+                      <Text style={[styles.chatInfoDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular", marginBottom: 0 }]}>
+                        {session.description}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.chatInfoDesc, { color: colors.textTertiary, fontFamily: "Inter_400Regular", marginBottom: 0 }]}>
+                        No description
+                      </Text>
+                    )}
+                  </View>
+                </View>
                 <View style={[styles.chatInfoMeta, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                   <Feather name="users" size={13} color={colors.textSecondary} />
                   <Text style={[styles.chatInfoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
