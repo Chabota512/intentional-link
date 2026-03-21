@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Dimensions,
   Linking,
   Modal,
+  PanResponder,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -43,7 +44,9 @@ interface MediaResponse {
 type Tab = "images" | "files";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
+const SCREEN_HEIGHT = Dimensions.get("window").height;
 const IMAGE_SIZE = (SCREEN_WIDTH - 48 - 8) / 3;
+const SWIPE_THRESHOLD = 50;
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -58,7 +61,9 @@ export default function MediaGalleryScreen() {
   const insets = useSafeAreaInsets();
   const { get, getFileUrl } = useApi();
   const [activeTab, setActiveTab] = useState<Tab>("images");
-  const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const viewerIndexRef = useRef<number | null>(null);
+  viewerIndexRef.current = viewerIndex;
 
   const { data, isLoading } = useQuery<MediaResponse>({
     queryKey: ["media", sessionId],
@@ -71,15 +76,64 @@ export default function MediaGalleryScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
-  const renderImage = ({ item }: { item: MediaItem }) => {
+  const imageCountRef = useRef(0);
+
+  const navigateViewer = (direction: "next" | "prev") => {
+    const cur = viewerIndexRef.current;
+    const count = imageCountRef.current;
+    if (cur === null) return;
+    if (direction === "next" && cur < count - 1) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setViewerIndex(cur + 1);
+    } else if (direction === "prev" && cur > 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setViewerIndex(cur - 1);
+    }
+  };
+
+  const navigateRef = useRef(navigateViewer);
+  navigateRef.current = navigateViewer;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > 8 || Math.abs(gs.dy) > 8,
+      onPanResponderRelease: (_, gs) => {
+        const { dx, dy } = gs;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+        if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return;
+        if (absDx >= absDy) {
+          if (dx < 0) navigateRef.current("next");
+          else navigateRef.current("prev");
+        } else {
+          if (dy < 0) navigateRef.current("next");
+          else navigateRef.current("prev");
+        }
+      },
+    })
+  ).current;
+
+  const imageUrls = images
+    .filter((i) => i.attachmentUrl)
+    .map((i) => getFileUrl(i.attachmentUrl!));
+
+  imageCountRef.current = imageUrls.length;
+
+  const currentUrl = viewerIndex !== null ? imageUrls[viewerIndex] : null;
+
+  const renderImage = ({ item, index }: { item: MediaItem; index: number }) => {
     const url = item.attachmentUrl ? getFileUrl(item.attachmentUrl) : null;
     if (!url) return null;
+    const flatIndex = images
+      .filter((i) => i.attachmentUrl)
+      .findIndex((i) => i.id === item.id);
     return (
       <Pressable
         style={({ pressed }) => [styles.imageThumb, { opacity: pressed ? 0.8 : 1 }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setViewerImage(url);
+          setViewerIndex(flatIndex >= 0 ? flatIndex : index);
         }}
       >
         <Image source={{ uri: url }} style={styles.imageThumbImg} resizeMode="cover" />
@@ -192,15 +246,48 @@ export default function MediaGalleryScreen() {
         />
       )}
 
-      <Modal visible={viewerImage !== null} transparent animationType="fade" onRequestClose={() => setViewerImage(null)}>
-        <Pressable style={styles.viewerOverlay} onPress={() => setViewerImage(null)}>
-          <Pressable style={styles.viewerCloseBtn} onPress={() => setViewerImage(null)}>
+      <Modal
+        visible={viewerIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerIndex(null)}
+      >
+        <View style={styles.viewerOverlay} {...panResponder.panHandlers}>
+          <Pressable style={styles.viewerCloseBtn} onPress={() => setViewerIndex(null)}>
             <Feather name="x" size={24} color="#fff" />
           </Pressable>
-          {viewerImage && (
-            <Image source={{ uri: viewerImage }} style={styles.viewerImage} resizeMode="contain" />
+
+          {viewerIndex !== null && (
+            <Text style={styles.viewerCounter}>
+              {viewerIndex + 1} / {imageUrls.length}
+            </Text>
           )}
-        </Pressable>
+
+          {currentUrl && (
+            <Image
+              source={{ uri: currentUrl }}
+              style={styles.viewerImage}
+              resizeMode="contain"
+            />
+          )}
+
+          <View style={styles.viewerNavRow}>
+            <Pressable
+              style={({ pressed }) => [styles.viewerNavBtn, { opacity: viewerIndex === 0 ? 0.25 : pressed ? 0.6 : 1 }]}
+              onPress={() => navigateViewer("prev")}
+              disabled={viewerIndex === 0}
+            >
+              <Feather name="chevron-left" size={28} color="#fff" />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.viewerNavBtn, { opacity: viewerIndex === imageUrls.length - 1 ? 0.25 : pressed ? 0.6 : 1 }]}
+              onPress={() => navigateViewer("next")}
+              disabled={viewerIndex === imageUrls.length - 1}
+            >
+              <Feather name="chevron-right" size={28} color="#fff" />
+            </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -261,7 +348,7 @@ const styles = StyleSheet.create({
   fileMeta: { fontSize: 12, marginTop: 2 },
   viewerOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.92)",
+    backgroundColor: "rgba(0,0,0,0.95)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -272,8 +359,32 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 8,
   },
+  viewerCounter: {
+    position: "absolute",
+    top: 64,
+    alignSelf: "center",
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+    fontWeight: "600",
+    zIndex: 10,
+  },
   viewerImage: {
-    width: SCREEN_WIDTH - 32,
-    height: SCREEN_WIDTH - 32,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.75,
+  },
+  viewerNavRow: {
+    position: "absolute",
+    bottom: 60,
+    flexDirection: "row",
+    gap: 48,
+    alignItems: "center",
+  },
+  viewerNavBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
