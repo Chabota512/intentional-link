@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, ne } from "drizzle-orm";
+import { eq, ilike, and, ne, or } from "drizzle-orm";
 
 const recoveryAttempts = new Map<string, { count: number; resetAt: number }>();
 const RECOVERY_MAX_ATTEMPTS = 5;
