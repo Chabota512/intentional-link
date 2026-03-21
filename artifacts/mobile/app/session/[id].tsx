@@ -1394,6 +1394,37 @@ export default function SessionScreen() {
             borderTopColor: colors.border,
             paddingBottom: bottomPad + 8,
           }]}>
+            {attachMenuVisible && (
+              <Pressable
+                style={StyleSheet.absoluteFillObject}
+                onPress={() => setAttachMenuVisible(false)}
+              />
+            )}
+            {attachMenuVisible && (
+              <Animated.View
+                entering={FadeInDown.duration(180).springify()}
+                style={[styles.attachPopup, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
+                <Pressable
+                  style={({ pressed }) => [styles.attachIconTile, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
+                  onPress={handlePickImage}
+                >
+                  <View style={[styles.attachIconCircle, { backgroundColor: "#E3F2FD" }]}>
+                    <Feather name="image" size={22} color="#1976D2" />
+                  </View>
+                  <Text style={[styles.attachIconLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Photo</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.attachIconTile, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
+                  onPress={handlePickFile}
+                >
+                  <View style={[styles.attachIconCircle, { backgroundColor: "#F3E5F5" }]}>
+                    <Feather name="file-text" size={22} color="#7B1FA2" />
+                  </View>
+                  <Text style={[styles.attachIconLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>File</Text>
+                </Pressable>
+              </Animated.View>
+            )}
             {replyToMessage && (
               <View style={[styles.replyBar, { backgroundColor: colors.surfaceAlt, borderLeftColor: colors.accent }]}>
                 <View style={{ flex: 1 }}>
@@ -1446,11 +1477,11 @@ export default function SessionScreen() {
             ) : (
               <>
                 <Pressable
-                  style={({ pressed }) => [styles.attachBtn, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-                  onPress={() => setAttachMenuVisible(true)}
+                  style={({ pressed }) => [styles.attachBtn, { backgroundColor: attachMenuVisible ? colors.accent : colors.surfaceAlt, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => setAttachMenuVisible(v => !v)}
                   disabled={uploading}
                 >
-                  <Feather name="plus" size={20} color={colors.accent} />
+                  <Feather name={attachMenuVisible ? "x" : "plus"} size={20} color={attachMenuVisible ? "#fff" : colors.accent} />
                 </Pressable>
                 <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, height: Math.min(Math.max(inputHeight + 20, 42), 160) }]}>
                   <TextInput
@@ -1545,38 +1576,6 @@ export default function SessionScreen() {
           );
         })()}
       </KeyboardAvoidingView>
-
-      <Modal
-        visible={attachMenuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setAttachMenuVisible(false)}
-      >
-        <Pressable style={styles.attachOverlay} onPress={() => setAttachMenuVisible(false)}>
-          <Pressable onPress={() => {}} style={[styles.attachSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.attachOptionsRow}>
-              <Pressable
-                style={({ pressed }) => [styles.attachIconTile, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
-                onPress={handlePickImage}
-              >
-                <View style={[styles.attachIconCircle, { backgroundColor: "#E3F2FD" }]}>
-                  <Feather name="image" size={24} color="#1976D2" />
-                </View>
-                <Text style={[styles.attachIconLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Photo</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.attachIconTile, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
-                onPress={handlePickFile}
-              >
-                <View style={[styles.attachIconCircle, { backgroundColor: "#F3E5F5" }]}>
-                  <Feather name="file-text" size={24} color="#7B1FA2" />
-                </View>
-                <Text style={[styles.attachIconLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>File</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       <Modal
         visible={actionMenuMessage !== null}
@@ -2355,26 +2354,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 24,
   },
-  attachSheet: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 10,
-  },
-  attachTitle: {
-    fontSize: 12,
-    textAlign: "center",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  attachOptionsRow: {
+  attachPopup: {
+    position: "absolute",
+    bottom: "100%",
+    left: 0,
+    marginBottom: 8,
     flexDirection: "row",
     gap: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 20,
   },
   attachIconTile: {
     alignItems: "center",
     gap: 6,
     paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     borderRadius: 12,
   },
   attachIconCircle: {
