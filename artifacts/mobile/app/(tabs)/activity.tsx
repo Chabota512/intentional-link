@@ -142,7 +142,7 @@ export default function ActivityScreen() {
           styles.header,
           {
             paddingTop: topPad + 12,
-            backgroundColor: colors.background,
+            backgroundColor: colors.surface,
             borderBottomColor: colors.border,
           },
         ]}
