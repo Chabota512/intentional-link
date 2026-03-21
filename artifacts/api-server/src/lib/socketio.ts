@@ -32,6 +32,7 @@ async function canAccessSession(sessionId: number, userId: number): Promise<bool
 
 export function initSocketIO(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
+    path: "/api/socket.io",
     cors: {
       origin: "*",
       methods: ["GET", "POST"],

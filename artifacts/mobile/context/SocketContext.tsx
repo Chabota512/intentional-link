@@ -45,6 +45,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
 
     const socket = io(BASE_URL, {
+      path: "/api/socket.io",
       auth: { token: user.token },
       transports: ["websocket", "polling"],
       reconnection: true,
