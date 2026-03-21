@@ -25,12 +25,20 @@ import { formatRelative } from "@/utils/date";
 function getNotifIcon(type: AppNotification["type"]) {
   if (type === "call") return "phone";
   if (type === "invite") return "user-plus";
+  if (type === "contact_request") return "user-plus";
+  if (type === "contact_accepted") return "check-circle";
+  if (type === "dnd_ending") return "moon";
+  if (type === "chat_completed") return "check-square";
   return "message-circle";
 }
 
 function getNotifColor(type: AppNotification["type"], colors: any) {
   if (type === "call") return colors.success;
   if (type === "invite") return colors.accent;
+  if (type === "contact_request") return colors.accent;
+  if (type === "contact_accepted") return colors.success;
+  if (type === "dnd_ending") return "#8B5CF6";
+  if (type === "chat_completed") return colors.textSecondary;
   return colors.accent;
 }
 
@@ -112,12 +120,12 @@ export default function ActivityScreen() {
         markRead.mutate(notif.id);
       }
       const sessionId = notif.data?.sessionId;
-      if (sessionId) {
-        if (notif.data?.type === "incoming-call") {
-          router.push(`/session/${sessionId}` as any);
-        } else {
-          router.push(`/session/${sessionId}` as any);
-        }
+      if (notif.type === "contact_request" || notif.type === "contact_accepted") {
+        router.push("/contacts" as any);
+      } else if (notif.type === "dnd_ending") {
+        router.push("/notifications-settings" as any);
+      } else if (sessionId) {
+        router.push(`/session/${sessionId}` as any);
       }
     },
     [markRead]
@@ -168,7 +176,7 @@ export default function ActivityScreen() {
             No activity yet
           </Text>
           <Text style={[styles.emptySub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-            Notifications for messages, calls, and invites will appear here.
+            Messages, calls, contact requests, and chat updates will appear here.
           </Text>
         </View>
       ) : (

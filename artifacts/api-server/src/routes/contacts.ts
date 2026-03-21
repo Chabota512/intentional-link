@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, contactsTable, usersTable } from "@workspace/db";
 import { AddContactBody, GetContactsResponseItem } from "@workspace/api-zod";
-import { sendPushNotification } from "../lib/pushNotifications";
+import { sendPushNotification, saveNotification } from "../lib/pushNotifications";
 
 const router: IRouter = Router();
 
@@ -189,7 +189,7 @@ router.post("/contacts", async (req, res): Promise<void> => {
 
   (async () => {
     try {
-      const [me] = await db.select({ displayName: usersTable.displayName, pushToken: usersTable.pushToken })
+      const [me] = await db.select({ name: usersTable.name, pushToken: usersTable.pushToken })
         .from(usersTable)
         .where(eq(usersTable.id, userId))
         .limit(1);
@@ -197,8 +197,12 @@ router.post("/contacts", async (req, res): Promise<void> => {
         .from(usersTable)
         .where(eq(usersTable.id, contactUserId))
         .limit(1);
-      if (them?.pushToken && me) {
-        await sendPushNotification(them.pushToken, "New Contact Request", `${me.displayName || "Someone"} wants to connect with you`, { contactUserId: userId });
+      if (me) {
+        const senderName = me.name || "Someone";
+        await saveNotification(contactUserId, "contact_request", "New Contact Request", `${senderName} wants to connect with you`, { fromUserId: userId });
+        if (them?.pushToken) {
+          await sendPushNotification(them.pushToken, "New Contact Request", `${senderName} wants to connect with you`, { contactUserId: userId });
+        }
       }
     } catch {}
   })();
@@ -242,6 +246,17 @@ router.post("/contacts/requests/:requestId/accept", async (req, res): Promise<vo
 
   const resp = myRow ? await buildContactResponse(myRow) : null;
   res.json(resp);
+
+  (async () => {
+    try {
+      const [accepter] = await db.select({ name: usersTable.name })
+        .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+      if (accepter) {
+        const accepterName = accepter.name || "Someone";
+        await saveNotification(request.userId, "contact_accepted", "Contact Request Accepted", `${accepterName} accepted your contact request`, { fromUserId: userId });
+      }
+    } catch {}
+  })();
 });
 
 router.post("/contacts/requests/:requestId/decline", async (req, res): Promise<void> => {

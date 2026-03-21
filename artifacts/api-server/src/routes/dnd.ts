@@ -8,8 +8,34 @@ import {
   dndWhitelistTable,
 } from "@workspace/db";
 import { verifyToken } from "../lib/auth";
+import { saveNotification } from "../lib/pushNotifications";
 
 const router: IRouter = Router();
+
+const dndEndingTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+function scheduleDndEndingAlert(userId: number, dndDurationMinutes: number) {
+  if (dndEndingTimers.has(userId)) {
+    clearTimeout(dndEndingTimers.get(userId)!);
+    dndEndingTimers.delete(userId);
+  }
+  const alertAfterMs = (dndDurationMinutes - 5) * 60 * 1000;
+  if (alertAfterMs <= 0) return;
+  const timer = setTimeout(async () => {
+    dndEndingTimers.delete(userId);
+    try {
+      await saveNotification(userId, "dnd_ending", "Do Not Disturb Ending Soon", "Your Do Not Disturb will turn off in 5 minutes.");
+    } catch {}
+  }, alertAfterMs);
+  dndEndingTimers.set(userId, timer);
+}
+
+function cancelDndEndingAlert(userId: number) {
+  if (dndEndingTimers.has(userId)) {
+    clearTimeout(dndEndingTimers.get(userId)!);
+    dndEndingTimers.delete(userId);
+  }
+}
 
 function authMiddleware(req: any, res: any, next: any) {
   const token = req.headers["authorization"]?.replace("Bearer ", "");
@@ -118,8 +144,14 @@ router.put("/users/dnd", authMiddleware, async (req: any, res): Promise<void> =>
     .onConflictDoUpdate({ target: userDndSettingsTable.userId, set: setFields });
 
   if (isDndActive === false) {
+    cancelDndEndingAlert(userId);
     await db.delete(dndWhitelistTable).where(eq(dndWhitelistTable.userId, userId));
-  } else if (isDndActive === true && Array.isArray(whitelistedContactIds)) {
+  } else if (isDndActive === true) {
+    if (dndDurationMinutes != null && Number.isFinite(Number(dndDurationMinutes)) && Number(dndDurationMinutes) > 5) {
+      scheduleDndEndingAlert(userId, Number(dndDurationMinutes));
+    }
+  }
+  if (isDndActive === true && Array.isArray(whitelistedContactIds)) {
     await db.delete(dndWhitelistTable).where(eq(dndWhitelistTable.userId, userId));
     if (whitelistedContactIds.length > 0) {
       await db.insert(dndWhitelistTable).values(

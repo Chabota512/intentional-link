@@ -1012,7 +1012,7 @@ export default function SessionScreen() {
 
   const shareSessionLink = async () => {
     const link = ExpoLinking.createURL(`session/${sessionId}`);
-    const message = `Join my Intentional Link session "${session?.title ?? "Session"}": ${link}`;
+    const message = `Join my Intentional Link chat "${session?.title ?? "Chat"}": ${link}`;
     try {
       const smsAvailable = await SMS.isAvailableAsync();
       if (smsAvailable) {
@@ -1670,7 +1670,7 @@ export default function SessionScreen() {
                 >
                   {joinByLinkMutation.isPending
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={[styles.joinLinkBtnText, { fontFamily: "Inter_600SemiBold" }]}>Join Session</Text>
+                    : <Text style={[styles.joinLinkBtnText, { fontFamily: "Inter_600SemiBold" }]}>Join Chat</Text>
                   }
                 </Pressable>
               )}
@@ -1684,7 +1684,7 @@ export default function SessionScreen() {
   if (!session) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.text }}>Session not found</Text>
+        <Text style={{ color: colors.text }}>Chat not found</Text>
       </View>
     );
   }
@@ -2133,7 +2133,7 @@ export default function SessionScreen() {
                 <View style={[styles.insightsIcon, { backgroundColor: colors.accentSoft }]}>
                   <Feather name="check-circle" size={16} color={colors.accent} />
                 </View>
-                <Text style={[styles.insightsTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Session Complete</Text>
+                <Text style={[styles.insightsTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Chat Complete</Text>
               </View>
               <View style={styles.insightsRow}>
                 <View style={styles.insightsStat}>
@@ -2342,7 +2342,7 @@ export default function SessionScreen() {
                   onPress={() => { setMoreMenuVisible(false); handleEndSession(); }}
                 >
                   <Feather name="stop-circle" size={20} color={colors.danger} />
-                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>End Session</Text>
+                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>End Chat</Text>
                 </Pressable>
                 <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
                 <Pressable

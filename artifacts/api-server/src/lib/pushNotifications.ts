@@ -6,7 +6,7 @@ const expo = new Expo();
 
 export async function saveNotification(
   userId: number,
-  type: "message" | "call" | "invite",
+  type: "message" | "call" | "invite" | "contact_request" | "contact_accepted" | "dnd_ending" | "chat_completed",
   title: string,
   body: string,
   data?: Record<string, unknown>

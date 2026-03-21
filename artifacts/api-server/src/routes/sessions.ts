@@ -322,6 +322,20 @@ router.patch("/sessions/:sessionId", async (req, res): Promise<void> => {
 
   const result = await getSessionWithParticipants(session.id);
   res.json(result);
+
+  if (parsed.data.status === "completed" && result) {
+    (async () => {
+      try {
+        const [ender] = await db.select({ name: usersTable.name })
+          .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+        const enderName = ender?.name || "Someone";
+        const otherParticipants = result.participants.filter(p => p.userId !== userId && p.status !== "declined");
+        for (const p of otherParticipants) {
+          await saveNotification(p.userId, "chat_completed", "Chat Ended", `${enderName} ended the chat "${session.title}"`, { sessionId });
+        }
+      } catch {}
+    })();
+  }
 });
 
 router.delete("/sessions/:sessionId", async (req, res): Promise<void> => {
@@ -405,9 +419,9 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
     .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
 
   if (invitedUser && inviter) {
-    const inviteTitle = "Session Invitation";
+    const inviteTitle = "Chat Invitation";
     const inviteBody = `${inviter.name} invited you to join "${membership.session.title}"`;
-    const inviteData = { sessionId, type: "session-invite" };
+    const inviteData = { sessionId, type: "chat-invite" };
     await saveNotification(invitedUser.id, "invite", inviteTitle, inviteBody, inviteData);
     if (invitedUser.pushToken) {
       await sendPushNotification(invitedUser.pushToken, inviteTitle, inviteBody, inviteData);

@@ -195,7 +195,7 @@ export default function PrivacyScreen() {
             <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>ONLINE VISIBILITY</Text>
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>
-                Control who can see when you are currently online. Contacts not selected will see your last-seen time from before this session instead.
+                Control who can see when you are currently online. Contacts not selected will see your last-seen time from before this chat instead.
               </Text>
               {visibilityOptions.map((opt, i) => (
                 <Pressable
