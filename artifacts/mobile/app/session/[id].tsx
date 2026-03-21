@@ -1393,7 +1393,7 @@ export default function SessionScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             {headerPerson ? (
               <UserAvatar
-                name={headerPerson.name}
+                name={session.title}
                 avatarUrl={headerPerson.avatarUrl}
                 size={34}
                 showDot={true}
