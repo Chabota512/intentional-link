@@ -10,6 +10,7 @@ import {
   Platform,
   TextInput,
   Image,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -77,6 +78,7 @@ export default function SessionsScreen() {
   const [activeFilter, setActiveFilter] = useState<"active" | "completed" | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
+  const [previewSession, setPreviewSession] = useState<Session | null>(null);
 
   const { isConnected: socketConnected, onlineUserIds } = useSocket();
   const { getPresenceStatus } = useLocalDiscovery();
@@ -178,7 +180,7 @@ export default function SessionsScreen() {
             onPress={(e) => {
               e.stopPropagation();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(`/session/media/${item.id}` as any);
+              setPreviewSession(item);
             }}
             hitSlop={6}
           >
@@ -259,6 +261,9 @@ export default function SessionsScreen() {
 
   const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
+
+  const previewOthers = previewSession?.participants.filter((p) => p.userId !== user?.id) ?? [];
+  const previewAvatarUser = previewOthers.length === 1 ? previewOthers[0].user : null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -416,6 +421,75 @@ export default function SessionsScreen() {
           }
         />
       )}
+
+      {/* Avatar Preview Modal */}
+      <Modal
+        visible={previewSession !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewSession(null)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setPreviewSession(null)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            {/* Close button */}
+            <Pressable
+              style={[styles.modalCloseBtn, { backgroundColor: "rgba(255,255,255,0.15)" }]}
+              onPress={() => setPreviewSession(null)}
+            >
+              <Feather name="x" size={20} color="#fff" />
+            </Pressable>
+
+            {/* Large avatar */}
+            {previewSession?.imageUrl ? (
+              <Image
+                source={{ uri: getFileUrl(previewSession.imageUrl) }}
+                style={styles.modalAvatar}
+              />
+            ) : previewAvatarUser?.avatarUrl ? (
+              <Image
+                source={{ uri: getFileUrl(previewAvatarUser.avatarUrl) }}
+                style={styles.modalAvatar}
+              />
+            ) : (
+              <View style={[styles.modalAvatarPlaceholder, { backgroundColor: colors.accentSoft }]}>
+                <Text style={[styles.modalAvatarLetter, { color: colors.accent, fontFamily: "Inter_700Bold" }]}>
+                  {previewSession?.title.trim().charAt(0).toUpperCase() ?? "?"}
+                </Text>
+              </View>
+            )}
+
+            {/* Chat name */}
+            <Text style={[styles.modalTitle, { fontFamily: "Inter_700Bold" }]} numberOfLines={2}>
+              {previewSession?.title}
+            </Text>
+
+            {/* Action buttons */}
+            <View style={styles.modalActions}>
+              <Pressable
+                style={({ pressed }) => [styles.modalActionBtn, { backgroundColor: "rgba(255,255,255,0.15)", opacity: pressed ? 0.7 : 1 }]}
+                onPress={() => {
+                  setPreviewSession(null);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/session/media/${previewSession?.id}` as any);
+                }}
+              >
+                <Feather name="image" size={24} color="#fff" />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.modalActionBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
+                onPress={() => {
+                  setPreviewSession(null);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/session/${previewSession?.id}`);
+                }}
+              >
+                <Feather name="message-circle" size={24} color="#fff" />
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -586,4 +660,60 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emptyBtnText: { color: "#fff", fontSize: 15 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalContent: {
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 24,
+    width: "100%",
+  },
+  modalCloseBtn: {
+    position: "absolute",
+    top: -48,
+    right: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalAvatar: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  modalAvatarPlaceholder: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalAvatarLetter: {
+    fontSize: 72,
+    lineHeight: 80,
+  },
+  modalTitle: {
+    fontSize: 22,
+    color: "#fff",
+    textAlign: "center",
+    marginTop: 4,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 24,
+    marginTop: 8,
+  },
+  modalActionBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
