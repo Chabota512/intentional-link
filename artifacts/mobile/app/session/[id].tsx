@@ -1407,7 +1407,9 @@ export default function SessionScreen() {
               />
             ) : (
               <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center" }}>
-                <Feather name="users" size={16} color={colors.accent} />
+                <Text style={{ fontSize: 16, color: colors.accent, fontFamily: "Inter_700Bold", lineHeight: 20 }}>
+                  {session.title.trim().charAt(0).toUpperCase()}
+                </Text>
               </View>
             )}
             <View style={{ flex: 1 }}>
