@@ -253,53 +253,58 @@ router.delete("/users/me/data", async (req, res): Promise<void> => {
     return;
   }
 
-  // Sessions this user created — all participants need to be notified before deletion
+  // Sessions this user created
   const createdSessions = await db.select({ id: sessionsTable.id })
     .from(sessionsTable)
     .where(eq(sessionsTable.creatorId, userId));
 
-  // Sessions this user is a participant in (but didn't create) — they'll be removed
-  const participantSessions = await db.select({ sessionId: sessionParticipantsTable.sessionId })
+  // Sessions this user is a participant in (created or joined)
+  const participantSessions = await db
+    .select({ sessionId: sessionParticipantsTable.sessionId })
     .from(sessionParticipantsTable)
     .where(eq(sessionParticipantsTable.userId, userId));
 
-  // Gather participants of sessions being deleted (to notify them)
-  const affectedParticipants = new Map<number, Set<number>>(); // sessionId -> userIds
+  // Handle each session the user created
   for (const session of createdSessions) {
-    const participants = await db.select({ userId: sessionParticipantsTable.userId })
+    // Find other joined participants who can take ownership
+    const otherParticipants = await db
+      .select({ userId: sessionParticipantsTable.userId })
       .from(sessionParticipantsTable)
       .where(and(
         eq(sessionParticipantsTable.sessionId, session.id),
+        eq(sessionParticipantsTable.status, "joined"),
         ne(sessionParticipantsTable.userId, userId),
       ));
-    affectedParticipants.set(session.id, new Set(participants.map(p => p.userId)));
+
+    if (otherParticipants.length > 0) {
+      // Transfer ownership to the first remaining participant — session survives untouched
+      const newOwnerId = otherParticipants[0].userId;
+      await db.update(sessionsTable)
+        .set({ creatorId: newOwnerId })
+        .where(eq(sessionsTable.id, session.id));
+      // Notify remaining participants so their session list refreshes
+      emitToSession(session.id, "participant_left", { sessionId: session.id, userId });
+    } else {
+      // No one else in the session — safe to delete it entirely
+      await db.delete(messagesTable).where(eq(messagesTable.sessionId, session.id));
+      await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.sessionId, session.id));
+      await db.delete(sessionsTable).where(eq(sessionsTable.id, session.id));
+    }
   }
 
-  // Delete created sessions and their data
-  for (const session of createdSessions) {
-    await db.delete(messagesTable).where(eq(messagesTable.sessionId, session.id));
-    await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.sessionId, session.id));
-    await db.delete(sessionsTable).where(eq(sessionsTable.id, session.id));
-  }
-
-  // Remove this user from sessions they joined but didn't create
+  // Remove the user from all sessions (created or joined) — removes it from their view
   await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
+
+  // Notify sessions the user was a joined member of (but didn't create)
+  for (const { sessionId } of participantSessions) {
+    if (!createdSessions.some(s => s.id === sessionId)) {
+      emitToSession(sessionId, "participant_left", { sessionId, userId });
+    }
+  }
 
   await db.update(usersTable)
     .set({ avatarUrl: null, pushToken: null })
     .where(eq(usersTable.id, userId));
-
-  // Notify participants of deleted sessions so their lists refresh immediately
-  for (const [sessionId, participantIds] of affectedParticipants) {
-    for (const pid of participantIds) {
-      emitToUser(pid, "session_deleted", { sessionId });
-    }
-  }
-
-  // Notify other participants in sessions the user was only a member of (they left)
-  for (const { sessionId } of participantSessions) {
-    emitToSession(sessionId, "participant_left", { sessionId, userId });
-  }
 
   res.json({ ok: true });
 });
