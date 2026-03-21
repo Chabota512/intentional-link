@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   Image,
+  Modal,
 } from "react-native";
 import UserAvatar from "@/components/UserAvatar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -70,6 +71,7 @@ export default function ContactsScreen() {
   const { get, post, del } = useApi();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("contacts");
+  const [avatarPreview, setAvatarPreview] = useState<ContactUser | null>(null);
 
   const { data: contacts = [], isLoading: contactsLoading, isRefetching, refetch } = useQuery<Contact[]>({
     queryKey: ["contacts"],
@@ -167,13 +169,22 @@ export default function ContactsScreen() {
           router.push(`/contact/${item.contactUser.id}`);
         }}
       >
-        <UserAvatar
-          name={item.contactUser.name}
-          avatarUrl={item.contactUser.avatarUrl}
-          size={44}
-          presenceStatus={status}
-          showDot={true}
-        />
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setAvatarPreview(item.contactUser);
+          }}
+          hitSlop={4}
+        >
+          <UserAvatar
+            name={item.contactUser.name}
+            avatarUrl={item.contactUser.avatarUrl}
+            size={44}
+            presenceStatus={status}
+            showDot={true}
+          />
+        </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[styles.contactName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
             {item.contactUser.name}
@@ -413,6 +424,36 @@ export default function ContactsScreen() {
           </ScrollView>
         )
       )}
+      <Modal
+        visible={avatarPreview !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarPreview(null)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center" }}
+          onPress={() => setAvatarPreview(null)}
+        >
+          <Pressable style={{ alignItems: "center", gap: 16 }} onPress={() => {}}>
+            <UserAvatar
+              name={avatarPreview?.name ?? ""}
+              avatarUrl={avatarPreview?.avatarUrl}
+              size={160}
+              showDot={false}
+            />
+            <View style={{ alignItems: "center", gap: 4 }}>
+              <Text style={{ color: "#fff", fontSize: 22, fontFamily: "Inter_600SemiBold" }}>
+                {avatarPreview?.name}
+              </Text>
+              {avatarPreview?.username ? (
+                <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 15, fontFamily: "Inter_400Regular" }}>
+                  @{avatarPreview.username}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
