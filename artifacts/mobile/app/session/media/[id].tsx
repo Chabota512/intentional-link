@@ -164,6 +164,7 @@ export default function MediaGalleryScreen() {
           </View>
         ) : (
           <FlatList
+            key="images"
             data={images}
             keyExtractor={(item) => String(item.id)}
             renderItem={renderImage}
@@ -182,6 +183,7 @@ export default function MediaGalleryScreen() {
         </View>
       ) : (
         <FlatList
+          key="files"
           data={files}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderFile}
