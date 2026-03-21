@@ -29,7 +29,7 @@ timeoutMs = 20000
 [userenv.shared]
 TOKEN_SECRET = "focus_token_secret_2024"
 DAILY_API_KEY = "9009d6f514544929a93c31950d239bfb2c9169314a5458ef670b4e86ce152997"
-NEON_DATABASE_URL = "postgresql://neondb_owner:npg_t8nMwPcDYRr5@ep-sparkling-queen-admhi4ox-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+NEON_DATABASE_URL = "postgresql://neondb_owner:npg_EVrf4zZOkM8Q@ep-little-cell-amcxvbhe-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 AGORA_APP_CERTIFICATE = "dbabc95354ed4c8cb3ff225584c795cc"
 AGORA_APP_ID = "ca37022df03743949dd32f31efab2137"
 EXPO_TOKEN = "2Y2E1-J52Sy7LFeKyXutfVVZCe8mQT1UjkmijaYb"
