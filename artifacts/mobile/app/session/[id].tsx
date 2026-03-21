@@ -1163,7 +1163,7 @@ export default function SessionScreen() {
     ? localParticipants.length > 0
       ? `${localParticipants.length + 1} nearby`
       : totalActive === 1
-        ? "only you is active"
+        ? "only you online"
         : `${totalActive} active`
     : "Completed";
 
@@ -1191,8 +1191,8 @@ export default function SessionScreen() {
           </View>
           <Pressable style={styles.navMeta} onPress={openParticipants}>
             <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]}>
+              <Text style={{ color: colors.textSecondary }}>{`${totalPeople} participant${totalPeople !== 1 ? "s" : ""} · `}</Text>
               <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
-              <Text style={{ color: colors.textSecondary }}>{` · ${totalPeople} participant${totalPeople !== 1 ? "s" : ""}`}</Text>
             </Text>
             <Feather name="chevron-right" size={12} color={colors.textTertiary} />
           </Pressable>
