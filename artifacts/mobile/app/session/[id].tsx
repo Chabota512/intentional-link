@@ -510,6 +510,7 @@ export default function SessionScreen() {
   const [reactionKeyboardHeight, setReactionKeyboardHeight] = useState(0);
   const [actionMenuMessage, setActionMenuMessage] = useState<Message | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -1189,75 +1190,15 @@ export default function SessionScreen() {
           </Pressable>
         </View>
         <View style={styles.navActions}>
-          {isActive && canSend && (
-            <>
-              <Pressable
-                style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1, backgroundColor: "#4CAF5022", borderRadius: 8, padding: 6 }]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push(`/session/call/${sessionId}?mode=voice` as any);
-                }}
-              >
-                <Feather name="phone" size={20} color="#4CAF50" />
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1, backgroundColor: "#FF6B9D22", borderRadius: 8, padding: 6 }]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push(`/session/call/${sessionId}?mode=video` as any);
-                }}
-              >
-                <Feather name="video" size={20} color="#FF6B9D" />
-              </Pressable>
-            </>
-          )}
           <Pressable
             style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(`/session/media/${sessionId}` as any);
+              setMoreMenuVisible(true);
             }}
           >
-            <Feather name="image" size={20} color={colors.textSecondary} />
+            <Feather name="more-vertical" size={22} color={colors.text} />
           </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
-            onPress={openParticipants}
-          >
-            <Feather name="users" size={20} color={colors.textSecondary} />
-          </Pressable>
-          {isActive && isCreator && (
-            <>
-              <Pressable
-                style={({ pressed }) => [styles.endBtn, { backgroundColor: "#FFF0F0", opacity: pressed ? 0.7 : 1 }]}
-                onPress={handleEndSession}
-              >
-                <Text style={[styles.endBtnText, { color: colors.danger, fontFamily: "Inter_600SemiBold" }]}>End</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
-                onPress={handleDeleteSession}
-              >
-                <Feather name="trash-2" size={18} color={colors.danger} />
-              </Pressable>
-            </>
-          )}
-          {!isActive && isCreator && (
-            <Pressable
-              style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
-              onPress={handleDeleteSession}
-            >
-              <Feather name="trash-2" size={18} color={colors.danger} />
-            </Pressable>
-          )}
-          {isActive && !isCreator && hasJoined && (
-            <Pressable
-              style={({ pressed }) => [styles.endBtn, { backgroundColor: "#FFF0F0", opacity: pressed ? 0.7 : 1 }]}
-              onPress={handleLeaveSession}
-            >
-              <Text style={[styles.endBtnText, { color: colors.danger, fontFamily: "Inter_600SemiBold" }]}>Leave</Text>
-            </Pressable>
-          )}
         </View>
       </View>
 
@@ -1829,6 +1770,97 @@ export default function SessionScreen() {
       </Modal>
 
       <Modal
+        visible={moreMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMoreMenuVisible(false)}
+      >
+        <Pressable style={styles.moreOverlay} onPress={() => setMoreMenuVisible(false)}>
+          <Pressable style={[styles.moreMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {isActive && canSend && (
+              <>
+                <Pressable
+                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => { setMoreMenuVisible(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/session/call/${sessionId}?mode=voice` as any); }}
+                >
+                  <Feather name="phone" size={20} color="#4CAF50" />
+                  <Text style={[styles.moreMenuItemText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Voice Call</Text>
+                </Pressable>
+                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
+                <Pressable
+                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => { setMoreMenuVisible(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/session/call/${sessionId}?mode=video` as any); }}
+                >
+                  <Feather name="video" size={20} color="#FF6B9D" />
+                  <Text style={[styles.moreMenuItemText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Video Call</Text>
+                </Pressable>
+                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
+              </>
+            )}
+            <Pressable
+              style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+              onPress={() => { setMoreMenuVisible(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/session/media/${sessionId}` as any); }}
+            >
+              <Feather name="image" size={20} color={colors.textSecondary} />
+              <Text style={[styles.moreMenuItemText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Media</Text>
+            </Pressable>
+            <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
+            <Pressable
+              style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+              onPress={() => { setMoreMenuVisible(false); openParticipants(); }}
+            >
+              <Feather name="users" size={20} color={colors.textSecondary} />
+              <Text style={[styles.moreMenuItemText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Participants</Text>
+            </Pressable>
+            {isActive && isCreator && (
+              <>
+                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
+                <Pressable
+                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => { setMoreMenuVisible(false); handleEndSession(); }}
+                >
+                  <Feather name="stop-circle" size={20} color={colors.danger} />
+                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>End Session</Text>
+                </Pressable>
+                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
+                <Pressable
+                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => { setMoreMenuVisible(false); handleDeleteSession(); }}
+                >
+                  <Feather name="trash-2" size={20} color={colors.danger} />
+                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Session</Text>
+                </Pressable>
+              </>
+            )}
+            {!isActive && isCreator && (
+              <>
+                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
+                <Pressable
+                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => { setMoreMenuVisible(false); handleDeleteSession(); }}
+                >
+                  <Feather name="trash-2" size={20} color={colors.danger} />
+                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Session</Text>
+                </Pressable>
+              </>
+            )}
+            {isActive && !isCreator && hasJoined && (
+              <>
+                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
+                <Pressable
+                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => { setMoreMenuVisible(false); handleLeaveSession(); }}
+                >
+                  <Feather name="log-out" size={20} color={colors.danger} />
+                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Leave Session</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
         visible={sheetVisible}
         animationType="slide"
         presentationStyle="pageSheet"
@@ -2027,6 +2059,34 @@ const styles = StyleSheet.create({
   navIconBtn: { padding: 4 },
   endBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginLeft: 4 },
   endBtnText: { fontSize: 13 },
+  moreOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    paddingTop: 88,
+    paddingRight: 12,
+  },
+  moreMenu: {
+    minWidth: 200,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  moreMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  moreMenuItemText: { fontSize: 15 },
+  moreMenuDivider: { height: StyleSheet.hairlineWidth },
   descBanner: {
     flexDirection: "row",
     alignItems: "flex-start",
