@@ -376,7 +376,7 @@ function VoicePlayer({
 
 const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🙏", "👍"];
 
-function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, senderPresenceStatus }: {
+function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, senderPresenceStatus, onAvatarPress }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
@@ -388,6 +388,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
   onLongPress?: () => void;
   onReact?: (emoji: string) => void;
   senderPresenceStatus?: "online" | "offline" | "local";
+  onAvatarPress?: (user: { name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" }) => void;
 }) {
   const renderContent = () => {
     if (message.type === "image" && message.attachmentUrl) {
@@ -494,7 +495,19 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
     >
       {!isOwn && (
         showAvatar
-          ? <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} presenceStatus={senderPresenceStatus} />
+          ? (
+            <Pressable
+              onPress={() => onAvatarPress?.({
+                name: message.sender.name,
+                username: message.sender.username,
+                avatarUrl: message.sender.avatarUrl,
+                presenceStatus: senderPresenceStatus,
+              })}
+              hitSlop={8}
+            >
+              <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} presenceStatus={senderPresenceStatus} />
+            </Pressable>
+          )
           : avatarPlaceholder
       )}
       <View style={{ maxWidth: "75%", gap: 3 }}>
@@ -582,7 +595,19 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
       </View>
       {isOwn && (
         showAvatar
-          ? <UserAvatar name={currentUser?.name ?? "?"} avatarUrl={currentUser?.avatarUrl} size={30} style={styles.senderAvatar} presenceStatus="online" />
+          ? (
+            <Pressable
+              onPress={() => onAvatarPress?.({
+                name: currentUser?.name ?? "?",
+                username: currentUser?.username,
+                avatarUrl: currentUser?.avatarUrl,
+                presenceStatus: "online",
+              })}
+              hitSlop={8}
+            >
+              <UserAvatar name={currentUser?.name ?? "?"} avatarUrl={currentUser?.avatarUrl} size={30} style={styles.senderAvatar} presenceStatus="online" />
+            </Pressable>
+          )
           : avatarPlaceholder
       )}
     </Animated.View>
@@ -618,6 +643,7 @@ export default function SessionScreen() {
   const [actionMenuMessage, setActionMenuMessage] = useState<Message | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [profileViewUser, setProfileViewUser] = useState<{ name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" } | null>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -1483,6 +1509,7 @@ export default function SessionScreen() {
                   onLongPress={() => setActionMenuMessage(item)}
                   onReact={(emoji) => reactMutation.mutate({ messageId: item.id, emoji })}
                   senderPresenceStatus={isOwn ? "online" : getEffectivePresence(item.senderId, item.sender.lastSeenAt) as any}
+                  onAvatarPress={setProfileViewUser}
                 />
               );
             }}
@@ -2032,6 +2059,50 @@ export default function SessionScreen() {
                   <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Leave Session</Text>
                 </Pressable>
               </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={profileViewUser !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProfileViewUser(null)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center" }}
+          onPress={() => setProfileViewUser(null)}
+        >
+          <Pressable
+            style={{ alignItems: "center", gap: 16 }}
+            onPress={() => {}}
+          >
+            {profileViewUser && (
+              <UserAvatar
+                name={profileViewUser.name}
+                avatarUrl={profileViewUser.avatarUrl}
+                size={160}
+                presenceStatus={profileViewUser.presenceStatus}
+                showDot={true}
+              />
+            )}
+            {profileViewUser && (
+              <View style={{ alignItems: "center", gap: 4 }}>
+                <Text style={{ color: "#fff", fontSize: 22, fontFamily: "Inter_600SemiBold" }}>
+                  {profileViewUser.name}
+                </Text>
+                {profileViewUser.username ? (
+                  <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 15, fontFamily: "Inter_400Regular" }}>
+                    @{profileViewUser.username}
+                  </Text>
+                ) : null}
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 }}>
+                  {profileViewUser.presenceStatus === "online" || profileViewUser.presenceStatus === "local"
+                    ? "Online"
+                    : "Offline"}
+                </Text>
+              </View>
             )}
           </Pressable>
         </Pressable>
