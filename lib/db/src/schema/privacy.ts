@@ -6,6 +6,7 @@ export const userPrivacySettingsTable = pgTable("user_privacy_settings", {
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }).unique(),
   presenceVisibility: text("presence_visibility", { enum: ["all", "specific", "none"] }).notNull().default("all"),
   readReceiptsEnabled: boolean("read_receipts_enabled").notNull().default(true),
+  offlineThresholdMinutes: integer("offline_threshold_minutes").notNull().default(5),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
