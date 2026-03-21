@@ -215,7 +215,7 @@ export default function SessionsScreen() {
             <Feather name="search" size={16} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text, fontFamily: "Inter_400Regular" }]}
-              placeholder="Search sessions…"
+              placeholder="Search chats…"
               placeholderTextColor={colors.textTertiary}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -262,7 +262,7 @@ export default function SessionsScreen() {
         <View style={styles.center}>
           <Feather name="wifi-off" size={36} color={colors.textTertiary} />
           <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: "Inter_600SemiBold", marginTop: 16 }]}>
-            Could not load sessions
+            Could not load chats
           </Text>
           <Text style={[styles.emptyDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
             Check your connection and try again.
@@ -318,7 +318,7 @@ export default function SessionsScreen() {
                   onPress={onNewSession}
                 >
                   <Feather name="plus" size={16} color="#fff" />
-                  <Text style={[styles.emptyBtnText, { fontFamily: "Inter_600SemiBold" }]}>New Session</Text>
+                  <Text style={[styles.emptyBtnText, { fontFamily: "Inter_600SemiBold" }]}>New Chat</Text>
                 </Pressable>
               </View>
             )

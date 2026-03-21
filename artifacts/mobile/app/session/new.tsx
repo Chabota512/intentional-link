@@ -117,7 +117,7 @@ export default function NewSessionScreen() {
     if (selectedIds.size === 0) {
       Alert.alert(
         "No contacts selected",
-        "You haven't added anyone to this session. Create it anyway?",
+        "You haven't added anyone to this chat. Create it anyway?",
         [
           { text: "Go back", style: "cancel" },
           {
@@ -152,7 +152,7 @@ export default function NewSessionScreen() {
             <Feather name="x" size={24} color={colors.text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
-            New Session
+            New Chat
           </Text>
           <Pressable
             style={({ pressed }) => [
@@ -190,11 +190,11 @@ export default function NewSessionScreen() {
             )}
           </Pressable>
           <Text style={[styles.iconHint, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
-            Tap to add a session photo
+            Tap to add a chat photo
           </Text>
 
           <Text style={[styles.label, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
-            SESSION TITLE
+            CHAT TITLE
           </Text>
           <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TextInput
@@ -215,7 +215,7 @@ export default function NewSessionScreen() {
           <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, minHeight: 90 }]}>
             <TextInput
               style={[styles.input, { color: colors.text, fontFamily: "Inter_400Regular", textAlignVertical: "top" }]}
-              placeholder="What is this session about?"
+              placeholder="What is this chat about?"
               placeholderTextColor={colors.textTertiary}
               value={description}
               onChangeText={setDescription}

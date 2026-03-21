@@ -532,7 +532,7 @@ export default function SessionScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
     onError: (e: any) => {
-      Alert.alert("Could not join", e.message || "Unable to join this session.");
+      Alert.alert("Could not join", e.message || "Unable to join this chat.");
     },
   });
 
@@ -689,7 +689,7 @@ export default function SessionScreen() {
       router.back();
     },
     onError: (e: any) => {
-      Alert.alert("Error", e.message || "Failed to leave session");
+      Alert.alert("Error", e.message || "Failed to leave chat");
     },
   });
 
@@ -937,17 +937,17 @@ export default function SessionScreen() {
 
   const handleEndSession = () => {
     confirmAction(
-      "End Session",
-      "Are you sure you want to end this focus session?",
-      "End Session",
+      "End Chat",
+      "Are you sure you want to end this chat?",
+      "End Chat",
       () => endMutation.mutate()
     );
   };
 
   const handleDeleteSession = () => {
     Alert.alert(
-      "Delete Session",
-      "This will permanently delete the session and all messages. This cannot be undone.",
+      "Delete Chat",
+      "This will permanently delete the chat and all messages. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -961,8 +961,8 @@ export default function SessionScreen() {
 
   const handleLeaveSession = () => {
     confirmAction(
-      "Leave Session",
-      "Are you sure you want to leave this session?",
+      "Leave Chat",
+      "Are you sure you want to leave this chat?",
       "Leave",
       () => leaveMutation.mutate()
     );
@@ -1014,7 +1014,7 @@ export default function SessionScreen() {
           </Pressable>
           <View style={styles.navCenter}>
             <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
-              {sessionPreview?.title ?? "Session"}
+              {sessionPreview?.title ?? "Chat"}
             </Text>
           </View>
           <View style={{ width: 30 }} />
@@ -1038,7 +1038,7 @@ export default function SessionScreen() {
                   </Text>
                   {sessionPreview.status !== "active" && (
                     <Text style={[styles.joinLinkSub, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>
-                      This session has already ended.
+                      This chat has already ended.
                     </Text>
                   )}
                 </>
@@ -1184,7 +1184,7 @@ export default function SessionScreen() {
       {!isCreator && isParticipant && !hasJoined && isActive && (
         <Animated.View entering={FadeIn} style={[styles.joinBanner, { backgroundColor: colors.accentSoft, borderBottomColor: colors.border }]}>
           <Text style={[styles.joinText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>
-            You've been invited to this session
+            You've been invited to this chat
           </Text>
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Pressable
@@ -1695,7 +1695,7 @@ export default function SessionScreen() {
                 <View style={styles.emptySheet}>
                   <Feather name="users" size={36} color={colors.textTertiary} />
                   <Text style={[styles.emptySheetText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                    All your contacts are already in this session
+                    All your contacts are already in this chat
                   </Text>
                 </View>
               ) : (

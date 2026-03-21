@@ -209,7 +209,7 @@ export default function ProfileScreen() {
   const handleDeleteData = () => {
     Alert.alert(
       "Clear All Data",
-      "This will permanently delete all your sessions, messages, and reset your profile photo. Your account stays active. This cannot be undone.",
+      "This will permanently delete all your chats, messages, and reset your profile photo. Your account stays active. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -235,7 +235,7 @@ export default function ProfileScreen() {
   const handleDeleteAccount = () => {
     Alert.alert(
       "Delete Account",
-      "This will permanently delete your account, all sessions, and all messages. This cannot be undone.",
+      "This will permanently delete your account, all chats, and all messages. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -305,7 +305,7 @@ export default function ProfileScreen() {
           <View style={[styles.statsRow, { borderTopColor: colors.border }]}>
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: colors.text, fontFamily: "Inter_700Bold" }]}>{totalSessions}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Sessions</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Chats</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
@@ -378,19 +378,19 @@ export default function ProfileScreen() {
           />
         </View>
 
-        <SectionHeader title="SESSIONS" colors={colors} />
+        <SectionHeader title="CHATS" colors={colors} />
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <SettingsRow
             icon="layers"
-            label="Active Sessions"
-            sublabel={`${activeSessions} session${activeSessions !== 1 ? "s" : ""} in progress`}
+            label="Active Chats"
+            sublabel={`${activeSessions} chat${activeSessions !== 1 ? "s" : ""} in progress`}
             onPress={() => router.push("/(tabs)")}
             colors={colors}
           />
           <SettingsRow
             icon="archive"
-            label="Past Sessions"
-            sublabel={`${totalSessions} total sessions`}
+            label="Past Chats"
+            sublabel={`${totalSessions} total chats`}
             onPress={() => router.push("/(tabs)")}
             colors={colors}
             last
@@ -408,7 +408,7 @@ export default function ProfileScreen() {
           <SettingsRow
             icon="lock"
             label="Privacy First"
-            sublabel="Only your contacts can join sessions"
+            sublabel="Only your contacts can join chats"
             colors={colors}
           />
           <SettingsRow
@@ -437,7 +437,7 @@ export default function ProfileScreen() {
           <SettingsRow
             icon="trash"
             label="Clear All Data"
-            sublabel="Delete sessions, messages, and photos"
+            sublabel="Delete chats, messages, and photos"
             onPress={deletingData ? undefined : handleDeleteData}
             color={colors.danger}
             colors={colors}
