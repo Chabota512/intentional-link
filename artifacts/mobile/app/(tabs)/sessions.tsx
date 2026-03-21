@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,9 @@ import {
   RefreshControl,
   Platform,
   TextInput,
-  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -21,20 +20,22 @@ import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import { useSocket } from "@/context/SocketContext";
 import { formatRelative } from "@/utils/date";
+import UserAvatar from "@/components/UserAvatar";
 
 interface Participant {
   id: number;
   userId: number;
   status: string;
-  user: { id: number; name: string; username: string };
+  user: { id: number; name: string; username: string; avatarUrl?: string | null; lastSeenAt?: string | null };
 }
 
-const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
-
-function resolveUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  return `${BASE_URL}${url}`;
+interface LastMessage {
+  id: number;
+  content: string;
+  type: string;
+  senderId: number;
+  senderName: string;
+  createdAt: string;
 }
 
 interface Session {
@@ -47,6 +48,23 @@ interface Session {
   participants: Participant[];
   createdAt: string;
   endedAt?: string;
+  lastMessage?: LastMessage | null;
+  unreadCount?: number;
+  messageCount?: number;
+}
+
+function getMessagePreview(msg: LastMessage | null | undefined, currentUserId: number | undefined): string {
+  if (!msg) return "No messages yet";
+  const prefix = msg.senderId === currentUserId ? "You: " : "";
+  switch (msg.type) {
+    case "image": return `${prefix}Sent a photo`;
+    case "file": return `${prefix}Sent a file`;
+    case "voice": return `${prefix}Voice note`;
+    default: {
+      const text = msg.content || "";
+      return `${prefix}${text.length > 60 ? text.slice(0, 60) + "…" : text}`;
+    }
+  }
 }
 
 export default function SessionsScreen() {
@@ -54,12 +72,11 @@ export default function SessionsScreen() {
   const insets = useSafeAreaInsets();
   const { get } = useApi();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState<"active" | "completed" | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
 
-  const { isConnected: socketConnected } = useSocket();
+  const { isConnected: socketConnected, onlineUserIds } = useSocket();
 
   const { data: sessions = [], isLoading, isError, isRefetching, refetch } = useQuery<Session[]>({
     queryKey: ["sessions"],
@@ -75,6 +92,7 @@ export default function SessionsScreen() {
       (s.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     );
 
+  const totalUnread = useMemo(() => sessions.reduce((sum, s) => sum + (s.unreadCount ?? 0), 0), [sessions]);
   const activeSessions = sessions.filter((s) => s.status === "active");
   const pendingInviteIds = new Set(
     sessions
@@ -107,6 +125,15 @@ export default function SessionsScreen() {
     const isActive = item.status === "active";
     const isPendingInvite = pendingInviteIds.has(item.id);
     const others = item.participants.filter((p) => p.userId !== user?.id);
+    const unread = item.unreadCount ?? 0;
+    const preview = getMessagePreview(item.lastMessage, user?.id);
+    const timeStr = item.lastMessage?.createdAt
+      ? formatRelative(item.lastMessage.createdAt)
+      : formatRelative(item.createdAt);
+
+    const someOnline = others.some((p) => onlineUserIds.has(p.userId));
+
+    const avatarUser = others.length === 1 ? others[0].user : null;
     const nameStr = others.length > 0
       ? others.map((p) => p.user.name).join(", ")
       : "Just you";
@@ -119,11 +146,11 @@ export default function SessionsScreen() {
             backgroundColor: colors.surface,
             borderColor: isPendingInvite
               ? colors.accent + "66"
-              : isActive
+              : unread > 0
               ? colors.accent + "33"
               : colors.border,
-            borderWidth: isActive || isPendingInvite ? 1.5 : 1,
-            opacity: pressed ? 0.9 : 1,
+            borderWidth: isPendingInvite || unread > 0 ? 1.5 : 1,
+            opacity: pressed ? 0.92 : 1,
             transform: [{ scale: pressed ? 0.985 : 1 }],
           },
         ]}
@@ -137,45 +164,70 @@ export default function SessionsScreen() {
             </Text>
           </View>
         )}
-        <View style={styles.sessionCardTop}>
-          <View style={[styles.sessionIconBg, { backgroundColor: isActive ? colors.accentSoft : colors.surfaceAlt, overflow: "hidden" }]}>
-            {resolveUrl(item.imageUrl) ? (
-              <Image source={{ uri: resolveUrl(item.imageUrl)! }} style={{ width: 40, height: 40, borderRadius: 12 }} resizeMode="cover" />
+        <View style={styles.sessionCardRow}>
+          <View style={{ position: "relative" }}>
+            {avatarUser ? (
+              <UserAvatar
+                name={avatarUser.name}
+                avatarUrl={avatarUser.avatarUrl}
+                size={50}
+                presenceStatus={onlineUserIds.has(avatarUser.id) ? "online" : undefined}
+                showDot={isActive && onlineUserIds.has(avatarUser.id)}
+              />
             ) : (
-              <Feather name={isActive ? "zap" : "archive"} size={18} color={isActive ? colors.accent : colors.textSecondary} />
+              <View style={[styles.groupAvatar, { backgroundColor: isActive ? colors.accentSoft : colors.surfaceAlt }]}>
+                <Feather name={isActive ? "zap" : "archive"} size={20} color={isActive ? colors.accent : colors.textSecondary} />
+                {isActive && someOnline && (
+                  <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
+                )}
+              </View>
             )}
           </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={[styles.sessionTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text style={[styles.sessionParticipants, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
-              {nameStr}
-            </Text>
-          </View>
-          <View style={{ alignItems: "flex-end", gap: 4 }}>
-            {isActive && (
-              <View style={[styles.activeDot, { backgroundColor: colors.success }]} />
+
+          <View style={styles.sessionContent}>
+            <View style={styles.sessionTopRow}>
+              <Text
+                style={[
+                  styles.sessionTitle,
+                  { color: colors.text, fontFamily: unread > 0 ? "Inter_700Bold" : "Inter_600SemiBold" },
+                ]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+              <Text style={[styles.sessionTime, { color: unread > 0 ? colors.accent : colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+                {timeStr}
+              </Text>
+            </View>
+
+            <View style={styles.sessionBottomRow}>
+              <Text
+                style={[
+                  styles.previewText,
+                  {
+                    color: unread > 0 ? colors.text : colors.textSecondary,
+                    fontFamily: unread > 0 ? "Inter_500Medium" : "Inter_400Regular",
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {preview}
+              </Text>
+              {unread > 0 && (
+                <View style={[styles.unreadBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.unreadText, { fontFamily: "Inter_700Bold" }]}>
+                    {unread > 99 ? "99+" : unread}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {others.length > 1 && (
+              <Text style={[styles.participantsText, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
+                {nameStr}
+              </Text>
             )}
-            <Text style={[styles.sessionTime, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
-              {formatRelative(item.createdAt)}
-            </Text>
           </View>
-        </View>
-        {item.description ? (
-          <Text style={[styles.sessionDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]} numberOfLines={2}>
-            {item.description}
-          </Text>
-        ) : null}
-        <View style={styles.sessionFooter}>
-          <View style={[styles.statusPill, { backgroundColor: isActive ? colors.accentSoft : colors.surfaceAlt }]}>
-            <Text style={[styles.statusPillText, { color: isActive ? colors.accent : colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
-              {isActive ? "Active" : "Completed"}
-            </Text>
-          </View>
-          <Text style={[styles.participantCount, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
-            {item.participants.length + 1} participant{item.participants.length !== 0 ? "s" : ""}
-          </Text>
         </View>
       </Pressable>
     );
@@ -190,7 +242,7 @@ export default function SessionsScreen() {
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Chats</Text>
           <Text style={[styles.headerSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-            {activeSessions.length} active
+            {activeSessions.length} active{totalUnread > 0 ? ` · ${totalUnread} unread` : ""}
           </Text>
         </View>
         <View style={styles.headerActions}>
@@ -201,7 +253,19 @@ export default function SessionsScreen() {
             ]}
             onPress={toggleSearch}
           >
-            <Feather name={searchVisible ? "x" : "search"} size={18} color={searchVisible ? colors.accent : colors.textSecondary} />
+            <Feather name={searchVisible ? "x" : "filter"} size={18} color={searchVisible ? colors.accent : colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.iconBtn,
+              { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/search" as any);
+            }}
+          >
+            <Feather name="search" size={18} color={colors.textSecondary} />
           </Pressable>
           <Pressable
             style={({ pressed }) => [styles.newBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
@@ -394,16 +458,16 @@ const styles = StyleSheet.create({
   },
   filterText: { fontSize: 13 },
   searchResultCount: { marginLeft: "auto", fontSize: 12 },
-  list: { padding: 12, gap: 10 },
+  list: { padding: 12, gap: 6 },
   listEmpty: { flex: 1 },
   sessionCard: {
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   invitedBanner: {
     flexDirection: "row",
@@ -413,23 +477,67 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   invitedBannerText: { color: "#fff", fontSize: 12 },
-  sessionCardTop: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, paddingBottom: 6 },
-  sessionIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  sessionCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  groupAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
   },
-  sessionTitle: { fontSize: 15 },
-  sessionParticipants: { fontSize: 13 },
+  onlineDot: {
+    position: "absolute",
+    bottom: 1,
+    right: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2.5,
+  },
+  sessionContent: {
+    flex: 1,
+    gap: 3,
+  },
+  sessionTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  sessionTitle: { fontSize: 15, flex: 1 },
   sessionTime: { fontSize: 11 },
-  activeDot: { width: 8, height: 8, borderRadius: 4 },
-  sessionDesc: { fontSize: 13, lineHeight: 18, paddingHorizontal: 12, paddingBottom: 6 },
-  sessionFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingBottom: 10 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusPillText: { fontSize: 11 },
-  participantCount: { fontSize: 12 },
+  sessionBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  previewText: {
+    fontSize: 13,
+    lineHeight: 18,
+    flex: 1,
+  },
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  unreadText: {
+    color: "#fff",
+    fontSize: 11,
+  },
+  participantsText: {
+    fontSize: 12,
+  },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 40 },
   emptyIcon: { width: 80, height: 80, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 8 },

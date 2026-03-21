@@ -9,6 +9,7 @@ import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import Colors from "@/constants/colors";
 import { usePendingInvites } from "@/hooks/usePendingInvites";
 import { usePendingContacts } from "@/hooks/usePendingContacts";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
 
 function NativeTabLayout() {
   return (
@@ -37,6 +38,7 @@ function ClassicTabLayout() {
   const isWeb = Platform.OS === "web";
   const pendingInvites = usePendingInvites();
   const pendingContacts = usePendingContacts();
+  const totalUnread = useUnreadCount();
 
   return (
     <Tabs
@@ -69,7 +71,7 @@ function ClassicTabLayout() {
         name="sessions"
         options={{
           title: "Chats",
-          tabBarBadge: pendingInvites > 0 ? pendingInvites : undefined,
+          tabBarBadge: (totalUnread + pendingInvites) > 0 ? (totalUnread + pendingInvites) : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 10 },
           tabBarIcon: ({ color }) =>
             isIOS ? (

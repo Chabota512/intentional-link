@@ -84,6 +84,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    socket.on("message_deleted", (data: any) => {
+      const { sessionId, messageId } = data;
+      queryClient.setQueryData(["messages", sessionId], (old: any[] = []) =>
+        old.filter((m) => m.id !== messageId)
+      );
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+    });
+
     socket.on("reaction_added", (data: any) => {
       const { messageId, sessionId, emoji, userId: reactUserId } = data;
       queryClient.setQueryData(["messages", sessionId], (old: any[] = []) =>

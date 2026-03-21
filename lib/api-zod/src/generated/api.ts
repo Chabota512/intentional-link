@@ -388,6 +388,7 @@ export const SendMessageBody = zod.object({
   attachmentUrl: zod.string().optional(),
   attachmentName: zod.string().optional(),
   attachmentSize: zod.number().optional(),
+  replyToId: zod.number().optional(),
 });
 
 /**

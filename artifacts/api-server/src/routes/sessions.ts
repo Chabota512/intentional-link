@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray, ne, desc, count as drizzleCount } from "drizzle-orm";
-import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable } from "@workspace/db";
+import { eq, and, inArray, ne, desc, count as drizzleCount, sql, gt } from "drizzle-orm";
+import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable, sessionReadCursorsTable } from "@workspace/db";
 import {
   CreateSessionBody,
   UpdateSessionBody,
@@ -102,10 +102,116 @@ router.get("/sessions", async (req, res): Promise<void> => {
     : [];
 
   const allSessions = [...creatorSessions, ...participantSessions]
-    .filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .filter((s, i, arr) => arr.findIndex(x => x.id === s.id) === i);
 
-  const results = await Promise.all(allSessions.map(s => getSessionWithParticipants(s.id)));
+  const sessionIds = allSessions.map(s => s.id);
+
+  const [lastMessages, readCursors, messageCounts] = await Promise.all([
+    sessionIds.length > 0
+      ? db.execute(sql`
+          SELECT DISTINCT ON (m.session_id)
+            m.session_id, m.id, m.content, m.type, m.sender_id, m.created_at,
+            u.name as sender_name
+          FROM messages m
+          JOIN users u ON u.id = m.sender_id
+          WHERE m.session_id = ANY(${sessionIds})
+          ORDER BY m.session_id, m.id DESC
+        `)
+      : { rows: [] },
+    sessionIds.length > 0
+      ? db.select({
+          sessionId: sessionReadCursorsTable.sessionId,
+          lastReadMessageId: sessionReadCursorsTable.lastReadMessageId,
+        })
+        .from(sessionReadCursorsTable)
+        .where(and(
+          inArray(sessionReadCursorsTable.sessionId, sessionIds),
+          eq(sessionReadCursorsTable.userId, userId)
+        ))
+      : [],
+    sessionIds.length > 0
+      ? db.execute(sql`
+          SELECT session_id, COUNT(*)::int as total
+          FROM messages
+          WHERE session_id = ANY(${sessionIds})
+          GROUP BY session_id
+        `)
+      : { rows: [] },
+  ]);
+
+  const lastMsgMap = new Map<number, any>();
+  for (const row of (lastMessages as any).rows) {
+    lastMsgMap.set(row.session_id, row);
+  }
+
+  const cursorMap = new Map<number, number>();
+  for (const c of readCursors as any[]) {
+    cursorMap.set(c.sessionId, c.lastReadMessageId);
+  }
+
+  const totalMap = new Map<number, number>();
+  for (const row of (messageCounts as any).rows) {
+    totalMap.set(row.session_id, row.total);
+  }
+
+  const unreadCounts = new Map<number, number>();
+  if (sessionIds.length > 0) {
+    const cursoredIds = sessionIds.filter(id => cursorMap.has(id));
+    const noCursorIds = sessionIds.filter(id => !cursorMap.has(id));
+
+    if (cursoredIds.length > 0) {
+      for (const sid of cursoredIds) {
+        const cursor = cursorMap.get(sid)!;
+        const [result] = await db.select({ count: drizzleCount() })
+          .from(messagesTable)
+          .where(and(
+            eq(messagesTable.sessionId, sid),
+            gt(messagesTable.id, cursor),
+            ne(messagesTable.senderId, userId)
+          ));
+        unreadCounts.set(sid, result?.count ?? 0);
+      }
+    }
+
+    if (noCursorIds.length > 0) {
+      for (const sid of noCursorIds) {
+        const [result] = await db.select({ count: drizzleCount() })
+          .from(messagesTable)
+          .where(and(
+            eq(messagesTable.sessionId, sid),
+            ne(messagesTable.senderId, userId)
+          ));
+        unreadCounts.set(sid, result?.count ?? 0);
+      }
+    }
+  }
+
+  allSessions.sort((a, b) => {
+    const aMsg = lastMsgMap.get(a.id);
+    const bMsg = lastMsgMap.get(b.id);
+    const aTime = aMsg ? new Date(aMsg.created_at).getTime() : new Date(a.createdAt).getTime();
+    const bTime = bMsg ? new Date(bMsg.created_at).getTime() : new Date(b.createdAt).getTime();
+    return bTime - aTime;
+  });
+
+  const results = await Promise.all(allSessions.map(async (s) => {
+    const full = await getSessionWithParticipants(s.id);
+    if (!full) return null;
+    const lastMsg = lastMsgMap.get(s.id);
+    return {
+      ...full,
+      lastMessage: lastMsg ? {
+        id: lastMsg.id,
+        content: lastMsg.content,
+        type: lastMsg.type,
+        senderId: lastMsg.sender_id,
+        senderName: lastMsg.sender_name,
+        createdAt: lastMsg.created_at,
+      } : null,
+      unreadCount: unreadCounts.get(s.id) ?? 0,
+      messageCount: totalMap.get(s.id) ?? 0,
+    };
+  }));
   res.json(results.filter(Boolean));
 });
 

@@ -59,17 +59,45 @@ async function formatMessages(msgs: (typeof messagesTable.$inferSelect)[]) {
     emojiMap.get(r.emoji)!.push(r.userId);
   }
 
+  const replyToIds = msgs.map(m => m.replyToId).filter((id): id is number => id != null);
+  let replyMap = new Map<number, { id: number; content: string; senderId: number; senderName: string; type: string }>();
+  if (replyToIds.length > 0) {
+    const replyMsgs = await db.select({
+      id: messagesTable.id,
+      content: messagesTable.content,
+      senderId: messagesTable.senderId,
+      type: messagesTable.type,
+    }).from(messagesTable).where(inArray(messagesTable.id, replyToIds));
+
+    for (const rm of replyMsgs) {
+      const sender = senderMap.get(rm.senderId);
+      replyMap.set(rm.id, {
+        id: rm.id,
+        content: rm.content,
+        senderId: rm.senderId,
+        senderName: sender?.name ?? "Unknown",
+        type: rm.type,
+      });
+    }
+  }
+
   return msgs.map(m => {
     const emojiMap = reactionsMap.get(m.id);
     const reactions = emojiMap
       ? Array.from(emojiMap.entries()).map(([emoji, userIds]) => ({ emoji, count: userIds.length, userIds }))
       : [];
 
-    return GetMessagesResponseItem.parse({
+    const base: any = {
       ...m,
       reactions,
       sender: senderMap.get(m.senderId) ?? { id: m.senderId, name: "Unknown", username: "unknown", createdAt: new Date(), lastSeenAt: null },
-    });
+    };
+
+    if (m.replyToId && replyMap.has(m.replyToId)) {
+      base.replyTo = replyMap.get(m.replyToId);
+    }
+
+    return base;
   });
 }
 
@@ -152,7 +180,7 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
     return;
   }
 
-  const { content, type, attachmentUrl, attachmentName, attachmentSize } = parsed.data;
+  const { content, type, attachmentUrl, attachmentName, attachmentSize, replyToId } = parsed.data;
 
   if (type === "text" && !content?.trim()) {
     res.status(400).json({ error: "Message content cannot be empty" });
@@ -164,6 +192,17 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
     return;
   }
 
+  if (replyToId) {
+    const [replyMsg] = await db.select({ id: messagesTable.id })
+      .from(messagesTable)
+      .where(and(eq(messagesTable.id, replyToId), eq(messagesTable.sessionId, sessionId)))
+      .limit(1);
+    if (!replyMsg) {
+      res.status(400).json({ error: "Reply target message not found in this session" });
+      return;
+    }
+  }
+
   const [msg] = await db.insert(messagesTable).values({
     sessionId,
     senderId: userId,
@@ -172,6 +211,7 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
     attachmentUrl: attachmentUrl || null,
     attachmentName: attachmentName || null,
     attachmentSize: attachmentSize || null,
+    replyToId: replyToId || null,
     status: "sent",
   }).returning();
 
@@ -479,6 +519,44 @@ router.get("/messages/search", async (req, res): Promise<void> => {
   });
 
   res.json({ results });
+});
+
+router.delete("/sessions/:sessionId/messages/:messageId", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const sessionId = parseInt(Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId, 10);
+  const messageId = parseInt(Array.isArray(req.params.messageId) ? req.params.messageId[0] : req.params.messageId, 10);
+
+  if (!(await canAccessSession(sessionId, userId))) {
+    res.status(403).json({ error: "You do not have access to this session" });
+    return;
+  }
+
+  const [msg] = await db.select({ id: messagesTable.id, senderId: messagesTable.senderId })
+    .from(messagesTable)
+    .where(and(eq(messagesTable.id, messageId), eq(messagesTable.sessionId, sessionId)))
+    .limit(1);
+
+  if (!msg) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+
+  if (msg.senderId !== userId) {
+    res.status(403).json({ error: "You can only delete your own messages" });
+    return;
+  }
+
+  await db.delete(messagesTable).where(eq(messagesTable.id, messageId));
+
+  emitToSession(sessionId, "message_deleted", { sessionId, messageId });
+
+  res.sendStatus(204);
 });
 
 export default router;

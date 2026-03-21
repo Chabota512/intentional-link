@@ -51,7 +51,7 @@ artifacts-monorepo/
 - **Invite UI**: Creator can invite contacts from inside a session via a People sheet
 - **Participants panel**: Tap participant count to see all participants, their status and online presence
 - **Profile editing**: Users can edit their name, username, and profile picture from the Profile tab
-- **Tab badge**: Sessions tab shows a badge count for pending invites; Contacts tab shows count of pending requests
+- **Tab badge**: Sessions tab shows combined unread message count + pending invites badge; Contacts tab shows count of pending requests
 - **Read receipts**: Own messages show single grey tick (sent), double grey (delivered), double blue #2196F3 (read)
 - **Voice notes**: VoicePlayer shows sender avatar, waveform, duration; raise-to-ear switches playback to earpiece (iOS auto via PlayAndRecord category); marks voice notes as read after playback
 - **Online presence dots**: UserAvatar shows green dot for online users in all locations (contacts, participants panel, chat)
@@ -59,6 +59,11 @@ artifacts-monorepo/
 - **Session logo**: Create-session modal supports image upload for session cover art
 - **Push notifications**: App registers device token on launch; server sends push when new message arrives or contact request is made; uses Expo push notification service
 - **Expanded Settings page**: Full-featured settings with Account, Privacy, Sessions, About, and Danger Zone sections; includes account deletion and data clearing
+- **Message actions**: Long-press a message to get action menu with reactions, Copy, Reply, and Delete (own messages only)
+- **Reply to messages**: Messages can quote a parent message with visual reply bar; replyToId stored in DB with same-session validation
+- **Message search**: Global search across all sessions from sessions list; results grouped by session with sender info
+- **Media gallery**: Per-session media & files view accessible from chat header; grid view for photos, list for files
+- **Session completion insights**: Completed sessions show summary card with duration, message count, media count, and participant count
 
 ## Database Schema (Drizzle ORM)
 
@@ -66,7 +71,7 @@ artifacts-monorepo/
 - `contacts` — id, userId, contactUserId, status (pending|accepted), createdAt
 - `sessions` — id, name, description, imageUrl, creatorId, status, createdAt, endedAt
 - `session_participants` — id, sessionId, userId, status (invited|joined)
-- `messages` — id, sessionId, senderId, content, type (text|image|file|voice), attachmentUrl, attachmentName, attachmentSize, status (sent|delivered|read), createdAt
+- `messages` — id, sessionId, senderId, content, type (text|image|file|voice), attachmentUrl, attachmentName, attachmentSize, replyToId, status (sent|delivered|read), createdAt
 - `uploads` — id (uuid), data (bytea), contentType, filename, fileSize, uploadedBy (FK→users), createdAt
 
 ## API Routes
@@ -94,6 +99,8 @@ All at `/api/*`:
 - `GET/POST /sessions/:id/messages` — list/send messages; sends push notification to other participants
 - `GET /sessions/:id/messages/poll?since=` — poll for new messages
 - `POST /sessions/:id/messages/:msgId/play` — mark voice note as read
+- `POST /sessions/:id/messages/:msgId/react` — toggle emoji reaction on a message
+- `DELETE /sessions/:id/messages/:msgId` — delete own message
 - `GET /messages/search?q=&sessionId=` — search messages across sessions
 - `GET /sessions/:id/media?type=&limit=&offset=` — get session media (images, files, voice notes)
 - `POST /storage/upload` — multipart upload; stores file as bytea in DB, returns `{ uploadId, url }`
@@ -110,6 +117,7 @@ WebSocket server runs alongside Express on the same HTTP server. Auth via JWT to
 - `presence_update` — broadcast when a user goes online/offline
 - `messages_read` — broadcast when a user reads messages in a session
 - `reaction_added` / `reaction_removed` — broadcast on emoji reaction changes
+- `message_deleted` — broadcast when a message is deleted
 
 **Events from client:**
 - `join_session` / `leave_session` — join/leave a session room
@@ -135,9 +143,11 @@ artifacts/mobile/
 │   │   ├── sessions.tsx     # Sessions list with filter
 │   │   ├── contacts.tsx     # Contacts with online/last seen indicators
 │   │   └── profile.tsx      # User profile + edit modal + logout
+│   ├── search.tsx           # Global message search screen
 │   ├── session/
 │   │   ├── new.tsx          # Create session modal
-│   │   └── [id].tsx         # Chat screen with media support + participants sheet
+│   │   ├── [id].tsx         # Chat screen with media support + participants sheet + message actions
+│   │   └── media/[id].tsx   # Media gallery (photos grid + files list) per session
 │   └── contacts/
 │       └── add.tsx          # Add contact modal
 ├── context/AuthContext.tsx  # Auth state (user, login, register, logout, updateUser)

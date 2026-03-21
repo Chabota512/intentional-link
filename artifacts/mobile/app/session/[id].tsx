@@ -15,6 +15,7 @@ import {
   Linking,
   Keyboard,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -53,6 +54,14 @@ interface Reaction {
   userIds: number[];
 }
 
+interface ReplyTo {
+  id: number;
+  content: string;
+  senderId: number;
+  senderName: string;
+  type: string;
+}
+
 interface Message {
   id: number;
   sessionId: number;
@@ -62,6 +71,8 @@ interface Message {
   attachmentUrl?: string | null;
   attachmentName?: string | null;
   attachmentSize?: number | null;
+  replyToId?: number | null;
+  replyTo?: ReplyTo | null;
   status: string;
   createdAt: string;
   sender: User;
@@ -403,6 +414,16 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
                 : [styles.bubbleOther, { backgroundColor: colors.messageBubbleOther, borderColor: colors.border }],
             ]}
           >
+            {message.replyTo && (
+              <View style={[styles.replyQuote, { backgroundColor: isOwn ? "rgba(255,255,255,0.15)" : colors.surfaceAlt, borderLeftColor: colors.accent }]}>
+                <Text style={[styles.replyQuoteName, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
+                  {message.replyTo.senderName}
+                </Text>
+                <Text style={[styles.replyQuoteText, { color: isOwn ? "rgba(255,255,255,0.8)" : colors.textSecondary, fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
+                  {message.replyTo.type !== "text" ? `[${message.replyTo.type}]` : message.replyTo.content}
+                </Text>
+              </View>
+            )}
             {renderContent()}
           </View>
         </Pressable>
@@ -487,6 +508,8 @@ export default function SessionScreen() {
   const [customEmojiInput, setCustomEmojiInput] = useState("");
   const [showCustomEmoji, setShowCustomEmoji] = useState(false);
   const [reactionKeyboardHeight, setReactionKeyboardHeight] = useState(0);
+  const [actionMenuMessage, setActionMenuMessage] = useState<Message | null>(null);
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -647,7 +670,7 @@ export default function SessionScreen() {
   }, [reactionPickerMessage]);
 
   const sendMutation = useMutation({
-    mutationFn: (payload: { content?: string; type?: string; attachmentUrl?: string; attachmentName?: string; attachmentSize?: number }) =>
+    mutationFn: (payload: { content?: string; type?: string; attachmentUrl?: string; attachmentName?: string; attachmentSize?: number; replyToId?: number }) =>
       post(`/sessions/${sessionId}/messages`, payload),
     onMutate: async (payload) => {
       const tempId = -(Date.now());
@@ -783,6 +806,15 @@ export default function SessionScreen() {
     isLoadingOlderRef.current = false;
   };
 
+  const deleteMutation = useMutation({
+    mutationFn: (messageId: number) => del(`/sessions/${sessionId}/messages/${messageId}`),
+    onSuccess: (_, messageId) => {
+      queryClient.setQueryData<Message[]>(["messages", sessionId], (old) =>
+        old ? old.filter((m) => m.id !== messageId) : []
+      );
+    },
+  });
+
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -794,7 +826,12 @@ export default function SessionScreen() {
       typingTimeoutRef.current = null;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    sendMutation.mutate({ content: trimmed, type: "text" });
+    const payload: any = { content: trimmed, type: "text" };
+    if (replyToMessage) {
+      payload.replyToId = replyToMessage.id;
+    }
+    sendMutation.mutate(payload);
+    setReplyToMessage(null);
   };
 
   const handlePickImage = async () => {
@@ -1176,6 +1213,15 @@ export default function SessionScreen() {
           )}
           <Pressable
             style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push(`/session/media/${sessionId}` as any);
+            }}
+          >
+            <Feather name="image" size={20} color={colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
             onPress={openParticipants}
           >
             <Feather name="users" size={20} color={colors.textSecondary} />
@@ -1307,7 +1353,7 @@ export default function SessionScreen() {
                   colors={colors}
                   getFileUrl={getFileUrl}
                   onPlayed={item.type === "voice" && !isOwn ? () => markPlayedMutation.mutate(item.id) : undefined}
-                  onLongPress={() => setReactionPickerMessage(item)}
+                  onLongPress={() => setActionMenuMessage(item)}
                   onReact={(emoji) => reactMutation.mutate({ messageId: item.id, emoji })}
                 />
               );
@@ -1384,6 +1430,21 @@ export default function SessionScreen() {
             borderTopColor: colors.border,
             paddingBottom: bottomPad + 8,
           }]}>
+            {replyToMessage && (
+              <View style={[styles.replyBar, { backgroundColor: colors.surfaceAlt, borderLeftColor: colors.accent }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.replyBarName, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
+                    {replyToMessage.senderId === user?.id ? "You" : replyToMessage.sender.name}
+                  </Text>
+                  <Text style={[styles.replyBarText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
+                    {replyToMessage.type !== "text" ? `[${replyToMessage.type}]` : replyToMessage.content}
+                  </Text>
+                </View>
+                <Pressable onPress={() => setReplyToMessage(null)} style={{ padding: 4 }}>
+                  <Feather name="x" size={16} color={colors.textTertiary} />
+                </Pressable>
+              </View>
+            )}
             {isRecording ? (
               <View style={styles.recordingRow}>
                 <UserAvatar name={user?.name ?? "?"} avatarUrl={user?.avatarUrl} size={30} />
@@ -1468,14 +1529,57 @@ export default function SessionScreen() {
           </View>
         )}
 
-        {!isActive && (
-          <View style={[styles.endedBar, { backgroundColor: colors.surfaceAlt, borderTopColor: colors.border, paddingBottom: bottomPad + 8 }]}>
-            <Feather name="archive" size={16} color={colors.textSecondary} />
-            <Text style={[styles.endedText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-              This session ended {session.endedAt ? formatRelative(session.endedAt) : ""}
-            </Text>
-          </View>
-        )}
+        {!isActive && (() => {
+          const start = session?.createdAt ? new Date(session.createdAt) : null;
+          const end = session?.endedAt ? new Date(session.endedAt) : null;
+          const durationMs = start && end ? end.getTime() - start.getTime() : 0;
+          const durationMin = Math.round(durationMs / 60000);
+          const durationStr = durationMin >= 60
+            ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
+            : `${durationMin}m`;
+          const msgCount = messages.length;
+          const mediaCount = messages.filter(m => m.type === "image" || m.type === "file" || m.type === "voice").length;
+          const participantCount = session?.participants.length ?? 0;
+
+          return (
+            <View style={[styles.insightsCard, { backgroundColor: colors.surfaceAlt, borderTopColor: colors.border, paddingBottom: bottomPad + 8 }]}>
+              <View style={styles.insightsHeader}>
+                <View style={[styles.insightsIcon, { backgroundColor: colors.accentSoft }]}>
+                  <Feather name="check-circle" size={16} color={colors.accent} />
+                </View>
+                <Text style={[styles.insightsTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Session Complete</Text>
+              </View>
+              <View style={styles.insightsRow}>
+                <View style={styles.insightsStat}>
+                  <Feather name="clock" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.insightsStatValue, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>{durationStr}</Text>
+                  <Text style={[styles.insightsStatLabel, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>Duration</Text>
+                </View>
+                <View style={[styles.insightsDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.insightsStat}>
+                  <Feather name="message-circle" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.insightsStatValue, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>{msgCount}</Text>
+                  <Text style={[styles.insightsStatLabel, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>Messages</Text>
+                </View>
+                <View style={[styles.insightsDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.insightsStat}>
+                  <Feather name="image" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.insightsStatValue, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>{mediaCount}</Text>
+                  <Text style={[styles.insightsStatLabel, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>Media</Text>
+                </View>
+                <View style={[styles.insightsDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.insightsStat}>
+                  <Feather name="users" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.insightsStatValue, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>{participantCount}</Text>
+                  <Text style={[styles.insightsStatLabel, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>People</Text>
+                </View>
+              </View>
+              <Text style={[styles.insightsEnded, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+                Ended {session?.endedAt ? formatRelative(session.endedAt) : ""}
+              </Text>
+            </View>
+          );
+        })()}
       </KeyboardAvoidingView>
 
       <Modal
@@ -1520,6 +1624,107 @@ export default function SessionScreen() {
               <Text style={[styles.attachCancelText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>Cancel</Text>
             </Pressable>
           </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={actionMenuMessage !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionMenuMessage(null)}
+      >
+        <Pressable
+          style={styles.attachOverlay}
+          onPress={() => setActionMenuMessage(null)}
+        >
+          <Pressable onPress={() => {}} style={[styles.actionMenuSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {actionMenuMessage && (
+              <View style={[styles.actionMenuPreview, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                <Text style={[{ color: colors.text, fontFamily: "Inter_400Regular", fontSize: 13 }]} numberOfLines={2}>
+                  {actionMenuMessage.type !== "text" ? `[${actionMenuMessage.type}]` : actionMenuMessage.content}
+                </Text>
+              </View>
+            )}
+            <View style={styles.actionMenuRow}>
+              {REACTION_EMOJIS.map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  style={({ pressed }) => [styles.reactionPickerEmoji, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => {
+                    if (actionMenuMessage) {
+                      reactMutation.mutate({ messageId: actionMenuMessage.id, emoji });
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                    setActionMenuMessage(null);
+                  }}
+                >
+                  <Text style={{ fontSize: 26 }}>{emoji}</Text>
+                </Pressable>
+              ))}
+              <Pressable
+                style={({ pressed }) => [styles.reactionPickerEmoji, {
+                  opacity: pressed ? 0.6 : 1,
+                  backgroundColor: colors.surfaceAlt,
+                  borderRadius: 18,
+                  width: 38,
+                  height: 38,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }]}
+                onPress={() => {
+                  const msg = actionMenuMessage;
+                  setActionMenuMessage(null);
+                  if (msg) setTimeout(() => setReactionPickerMessage(msg), 200);
+                }}
+              >
+                <Feather name="plus" size={18} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            <View style={[styles.actionMenuDivider, { backgroundColor: colors.border }]} />
+            {actionMenuMessage?.type === "text" && actionMenuMessage.content && (
+              <Pressable
+                style={({ pressed }) => [styles.actionMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                onPress={() => {
+                  if (actionMenuMessage) Clipboard.setStringAsync(actionMenuMessage.content);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setActionMenuMessage(null);
+                }}
+              >
+                <Feather name="copy" size={18} color={colors.text} />
+                <Text style={[styles.actionMenuItemText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Copy</Text>
+              </Pressable>
+            )}
+            <Pressable
+              style={({ pressed }) => [styles.actionMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+              onPress={() => {
+                const msg = actionMenuMessage;
+                setActionMenuMessage(null);
+                if (msg) setReplyToMessage(msg);
+              }}
+            >
+              <Feather name="corner-up-left" size={18} color={colors.text} />
+              <Text style={[styles.actionMenuItemText, { color: colors.text, fontFamily: "Inter_500Medium" }]}>Reply</Text>
+            </Pressable>
+            {actionMenuMessage?.senderId === user?.id && (
+              <Pressable
+                style={({ pressed }) => [styles.actionMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                onPress={() => {
+                  const msg = actionMenuMessage;
+                  setActionMenuMessage(null);
+                  if (msg) {
+                    confirmAction(
+                      "Delete Message",
+                      "Are you sure you want to delete this message? This cannot be undone.",
+                      () => deleteMutation.mutate(msg.id)
+                    );
+                  }
+                }}
+              >
+                <Feather name="trash-2" size={18} color={colors.danger} />
+                <Text style={[styles.actionMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete</Text>
+              </Pressable>
+            )}
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -2236,4 +2441,89 @@ const styles = StyleSheet.create({
   typingText: {
     fontSize: 12,
   },
+  replyQuote: {
+    borderLeftWidth: 3,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 6,
+  },
+  replyQuoteName: { fontSize: 12 },
+  replyQuoteText: { fontSize: 12, marginTop: 1 },
+  replyBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderLeftWidth: 3,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 12,
+    marginTop: 8,
+    gap: 8,
+  },
+  replyBarName: { fontSize: 12 },
+  replyBarText: { fontSize: 12, marginTop: 1 },
+  actionMenuSheet: {
+    width: "90%",
+    maxWidth: 340,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    gap: 4,
+  },
+  actionMenuPreview: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 8,
+  },
+  actionMenuRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 4,
+  },
+  actionMenuDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 8,
+  },
+  actionMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  actionMenuItemText: { fontSize: 15 },
+  insightsCard: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    padding: 16,
+    gap: 12,
+  },
+  insightsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  insightsIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  insightsTitle: { fontSize: 14 },
+  insightsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  insightsStat: {
+    alignItems: "center",
+    gap: 3,
+    flex: 1,
+  },
+  insightsStatValue: { fontSize: 16 },
+  insightsStatLabel: { fontSize: 10 },
+  insightsDivider: { width: 1, height: 30 },
+  insightsEnded: { fontSize: 11, textAlign: "center" },
 });

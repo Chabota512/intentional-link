@@ -13,6 +13,7 @@ export const messagesTable = pgTable("messages", {
   attachmentUrl: text("attachment_url"),
   attachmentName: text("attachment_name"),
   attachmentSize: integer("attachment_size"),
+  replyToId: integer("reply_to_id"),
   status: text("status", { enum: ["sent", "delivered", "read"] }).notNull().default("sent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, timestamp, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -21,6 +21,16 @@ export const sessionParticipantsTable = pgTable("session_participants", {
   status: text("status", { enum: ["invited", "joined", "declined"] }).notNull().default("invited"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const sessionReadCursorsTable = pgTable("session_read_cursors", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => sessionsTable.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  lastReadMessageId: integer("last_read_message_id").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.sessionId, t.userId),
+]);
 
 export const insertSessionSchema = createInsertSchema(sessionsTable).omit({ id: true, createdAt: true, endedAt: true });
 export type InsertSession = z.infer<typeof insertSessionSchema>;

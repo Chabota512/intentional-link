@@ -1,8 +1,8 @@
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { verifyToken } from "./auth";
-import { db, usersTable, sessionsTable, sessionParticipantsTable } from "@workspace/db";
-import { eq, and, ne } from "drizzle-orm";
+import { db, usersTable, sessionsTable, sessionParticipantsTable, sessionReadCursorsTable, messagesTable } from "@workspace/db";
+import { eq, and, ne, desc } from "drizzle-orm";
 
 let io: Server | null = null;
 
@@ -140,6 +140,21 @@ export function initSocketIO(httpServer: HttpServer): Server {
 
       const hasAccess = await canAccessSession(sessionId, userId);
       if (!hasAccess) return;
+
+      const [latestMsg] = await db.select({ id: messagesTable.id })
+        .from(messagesTable)
+        .where(eq(messagesTable.sessionId, sessionId))
+        .orderBy(desc(messagesTable.id))
+        .limit(1);
+
+      if (latestMsg) {
+        await db.insert(sessionReadCursorsTable)
+          .values({ sessionId, userId, lastReadMessageId: latestMsg.id, updatedAt: new Date() })
+          .onConflictDoUpdate({
+            target: [sessionReadCursorsTable.sessionId, sessionReadCursorsTable.userId],
+            set: { lastReadMessageId: latestMsg.id, updatedAt: new Date() },
+          });
+      }
 
       socket.to(`session:${sessionId}`).emit("messages_read", {
         userId,
