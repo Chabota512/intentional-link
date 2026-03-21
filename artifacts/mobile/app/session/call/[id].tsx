@@ -30,6 +30,7 @@ export default function CallScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [speakerOn, setSpeakerOn] = useState(!isVoice);
+  const ringbackActiveRef = React.useRef(false);
 
   useEffect(() => {
     joinCall();
@@ -76,10 +77,29 @@ export default function CallScreen() {
     }
   }
 
+  function startRingback() {
+    if (Platform.OS !== "web" && !ringbackActiveRef.current) {
+      try {
+        InCallManager.startRingback("_BUNDLE_");
+        ringbackActiveRef.current = true;
+      } catch {}
+    }
+  }
+
+  function stopRingback() {
+    if (Platform.OS !== "web" && ringbackActiveRef.current) {
+      try {
+        InCallManager.stopRingback();
+        ringbackActiveRef.current = false;
+      } catch {}
+    }
+  }
+
   function handleMessage(event: WebViewMessageEvent) {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === "endCall") {
+        stopRingback();
         leaveCall();
       } else if (msg.type === "toggleSpeaker") {
         const next = !speakerOn;
@@ -87,12 +107,19 @@ export default function CallScreen() {
         if (Platform.OS !== "web") {
           InCallManager.setSpeakerphoneOn(next);
         }
+      } else if (msg.type === "callConnected") {
+        startRingback();
+      } else if (msg.type === "participantJoined") {
+        stopRingback();
+      } else if (msg.type === "participantLeft") {
+        if (msg.count === 0) startRingback();
       }
     } catch {}
   }
 
   function leaveCall() {
     if (Platform.OS !== "web") {
+      stopRingback();
       InCallManager.stop();
     }
     router.replace(`/session/${sessionId}` as any);
