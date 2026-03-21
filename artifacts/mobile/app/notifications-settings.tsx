@@ -59,13 +59,13 @@ const DURATION_PRESETS: DurationPreset[] = [
 ];
 
 const DAYS = [
+  { key: "sun", label: "S", full: "Sunday" },
   { key: "mon", label: "M", full: "Monday" },
   { key: "tue", label: "T", full: "Tuesday" },
   { key: "wed", label: "W", full: "Wednesday" },
   { key: "thu", label: "T", full: "Thursday" },
   { key: "fri", label: "F", full: "Friday" },
   { key: "sat", label: "S", full: "Saturday" },
-  { key: "sun", label: "S", full: "Sunday" },
 ];
 
 
