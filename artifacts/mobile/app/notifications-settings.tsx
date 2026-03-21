@@ -12,6 +12,7 @@ import {
   Modal,
   Platform,
 } from "react-native";
+import Slider from "@react-native-community/slider";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -60,12 +61,6 @@ const DAYS = [
   { key: "sun", label: "S" },
 ];
 
-const VOLUME_PRESETS = [
-  { label: "Silent", value: 0, icon: "volume-x" as const },
-  { label: "Low", value: 25, icon: "volume-1" as const },
-  { label: "Medium", value: 60, icon: "volume-2" as const },
-  { label: "Full", value: 100, icon: "volume-2" as const },
-];
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => {
   const h = i % 12 === 0 ? 12 : i % 12;
@@ -350,23 +345,24 @@ export default function NotificationsSettingsScreen() {
             <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>NOTIFICATION VOLUME</Text>
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.volumeRow}>
-                {VOLUME_PRESETS.map((p, i) => {
-                  const active = settings.notificationVolume === p.value;
-                  return (
-                    <Pressable
-                      key={p.value}
-                      style={[
-                        styles.volumeChip,
-                        i > 0 && { marginLeft: 8 },
-                        { borderColor: active ? colors.accent : colors.border, backgroundColor: active ? colors.accentSoft ?? colors.background : "transparent" },
-                      ]}
-                      onPress={() => setVolume(p.value)}
-                    >
-                      <Feather name={p.icon} size={16} color={active ? colors.accent : colors.textSecondary} />
-                      <Text style={[styles.volumeChipText, { color: active ? colors.accent : colors.textSecondary }]}>{p.label}</Text>
-                    </Pressable>
-                  );
-                })}
+                <Feather
+                  name={settings.notificationVolume === 0 ? "volume-x" : settings.notificationVolume < 50 ? "volume-1" : "volume-2"}
+                  size={18}
+                  color={colors.accent}
+                />
+                <Slider
+                  style={styles.volumeSlider}
+                  minimumValue={0}
+                  maximumValue={100}
+                  step={1}
+                  value={settings.notificationVolume}
+                  onValueChange={(val) => setSettings(prev => ({ ...prev, notificationVolume: val }))}
+                  onSlidingComplete={(val) => setVolume(val)}
+                  minimumTrackTintColor={colors.accent}
+                  maximumTrackTintColor={colors.border}
+                  thumbTintColor={colors.accent}
+                />
+                <Text style={[styles.volumeLabel, { color: colors.textSecondary }]}>{settings.notificationVolume}%</Text>
               </View>
             </View>
 
@@ -569,17 +565,21 @@ const styles = StyleSheet.create({
 
   volumeRow: {
     flexDirection: "row",
-    padding: 12,
-  },
-  volumeChip: {
-    flex: 1,
     alignItems: "center",
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
   },
-  volumeChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  volumeSlider: {
+    flex: 1,
+    height: 40,
+  },
+  volumeLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    minWidth: 36,
+    textAlign: "right",
+  },
 
   modalBackdrop: {
     flex: 1,
