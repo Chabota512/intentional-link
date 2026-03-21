@@ -22,7 +22,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, name: string, password: string) => Promise<void>;
+  register: (username: string, name: string, password: string, securityQuestion: string, securityAnswer: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updates: { name?: string; username?: string; avatarUrl?: string | null }) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -64,11 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(authUser);
   };
 
-  const register = async (username: string, name: string, password: string) => {
+  const register = async (username: string, name: string, password: string, securityQuestion: string, securityAnswer: string) => {
     const res = await fetch(`${BASE_URL}/api/users/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, name, password }),
+      body: JSON.stringify({ username, name, password, securityQuestion, securityAnswer }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Registration failed");

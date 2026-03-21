@@ -70,7 +70,7 @@ artifacts-monorepo/
 
 ## Database Schema (Drizzle ORM)
 
-- `users` — id, username, name, displayName, passwordHash, avatarUrl, pushToken, createdAt, lastSeenAt
+- `users` — id, username, name, displayName, passwordHash, securityQuestion, securityAnswerHash, avatarUrl, pushToken, createdAt, lastSeenAt
 - `contacts` — id, userId, contactUserId, status (pending|accepted), createdAt
 - `sessions` — id, name, description, imageUrl, creatorId, status, createdAt, endedAt
 - `session_participants` — id, sessionId, userId, status (invited|joined)
@@ -81,8 +81,10 @@ artifacts-monorepo/
 
 All at `/api/*`:
 
-- `POST /users/register` — register
+- `POST /users/register` — register (requires securityQuestion + securityAnswer)
 - `POST /users/login` — login (updates lastSeenAt)
+- `POST /users/security-question` — get security question for username (public, rate-limited)
+- `POST /users/reset-password` — reset password via security answer (public, rate-limited)
 - `GET /users/me` — get current user
 - `PUT /users/me` — update name/username/pushToken
 - `DELETE /users/me` — delete account

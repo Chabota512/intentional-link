@@ -20,7 +20,7 @@ app.use("/api", (req: Request, res: Response, next: NextFunction) => {
       req.headers["x-user-id"] = String(userId);
       return next();
     }
-    if (req.path !== "/users/login" && req.path !== "/users/register" && req.path !== "/healthz") {
+    if (req.path !== "/users/login" && req.path !== "/users/register" && req.path !== "/users/security-question" && req.path !== "/users/reset-password" && req.path !== "/healthz") {
       res.status(401).json({ error: "Invalid or expired token" });
       return;
     }

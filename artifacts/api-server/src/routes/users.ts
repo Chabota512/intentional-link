@@ -1,5 +1,21 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, ne, or } from "drizzle-orm";
+import { eq, ilike, and, ne } from "drizzle-orm";
+
+const recoveryAttempts = new Map<string, { count: number; resetAt: number }>();
+const RECOVERY_MAX_ATTEMPTS = 5;
+const RECOVERY_WINDOW_MS = 15 * 60 * 1000;
+
+function checkRecoveryRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = recoveryAttempts.get(key);
+  if (!entry || now > entry.resetAt) {
+    recoveryAttempts.set(key, { count: 1, resetAt: now + RECOVERY_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RECOVERY_MAX_ATTEMPTS) return false;
+  entry.count++;
+  return true;
+}
 import { db, usersTable, sessionsTable, sessionParticipantsTable, messagesTable, userPrivacySettingsTable, contactsTable, notificationsTable, uploadsTable, sessionReadCursorsTable, messageReactionsTable } from "@workspace/db";
 import { emitToUser, emitToSession } from "../lib/socketio";
 import {
@@ -28,6 +44,14 @@ router.post("/users/register", async (req, res): Promise<void> => {
   const { username: rawUsername, name, password } = parsed.data;
   const username = rawUsername.trim().toLowerCase();
 
+  const securityQuestion = req.body?.securityQuestion as string | undefined;
+  const securityAnswer = req.body?.securityAnswer as string | undefined;
+
+  if (!securityQuestion || !securityAnswer || securityQuestion.trim().length === 0 || securityAnswer.trim().length < 2) {
+    res.status(400).json({ error: "Security question and answer are required" });
+    return;
+  }
+
   let existing: (typeof usersTable.$inferSelect)[];
   try {
     existing = await db.select().from(usersTable).where(ilike(usersTable.username, username)).limit(1);
@@ -41,10 +65,11 @@ router.post("/users/register", async (req, res): Promise<void> => {
   }
 
   const passwordHash = await hashPassword(password);
+  const securityAnswerHash = await hashPassword(securityAnswer.trim().toLowerCase());
 
   let user;
   try {
-    [user] = await db.insert(usersTable).values({ username, name: name.trim(), passwordHash }).returning();
+    [user] = await db.insert(usersTable).values({ username, name: name.trim(), passwordHash, securityQuestion: securityQuestion.trim(), securityAnswerHash }).returning();
   } catch (err: any) {
     if (err.code === "23505") {
       res.status(409).json({ error: "Username already taken" });
@@ -113,6 +138,92 @@ router.post("/users/login", async (req, res): Promise<void> => {
     createdAt: user.createdAt,
     lastSeenAt: now,
   }));
+});
+
+router.post("/users/security-question", async (req, res): Promise<void> => {
+  const { username: rawUsername } = req.body ?? {};
+  if (!rawUsername || typeof rawUsername !== "string" || rawUsername.trim().length === 0) {
+    res.status(400).json({ error: "Username is required" });
+    return;
+  }
+
+  const username = rawUsername.trim().toLowerCase();
+
+  if (!checkRecoveryRateLimit(`sq:${username}`)) {
+    res.status(429).json({ error: "Too many attempts. Please try again later." });
+    return;
+  }
+
+  try {
+    const [user] = await db.select({
+      id: usersTable.id,
+      securityQuestion: usersTable.securityQuestion,
+    }).from(usersTable)
+      .where(ilike(usersTable.username, username))
+      .limit(1);
+
+    if (!user || !user.securityQuestion) {
+      res.status(404).json({ error: "Unable to process request" });
+      return;
+    }
+
+    res.json({ securityQuestion: user.securityQuestion });
+  } catch (err) {
+    console.error("[POST /users/security-question] Error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+router.post("/users/reset-password", async (req, res): Promise<void> => {
+  const { username: rawUsername, securityAnswer, newPassword } = req.body ?? {};
+
+  if (!rawUsername || typeof rawUsername !== "string") {
+    res.status(400).json({ error: "Username is required" });
+    return;
+  }
+  if (!securityAnswer || typeof securityAnswer !== "string" || securityAnswer.trim().length < 2) {
+    res.status(400).json({ error: "Security answer is required" });
+    return;
+  }
+  if (!newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
+    res.status(400).json({ error: "New password must be at least 6 characters" });
+    return;
+  }
+
+  const username = rawUsername.trim().toLowerCase();
+
+  if (!checkRecoveryRateLimit(`rp:${username}`)) {
+    res.status(429).json({ error: "Too many attempts. Please try again later." });
+    return;
+  }
+
+  try {
+    const [user] = await db.select({
+      id: usersTable.id,
+      securityAnswerHash: usersTable.securityAnswerHash,
+    }).from(usersTable)
+      .where(ilike(usersTable.username, username))
+      .limit(1);
+
+    if (!user || !user.securityAnswerHash) {
+      res.status(400).json({ error: "Unable to reset password" });
+      return;
+    }
+
+    const answerMatch = await verifyPassword(securityAnswer.trim().toLowerCase(), user.securityAnswerHash);
+    if (!answerMatch) {
+      res.status(400).json({ error: "Unable to reset password" });
+      return;
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await db.update(usersTable).set({ passwordHash: newHash }).where(eq(usersTable.id, user.id));
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[POST /users/reset-password] Error:", err);
+    res.status(500).json({ error: "Something went wrong" });
+  }
 });
 
 router.get("/users/me", async (req, res): Promise<void> => {
