@@ -32,7 +32,7 @@ import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Audio, Video, ResizeMode, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
-import { VideoView, useVideoPlayer, useEvent } from "expo-video";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { LightSensor } from "expo-sensors";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
@@ -801,9 +801,17 @@ export default function SessionScreen() {
     }
   }, [videoViewer?.url]);
 
-  const { isPlaying: vpIsPlaying } = useEvent(inAppVideoPlayer, "playingChange", { isPlaying: false });
-  const { currentTime: vpCurrentTime } = useEvent(inAppVideoPlayer, "timeUpdate", { currentTime: 0, bufferedPosition: 0 });
-  const { status: vpStatus } = useEvent(inAppVideoPlayer, "statusChange", { status: "idle" as const, error: undefined });
+  const [vpIsPlaying, setVpIsPlaying] = useState(false);
+  const [vpCurrentTime, setVpCurrentTime] = useState(0);
+  const [vpStatus, setVpStatus] = useState<"idle" | "loading" | "readyToPlay" | "error">("idle");
+
+  useEffect(() => {
+    inAppVideoPlayer.timeUpdateEventInterval = 0.5;
+    const s1 = inAppVideoPlayer.addListener("playingChange", ({ isPlaying }) => setVpIsPlaying(isPlaying));
+    const s2 = inAppVideoPlayer.addListener("timeUpdate", ({ currentTime }) => setVpCurrentTime(currentTime));
+    const s3 = inAppVideoPlayer.addListener("statusChange", ({ status }) => setVpStatus(status));
+    return () => { s1.remove(); s2.remove(); s3.remove(); };
+  }, []);
 
   const [vpRate, setVpRate] = useState(1);
   const [vpMuted, setVpMuted] = useState(false);
