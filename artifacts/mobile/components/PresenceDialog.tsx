@@ -104,8 +104,8 @@ export function PresenceDialog() {
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           {step === "choice" ? (
             <>
-              <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
-                <Feather name="wifi" size={24} color={colors.accent} />
+              <View style={[styles.iconWrap, { backgroundColor: "#dcfce7" }]}>
+                <Feather name="wifi" size={24} color="#16a34a" />
               </View>
               <Text style={[styles.title, { color: colors.text }]}>You're back online</Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
