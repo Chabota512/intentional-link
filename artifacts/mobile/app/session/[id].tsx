@@ -243,7 +243,7 @@ function VoicePlayer({
   return (
     <View style={[styles.voicePlayerRow]}>
       {!isOwn && senderName && (
-        <UserAvatar name={senderName} avatarUrl={senderAvatarUrl} size={28} />
+        <UserAvatar name={senderName} avatarUrl={senderAvatarUrl} size={28} showDot={false} />
       )}
       <Pressable
         onPress={togglePlay}
@@ -291,7 +291,7 @@ function VoicePlayer({
         )}
       </Pressable>
       {isOwn && senderName && (
-        <UserAvatar name={senderName} avatarUrl={senderAvatarUrl} size={28} />
+        <UserAvatar name={senderName} avatarUrl={senderAvatarUrl} size={28} showDot={false} />
       )}
     </View>
   );
@@ -387,7 +387,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
     >
       {!isOwn && (
         showAvatar
-          ? <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} />
+          ? <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} showDot={false} />
           : avatarPlaceholder
       )}
       <View style={{ maxWidth: "75%", gap: 3 }}>
@@ -475,7 +475,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
       </View>
       {isOwn && (
         showAvatar
-          ? <UserAvatar name={currentUser?.name ?? "?"} avatarUrl={currentUser?.avatarUrl} size={30} style={styles.senderAvatar} />
+          ? <UserAvatar name={currentUser?.name ?? "?"} avatarUrl={currentUser?.avatarUrl} size={30} style={styles.senderAvatar} showDot={false} />
           : avatarPlaceholder
       )}
     </Animated.View>
@@ -1391,7 +1391,7 @@ export default function SessionScreen() {
             )}
             {isRecording ? (
               <View style={styles.recordingRow}>
-                <UserAvatar name={user?.name ?? "?"} avatarUrl={user?.avatarUrl} size={30} />
+                <UserAvatar name={user?.name ?? "?"} avatarUrl={user?.avatarUrl} size={30} showDot={false} />
                 <Pressable
                   style={({ pressed }) => [styles.recordingCancelBtn, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
                   onPress={handleCancelRecording}

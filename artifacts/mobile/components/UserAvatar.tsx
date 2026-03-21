@@ -56,7 +56,7 @@ export default function UserAvatar({
   const dotBorder = Math.max(1.5, Math.round(size * 0.04));
 
   const showPresenceDot = showDot;
-  const dot = dotColor(presenceStatus, isOnline ?? true, colors.success, colors.textTertiary);
+  const dot = dotColor(presenceStatus, isOnline, colors.success, colors.textTertiary);
 
   return (
     <View style={[{ width: size, height: size, position: "relative" }, style]}>
