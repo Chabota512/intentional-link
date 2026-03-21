@@ -31,7 +31,7 @@ import * as SMS from "expo-sms";
 import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
+import { Audio, Video, ResizeMode, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import { LightSensor } from "expo-sensors";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
@@ -427,6 +427,48 @@ function getSortedEmojis(usage: EmojiUsage): string[] {
   });
 }
 
+function isVideoFile(name: string | null | undefined): boolean {
+  if (!name) return false;
+  return /\.(mp4|mov|m4v|avi|mkv|webm|3gp|wmv)$/i.test(name);
+}
+
+function InlineVideoPlayer({ url, isOwn, colors, onLongPress }: {
+  url: string;
+  isOwn: boolean;
+  colors: ReturnType<typeof import("@/hooks/useTheme").useTheme>["colors"];
+  onLongPress?: () => void;
+}) {
+  const videoRef = useRef<Video>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  return (
+    <Pressable
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      style={{ borderRadius: 12, overflow: "hidden", width: 240, backgroundColor: "#000" }}
+    >
+      <Video
+        ref={videoRef}
+        source={{ uri: url }}
+        style={{ width: 240, height: 160 }}
+        resizeMode={ResizeMode.CONTAIN}
+        useNativeControls
+        onPlaybackStatusUpdate={(status) => {
+          if (status.isLoaded) {
+            setIsLoaded(true);
+          }
+        }}
+        shouldPlay={false}
+      />
+      {!isLoaded && (
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <ActivityIndicator color="#fff" />
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
 function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, senderPresenceStatus, onAvatarPress, onImagePress }: {
   message: Message;
   isOwn: boolean;
@@ -467,6 +509,18 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
 
     if (message.type === "file" && message.attachmentUrl) {
       const url = getFileUrl(message.attachmentUrl);
+
+      if (isVideoFile(message.attachmentName)) {
+        return (
+          <InlineVideoPlayer
+            url={url}
+            isOwn={isOwn}
+            colors={colors}
+            onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onLongPress?.(); }}
+          />
+        );
+      }
+
       return (
         <Pressable
           onPress={() => Linking.openURL(url)}
