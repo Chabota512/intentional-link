@@ -194,29 +194,26 @@ router.get("/sessions/:id/call-page", async (req, res) => {
     pointer-events: none;
   }
 
-  /* Pill buttons (WhatsApp / Messenger style) */
+  /* Compact circular icon buttons */
   .ctrl-btn {
     display: flex;
-    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 7px;
-    padding: 0 18px;
-    height: 50px;
-    border-radius: 25px;
+    width: 56px;
+    height: 56px;
+    border-radius: 28px;
     border: none;
     cursor: pointer;
     background: rgba(40,40,40,0.88);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.45);
     transition: transform 0.1s, opacity 0.15s, background 0.2s;
     pointer-events: all;
-    white-space: nowrap;
   }
-  .ctrl-btn:active { transform: scale(0.94); opacity: 0.85; }
+  .ctrl-btn:active { transform: scale(0.90); opacity: 0.80; }
   .ctrl-btn svg { flex-shrink: 0; display: block; }
-  .ctrl-label { font-size: 13px; font-weight: 600; color: #fff; letter-spacing: 0.1px; }
+  .ctrl-label { display: none; }
 
   .btn-mute.active { background: rgba(255,59,48,0.88); }
   .btn-video.active { background: rgba(255,59,48,0.88); }
