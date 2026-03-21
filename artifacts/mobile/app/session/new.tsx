@@ -205,7 +205,7 @@ export default function NewSessionScreen() {
               onChangeText={setTitle}
               autoFocus
               returnKeyType="next"
-              maxLength={100}
+              maxLength={40}
             />
           </View>
 
