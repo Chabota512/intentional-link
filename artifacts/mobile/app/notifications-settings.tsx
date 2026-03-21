@@ -81,6 +81,15 @@ function Avatar({ name, avatarUrl, size = 38, colors }: { name: string; avatarUr
 }
 
 
+function timeToMins(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function isOvernight(start: string, end: string): boolean {
+  return timeToMins(end) <= timeToMins(start);
+}
+
 function formatTimeValue(value: string): string {
   const [hStr, mStr] = value.split(":");
   const h = parseInt(hStr);
@@ -237,6 +246,7 @@ export default function NotificationsSettingsScreen() {
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editStart, setEditStart] = useState<string | null>(null);
   const [editEnd, setEditEnd] = useState<string | null>(null);
+  const [editSameTimeError, setEditSameTimeError] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
