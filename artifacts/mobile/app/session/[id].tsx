@@ -299,7 +299,7 @@ function VoicePlayer({
 
 const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🙏", "👍"];
 
-function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact }: {
+function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, senderPresenceStatus }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
@@ -310,6 +310,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
   onPlayed?: () => void;
   onLongPress?: () => void;
   onReact?: (emoji: string) => void;
+  senderPresenceStatus?: "online" | "offline" | "local";
 }) {
   const renderContent = () => {
     if (message.type === "image" && message.attachmentUrl) {
@@ -387,7 +388,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
     >
       {!isOwn && (
         showAvatar
-          ? <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} presenceStatus={getEffectivePresence(message.sender.id, message.sender.lastSeenAt) as any} />
+          ? <UserAvatar name={message.sender.name} avatarUrl={message.sender.avatarUrl} size={30} style={styles.senderAvatar} presenceStatus={senderPresenceStatus} />
           : avatarPlaceholder
       )}
       <View style={{ maxWidth: "75%", gap: 3 }}>
@@ -1309,6 +1310,7 @@ export default function SessionScreen() {
                   onPlayed={item.type === "voice" && !isOwn ? () => markPlayedMutation.mutate(item.id) : undefined}
                   onLongPress={() => setActionMenuMessage(item)}
                   onReact={(emoji) => reactMutation.mutate({ messageId: item.id, emoji })}
+                  senderPresenceStatus={isOwn ? "online" : getEffectivePresence(item.senderId, item.sender.lastSeenAt) as any}
                 />
               );
             }}
