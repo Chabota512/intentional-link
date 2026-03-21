@@ -139,20 +139,12 @@ export default function CallScreen() {
       </View>
 
       {Platform.OS === "web" ? (
-        <View style={styles.webFallback}>
-          <Feather name={isVoice ? "phone" : "video"} size={48} color="#FF6B9D" />
-          <Text style={{ color: "#fff", fontSize: 16, marginTop: 16, textAlign: "center", paddingHorizontal: 32 }}>
-            {isVoice ? "Voice" : "Video"} calls open in your browser. Tap below to join.
-          </Text>
-          <Pressable
-            style={styles.openBrowserBtn}
-            onPress={() => {
-              if (typeof window !== "undefined") window.open(callUrl, "_blank");
-            }}
-          >
-            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 16 }}>Open Call</Text>
-          </Pressable>
-        </View>
+        <iframe
+          src={callUrl}
+          style={{ flex: 1, border: "none", width: "100%", height: "100%" } as any}
+          allow="camera; microphone; display-capture; autoplay"
+          allowFullScreen
+        />
       ) : (
         <WebView
           source={{ uri: callUrl }}
@@ -248,17 +240,5 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: "#111",
-  },
-  webFallback: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  openBrowserBtn: {
-    marginTop: 24,
-    backgroundColor: "#FF6B9D",
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 14,
   },
 });
