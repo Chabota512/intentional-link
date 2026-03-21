@@ -9,6 +9,7 @@ let io: Server | null = null;
 const onlineUsers = new Map<number, Set<string>>();
 
 const typingTimers = new Map<string, NodeJS.Timeout>();
+const recordingTimers = new Map<string, NodeJS.Timeout>();
 
 async function canAccessSession(sessionId: number, userId: number): Promise<boolean> {
   const [session] = await db.select({ creatorId: sessionsTable.creatorId })
@@ -134,6 +135,58 @@ export function initSocketIO(httpServer: HttpServer): Server {
       });
     });
 
+    socket.on("recording_start", async (data: unknown) => {
+      if (!data || typeof data !== "object") return;
+      const { sessionId } = data as { sessionId?: unknown };
+      if (typeof sessionId !== "number" || !Number.isFinite(sessionId)) return;
+
+      const hasAccess = await canAccessSession(sessionId, userId);
+      if (!hasAccess) return;
+
+      const key = `${userId}:${sessionId}`;
+
+      if (recordingTimers.has(key)) {
+        clearTimeout(recordingTimers.get(key)!);
+      }
+
+      socket.to(`session:${sessionId}`).emit("recording_start", {
+        userId,
+        sessionId,
+      });
+
+      recordingTimers.set(
+        key,
+        setTimeout(() => {
+          socket.to(`session:${sessionId}`).emit("recording_stop", {
+            userId,
+            sessionId,
+          });
+          recordingTimers.delete(key);
+        }, 60000)
+      );
+    });
+
+    socket.on("recording_stop", async (data: unknown) => {
+      if (!data || typeof data !== "object") return;
+      const { sessionId } = data as { sessionId?: unknown };
+      if (typeof sessionId !== "number" || !Number.isFinite(sessionId)) return;
+
+      const hasAccess = await canAccessSession(sessionId, userId);
+      if (!hasAccess) return;
+
+      const key = `${userId}:${sessionId}`;
+
+      if (recordingTimers.has(key)) {
+        clearTimeout(recordingTimers.get(key)!);
+        recordingTimers.delete(key);
+      }
+
+      socket.to(`session:${sessionId}`).emit("recording_stop", {
+        userId,
+        sessionId,
+      });
+    });
+
     socket.on("mark_read", async (data: unknown) => {
       if (!data || typeof data !== "object") return;
       const { sessionId } = data as { sessionId?: unknown };
@@ -182,6 +235,18 @@ export function initSocketIO(httpServer: HttpServer): Server {
           typingTimers.delete(key);
           const sid = parseInt(key.split(":")[1], 10);
           socket.to(`session:${sid}`).emit("typing_stop", {
+            userId,
+            sessionId: sid,
+          });
+        }
+      }
+
+      for (const [key, timer] of recordingTimers.entries()) {
+        if (key.startsWith(`${userId}:`)) {
+          clearTimeout(timer);
+          recordingTimers.delete(key);
+          const sid = parseInt(key.split(":")[1], 10);
+          socket.to(`session:${sid}`).emit("recording_stop", {
             userId,
             sessionId: sid,
           });

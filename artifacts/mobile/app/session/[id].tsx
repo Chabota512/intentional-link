@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeIn, FadeOut } from "react-native-reanimated";
 import { TextInput } from "react-native";
 import * as Haptics from "expo-haptics";
 import * as SMS from "expo-sms";
@@ -502,7 +502,7 @@ export default function SessionScreen() {
   const { get, post, patch, del, uploadFile, getFileUrl } = useApi();
   const { user } = useAuth();
   const { getPresenceStatus } = useLocalDiscovery();
-  const { isConnected: socketConnected, typingUsers, onlineUserIds, emitTypingStart, emitTypingStop, emitMarkRead, joinSession, leaveSession } = useSocket();
+  const { isConnected: socketConnected, typingUsers, recordingUsers, onlineUserIds, emitTypingStart, emitTypingStop, emitRecordingStart, emitRecordingStop, emitMarkRead, joinSession, leaveSession } = useSocket();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const flatListRef = useRef<FlatList>(null);
@@ -661,6 +661,17 @@ export default function SessionScreen() {
     const creatorName = session.creator.name;
     if (!typingParticipantNames.includes(creatorName)) {
       typingParticipantNames.push(creatorName);
+    }
+  }
+
+  const sessionRecordingUserIds = recordingUsers.get(sessionId);
+  const recordingParticipantNames = session?.participants
+    .filter((p) => sessionRecordingUserIds?.has(p.userId))
+    .map((p) => p.user.name) ?? [];
+  if (session?.creator && sessionRecordingUserIds?.has(session.creator.id) && session.creator.id !== user?.id) {
+    const creatorName = session.creator.name;
+    if (!recordingParticipantNames.includes(creatorName)) {
+      recordingParticipantNames.push(creatorName);
     }
   }
 
@@ -966,6 +977,7 @@ export default function SessionScreen() {
       setRecording(rec);
       setIsRecording(true);
       setRecordingSeconds(0);
+      emitRecordingStart(sessionId);
       recordingTimerRef.current = setInterval(() => {
         setRecordingSeconds((s) => s + 1);
       }, 1000);
@@ -983,6 +995,7 @@ export default function SessionScreen() {
     setIsRecording(false);
     setIsRecordingPaused(false);
     setRecordingSeconds(0);
+    emitRecordingStop(sessionId);
     if (recording) {
       try {
         await recording.stopAndUnloadAsync();
@@ -1031,6 +1044,7 @@ export default function SessionScreen() {
     setIsRecording(false);
     setIsRecordingPaused(false);
     setRecordingSeconds(0);
+    emitRecordingStop(sessionId);
     try {
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
@@ -1416,6 +1430,19 @@ export default function SessionScreen() {
               </View>
             }
           />
+        )}
+
+        {recordingParticipantNames.length > 0 && canSend && (
+          <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={[styles.typingBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <Feather name="mic" size={13} color={colors.danger} />
+            <Text style={[styles.typingText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+              {recordingParticipantNames.length === 1
+                ? `${recordingParticipantNames[0]} is recording a voice note…`
+                : recordingParticipantNames.length === 2
+                ? `${recordingParticipantNames[0]} and ${recordingParticipantNames[1]} are recording…`
+                : `${recordingParticipantNames[0]} and ${recordingParticipantNames.length - 1} others are recording…`}
+            </Text>
+          </Animated.View>
         )}
 
         {typingParticipantNames.length > 0 && canSend && (

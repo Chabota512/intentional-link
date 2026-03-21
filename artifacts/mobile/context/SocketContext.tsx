@@ -15,9 +15,12 @@ interface SocketContextValue {
   socket: Socket | null;
   isConnected: boolean;
   typingUsers: Map<number, Set<number>>;
+  recordingUsers: Map<number, Set<number>>;
   onlineUserIds: Set<number>;
   emitTypingStart: (sessionId: number) => void;
   emitTypingStop: (sessionId: number) => void;
+  emitRecordingStart: (sessionId: number) => void;
+  emitRecordingStop: (sessionId: number) => void;
   emitMarkRead: (sessionId: number) => void;
   joinSession: (sessionId: number) => void;
   leaveSession: (sessionId: number) => void;
@@ -31,6 +34,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Map<number, Set<number>>>(new Map());
+  const [recordingUsers, setRecordingUsers] = useState<Map<number, Set<number>>>(new Map());
   const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
   const appStateRef = useRef<AppStateStatus>("active");
 
@@ -158,6 +162,32 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     });
 
+    socket.on("recording_start", (data: TypingUser) => {
+      if (data.userId === user.id) return;
+      setRecordingUsers((prev) => {
+        const next = new Map(prev);
+        const set = new Set(next.get(data.sessionId) || []);
+        set.add(data.userId);
+        next.set(data.sessionId, set);
+        return next;
+      });
+    });
+
+    socket.on("recording_stop", (data: TypingUser) => {
+      if (data.userId === user.id) return;
+      setRecordingUsers((prev) => {
+        const next = new Map(prev);
+        const set = new Set(next.get(data.sessionId) || []);
+        set.delete(data.userId);
+        if (set.size === 0) {
+          next.delete(data.sessionId);
+        } else {
+          next.set(data.sessionId, set);
+        }
+        return next;
+      });
+    });
+
     socket.on("presence_update", (data: { userId: number; status: string }) => {
       if (data.userId === user.id) return;
       setOnlineUserIds((prev) => {
@@ -205,6 +235,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socketRef.current?.emit("typing_stop", { sessionId });
   }, []);
 
+  const emitRecordingStart = useCallback((sessionId: number) => {
+    socketRef.current?.emit("recording_start", { sessionId });
+  }, []);
+
+  const emitRecordingStop = useCallback((sessionId: number) => {
+    socketRef.current?.emit("recording_stop", { sessionId });
+  }, []);
+
   const emitMarkRead = useCallback((sessionId: number) => {
     socketRef.current?.emit("mark_read", { sessionId });
   }, []);
@@ -223,9 +261,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         socket: socketRef.current,
         isConnected,
         typingUsers,
+        recordingUsers,
         onlineUserIds,
         emitTypingStart,
         emitTypingStop,
+        emitRecordingStart,
+        emitRecordingStop,
         emitMarkRead,
         joinSession,
         leaveSession,
