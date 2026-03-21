@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, lt, gt, ne, desc, inArray, ilike } from "drizzle-orm";
 import { db, messagesTable, usersTable, sessionsTable, sessionParticipantsTable, messageReactionsTable } from "@workspace/db";
 import { SendMessageBody, GetMessagesResponseItem } from "@workspace/api-zod";
-import { sendPushNotifications, saveNotification } from "../lib/pushNotifications";
+import { sendPushNotification, sendPushNotifications, saveNotification } from "../lib/pushNotifications";
 import { emitToSession, isUserOnline } from "../lib/socketio";
 
 const router: IRouter = Router();
@@ -420,6 +420,45 @@ router.post("/sessions/:sessionId/messages/:messageId/react", async (req, res): 
   await db.insert(messageReactionsTable).values({ messageId, userId, emoji });
   res.json({ action: "added" });
   emitToSession(sessionId, "reaction_added", { messageId, userId, emoji, sessionId });
+
+  // Send notification to the message sender (if different from the reactor)
+  (async () => {
+    try {
+      const [targetMsg] = await db.select({ senderId: messagesTable.senderId, content: messagesTable.content, type: messagesTable.type })
+        .from(messagesTable)
+        .where(eq(messagesTable.id, messageId))
+        .limit(1);
+
+      if (!targetMsg || targetMsg.senderId === userId) return;
+
+      const [reactor] = await db.select({ name: usersTable.name })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+
+      const [sessionRow] = await db.select({ name: sessionsTable.title })
+        .from(sessionsTable)
+        .where(eq(sessionsTable.id, sessionId))
+        .limit(1);
+
+      const reactorName = reactor?.name || "Someone";
+      const sessionName = sessionRow?.name || "a session";
+      const notifBody = `${reactorName} reacted ${emoji} to your message`;
+
+      const [senderRow] = await db.select({ id: usersTable.id, pushToken: usersTable.pushToken })
+        .from(usersTable)
+        .where(eq(usersTable.id, targetMsg.senderId))
+        .limit(1);
+
+      if (!senderRow) return;
+
+      await saveNotification(senderRow.id, "message", sessionName, notifBody, { sessionId, messageId });
+
+      if (senderRow.pushToken) {
+        await sendPushNotification(senderRow.pushToken, sessionName, notifBody, { sessionId, messageId });
+      }
+    } catch {}
+  })();
 });
 
 router.get("/messages/search", async (req, res): Promise<void> => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
@@ -16,6 +16,7 @@ import {
   Linking,
   Keyboard,
   Dimensions,
+  PanResponder,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -706,7 +707,7 @@ export default function SessionScreen() {
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [profileViewUser, setProfileViewUser] = useState<{ name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" } | null>(null);
-  const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [viewerImageIndex, setViewerImageIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -804,6 +805,28 @@ export default function SessionScreen() {
       return data;
     },
   });
+
+  const chatImageUrls = useMemo(() => {
+    return messages
+      .filter(m => m.type === "image" && m.attachmentUrl)
+      .map(m => getFileUrl(m.attachmentUrl!));
+  }, [messages, getFileUrl]);
+
+  const openImageViewer = useCallback((url: string) => {
+    const idx = chatImageUrls.indexOf(url);
+    setViewerImageIndex(idx >= 0 ? idx : 0);
+  }, [chatImageUrls]);
+
+  const viewerPanResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
+    onPanResponderRelease: (_, g) => {
+      if (g.dx < -40) {
+        setViewerImageIndex(prev => prev !== null && prev < chatImageUrls.length - 1 ? prev + 1 : prev);
+      } else if (g.dx > 40) {
+        setViewerImageIndex(prev => prev !== null && prev > 0 ? prev - 1 : prev);
+      }
+    },
+  }), [chatImageUrls.length]);
 
   const { data: contacts = [] } = useQuery<Contact[]>({
     queryKey: ["contacts"],
@@ -1628,7 +1651,7 @@ export default function SessionScreen() {
                   onReact={(emoji) => reactMutation.mutate({ messageId: item.id, emoji })}
                   senderPresenceStatus={isOwn ? "online" : getEffectivePresence(item.senderId, item.sender.lastSeenAt) as any}
                   onAvatarPress={setProfileViewUser}
-                  onImagePress={setViewerImage}
+                  onImagePress={openImageViewer}
                 />
               );
             }}
@@ -2367,19 +2390,48 @@ export default function SessionScreen() {
         </View>
       </Modal>
 
-      <Modal visible={viewerImage !== null} transparent animationType="fade" onRequestClose={() => setViewerImage(null)}>
-        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.93)", alignItems: "center", justifyContent: "center" }} onPress={() => setViewerImage(null)}>
-          <Pressable style={{ position: "absolute", top: 60, right: 20, zIndex: 10, padding: 8 }} onPress={() => setViewerImage(null)}>
+      <Modal visible={viewerImageIndex !== null} transparent animationType="fade" onRequestClose={() => setViewerImageIndex(null)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.93)" }} {...viewerPanResponder.panHandlers}>
+          <Pressable style={{ position: "absolute", top: 60, right: 20, zIndex: 10, padding: 8 }} onPress={() => setViewerImageIndex(null)}>
             <Feather name="x" size={26} color="#fff" />
           </Pressable>
-          {viewerImage && (
-            <Image
-              source={{ uri: viewerImage }}
-              style={{ width: Dimensions.get("window").width, height: Dimensions.get("window").width * 1.2 }}
-              resizeMode="contain"
-            />
+          {viewerImageIndex !== null && chatImageUrls.length > 1 && (
+            <View style={{ position: "absolute", top: 66, left: 0, right: 0, alignItems: "center", zIndex: 10 }}>
+              <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
+                {viewerImageIndex + 1} / {chatImageUrls.length}
+              </Text>
+            </View>
           )}
-        </Pressable>
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            {viewerImageIndex !== null && chatImageUrls[viewerImageIndex] && (
+              <Image
+                source={{ uri: chatImageUrls[viewerImageIndex] }}
+                style={{ width: Dimensions.get("window").width, height: Dimensions.get("window").width * 1.2 }}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+          {viewerImageIndex !== null && chatImageUrls.length > 1 && (
+            <>
+              {viewerImageIndex > 0 && (
+                <Pressable
+                  style={{ position: "absolute", left: 12, top: "50%", zIndex: 10, padding: 10, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 24 }}
+                  onPress={() => setViewerImageIndex(i => i !== null ? i - 1 : i)}
+                >
+                  <Feather name="chevron-left" size={28} color="#fff" />
+                </Pressable>
+              )}
+              {viewerImageIndex < chatImageUrls.length - 1 && (
+                <Pressable
+                  style={{ position: "absolute", right: 12, top: "50%", zIndex: 10, padding: 10, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 24 }}
+                  onPress={() => setViewerImageIndex(i => i !== null ? i + 1 : i)}
+                >
+                  <Feather name="chevron-right" size={28} color="#fff" />
+                </Pressable>
+              )}
+            </>
+          )}
+        </View>
       </Modal>
     </View>
   );
