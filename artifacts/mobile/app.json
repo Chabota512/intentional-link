@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Intentional Link",
-    "slug": "mobile",
+    "slug": "intentional-link",
     "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -57,7 +57,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "8bf968f3-4d7e-434b-8a10-23281a087dd9"
+        "projectId": "588ad9ab-8b46-479d-af0d-8eedf7343865"
       }
     },
     "owner": "chabota_01"
