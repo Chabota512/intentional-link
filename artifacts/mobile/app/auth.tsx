@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
@@ -119,7 +120,7 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
+          <Animated.View entering={FadeInDown.duration(400).delay(0)} style={styles.header}>
             <View style={[styles.logoContainer, { backgroundColor: colors.accent }]}>
               <Image source={appIcon} style={styles.logoImage} resizeMode="contain" />
             </View>
@@ -127,9 +128,9 @@ export default function AuthScreen() {
             <Text style={[styles.tagline, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
               Intentional communication
             </Text>
-          </View>
+          </Animated.View>
 
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Animated.View entering={FadeInDown.duration(500).springify()} style={[styles.card, { backgroundColor: "#fff" }]}>
             <View style={styles.fields}>
               <Text style={[styles.cardTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>
                 {mode === "login" ? "Welcome back" : "Create account"}
@@ -269,7 +270,7 @@ export default function AuthScreen() {
                 </Text>
               </Pressable>
             </View>
-          </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -299,27 +300,26 @@ const styles = StyleSheet.create({
   appName: { fontSize: 32 },
   tagline: { fontSize: 15, letterSpacing: 0.3 },
   card: {
-    borderRadius: 20,
-    borderWidth: 1,
+    borderRadius: 28,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 3,
+    shadowColor: "#4BA896",
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.18,
+    shadowRadius: 48,
+    elevation: 18,
   },
-  fields: { padding: 24, gap: 12 },
-  cardTitle: { fontSize: 22, marginBottom: 2 },
-  cardSubtitle: { fontSize: 14, marginBottom: 4 },
+  fields: { padding: 28, gap: 14 },
+  cardTitle: { fontSize: 24, marginBottom: 2 },
+  cardSubtitle: { fontSize: 14, marginBottom: 6 },
   switchLink: { alignItems: "center", paddingVertical: 4, marginTop: 4 },
   switchLinkText: { fontSize: 14 },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
     gap: 10,
   },
   input: { flex: 1, fontSize: 15 },
@@ -335,15 +335,15 @@ const styles = StyleSheet.create({
   strengthLabel: { fontSize: 11 },
   passwordHint: { fontSize: 11, marginTop: 4, paddingHorizontal: 2 },
   primaryBtn: {
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 16,
+    paddingVertical: 17,
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 6,
     shadowColor: "#4BA896",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 6,
   },
   primaryBtnText: { color: "#fff", fontSize: 16 },
   errorBox: {
