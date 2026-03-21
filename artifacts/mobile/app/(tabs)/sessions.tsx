@@ -278,15 +278,6 @@ export default function SessionsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.iconBtn,
-              { backgroundColor: searchVisible ? colors.accentSoft : colors.surfaceAlt, opacity: pressed ? 0.8 : 1 },
-            ]}
-            onPress={toggleSearch}
-          >
-            <Feather name={searchVisible ? "x" : "filter"} size={18} color={searchVisible ? colors.accent : colors.textSecondary} />
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.iconBtn,
               { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 },
             ]}
             onPress={() => {
