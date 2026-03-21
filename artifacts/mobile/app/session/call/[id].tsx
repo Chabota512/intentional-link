@@ -93,10 +93,16 @@ export default function CallScreen() {
 
   function handleEnd() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(`Leave ${isVoice ? "voice" : "video"} call?`, "You will exit the call.", [
-      { text: "Stay", style: "cancel" },
-      { text: "Leave", style: "destructive", onPress: leaveCall },
-    ]);
+    if (Platform.OS === "web") {
+      if (window.confirm(`Leave ${isVoice ? "voice" : "video"} call?`)) {
+        leaveCall();
+      }
+    } else {
+      Alert.alert(`Leave ${isVoice ? "voice" : "video"} call?`, "You will exit the call.", [
+        { text: "Stay", style: "cancel" },
+        { text: "Leave", style: "destructive", onPress: leaveCall },
+      ]);
+    }
   }
 
   if (loading) {
