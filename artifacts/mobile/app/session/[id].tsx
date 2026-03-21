@@ -2411,26 +2411,6 @@ export default function SessionScreen() {
               />
             )}
           </View>
-          {viewerImageIndex !== null && chatImageUrls.length > 1 && (
-            <>
-              {viewerImageIndex > 0 && (
-                <Pressable
-                  style={{ position: "absolute", left: 12, top: "50%", zIndex: 10, padding: 10, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 24 }}
-                  onPress={() => setViewerImageIndex(i => i !== null ? i - 1 : i)}
-                >
-                  <Feather name="chevron-left" size={28} color="#fff" />
-                </Pressable>
-              )}
-              {viewerImageIndex < chatImageUrls.length - 1 && (
-                <Pressable
-                  style={{ position: "absolute", right: 12, top: "50%", zIndex: 10, padding: 10, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 24 }}
-                  onPress={() => setViewerImageIndex(i => i !== null ? i + 1 : i)}
-                >
-                  <Feather name="chevron-right" size={28} color="#fff" />
-                </Pressable>
-              )}
-            </>
-          )}
         </View>
       </Modal>
     </View>
