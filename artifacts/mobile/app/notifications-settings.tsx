@@ -248,6 +248,16 @@ export default function NotificationsSettingsScreen() {
   const [editEnd, setEditEnd] = useState<string | null>(null);
   const [editSameTimeError, setEditSameTimeError] = useState(false);
 
+  const handleEditStartChange = (v: string | null) => {
+    setEditStart(v);
+    setEditSameTimeError(false);
+  };
+
+  const handleEditEndChange = (v: string | null) => {
+    setEditEnd(v);
+    setEditSameTimeError(false);
+  };
+
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
@@ -350,11 +360,17 @@ export default function NotificationsSettingsScreen() {
     const existing = settings.quietHourSchedules.find(s => s.day === day);
     setEditStart(existing?.startTime ?? null);
     setEditEnd(existing?.endTime ?? null);
+    setEditSameTimeError(false);
     setEditingDay(day);
   };
 
   const saveDaySchedule = () => {
     if (!editingDay || !editStart || !editEnd) return;
+    if (editStart === editEnd) {
+      setEditSameTimeError(true);
+      return;
+    }
+    setEditSameTimeError(false);
     const next = [
       ...settings.quietHourSchedules.filter(s => s.day !== editingDay),
       { day: editingDay, startTime: editStart, endTime: editEnd },
@@ -460,9 +476,14 @@ export default function NotificationsSettingsScreen() {
                     <Text style={[styles.quietDayName, { color: sched ? colors.text : colors.textSecondary }]}>{d.full}</Text>
                     {sched ? (
                       <>
-                        <Text style={[styles.quietDayTime, { color: colors.accent }]}>
-                          {formatTimeValue(sched.startTime)} – {formatTimeValue(sched.endTime)}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flex: 1, justifyContent: "flex-end" }}>
+                          {isOvernight(sched.startTime, sched.endTime) && (
+                            <Text style={{ fontSize: 12 }}>🌙</Text>
+                          )}
+                          <Text style={[styles.quietDayTime, { color: colors.accent }]}>
+                            {formatTimeValue(sched.startTime)} – {formatTimeValue(sched.endTime)}
+                          </Text>
+                        </View>
                         <Pressable onPress={() => removeDaySchedule(d.key)} hitSlop={10} style={styles.quietDayRemove}>
                           <Feather name="x" size={15} color={colors.textTertiary} />
                         </Pressable>
@@ -517,20 +538,36 @@ export default function NotificationsSettingsScreen() {
             <Text style={[styles.scheduleNoteText, { color: colors.textTertiary, marginBottom: 16 }]}>
               Notifications will be silenced during this window.
             </Text>
-            <View style={[styles.timeRow, { padding: 0, marginBottom: 20 }]}>
-              <TimePicker value={editStart} onChange={setEditStart} label="From" colors={colors} />
+            <View style={[styles.timeRow, { padding: 0, marginBottom: 8 }]}>
+              <TimePicker value={editStart} onChange={handleEditStartChange} label="From" colors={colors} />
               <Feather name="arrow-right" size={15} color={colors.textTertiary} />
-              <TimePicker value={editEnd} onChange={setEditEnd} label="Until" colors={colors} />
+              <TimePicker value={editEnd} onChange={handleEditEndChange} label="Until" colors={colors} />
             </View>
+            {editSameTimeError && (
+              <Text style={{ color: "#EF4444", fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", marginBottom: 8 }}>
+                Start and end time can't be the same.
+              </Text>
+            )}
+            {!editSameTimeError && editStart && editEnd && isOvernight(editStart, editEnd) && (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 8, gap: 4 }}>
+                <Text style={{ fontSize: 13 }}>🌙</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: "Inter_400Regular" }}>
+                  Spans midnight — ends the next day
+                </Text>
+              </View>
+            )}
+            {!editSameTimeError && editStart && editEnd && !isOvernight(editStart, editEnd) && (
+              <View style={{ height: 8 }} />
+            )}
             <Pressable
               style={[
                 styles.saveBtn,
-                { backgroundColor: (!editStart || !editEnd) ? colors.border : colors.accent },
+                { backgroundColor: (!editStart || !editEnd || editSameTimeError) ? colors.border : colors.accent },
               ]}
               onPress={saveDaySchedule}
-              disabled={!editStart || !editEnd}
+              disabled={!editStart || !editEnd || editSameTimeError}
             >
-              <Text style={[styles.saveBtnText, { color: (!editStart || !editEnd) ? colors.textTertiary : "#fff" }]}>Save</Text>
+              <Text style={[styles.saveBtnText, { color: (!editStart || !editEnd || editSameTimeError) ? colors.textTertiary : "#fff" }]}>Save</Text>
             </Pressable>
           </View>
         </Pressable>
