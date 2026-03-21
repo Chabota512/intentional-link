@@ -114,7 +114,7 @@ router.get("/sessions", async (req, res): Promise<void> => {
             u.name as sender_name
           FROM messages m
           JOIN users u ON u.id = m.sender_id
-          WHERE m.session_id = ANY(${sessionIds})
+          WHERE m.session_id = ANY(ARRAY[${sql.join(sessionIds.map(id => sql`${id}`), sql`, `)}]::int[])
           ORDER BY m.session_id, m.id DESC
         `)
       : { rows: [] },
@@ -133,7 +133,7 @@ router.get("/sessions", async (req, res): Promise<void> => {
       ? db.execute(sql`
           SELECT session_id, COUNT(*)::int as total
           FROM messages
-          WHERE session_id = ANY(${sessionIds})
+          WHERE session_id = ANY(ARRAY[${sql.join(sessionIds.map(id => sql`${id}`), sql`, `)}]::int[])
           GROUP BY session_id
         `)
       : { rows: [] },
