@@ -791,14 +791,18 @@ export default function SessionScreen() {
   const [viewerImageIndex, setViewerImageIndex] = useState<number | null>(null);
   const [videoViewer, setVideoViewer] = useState<{ url: string; name: string } | null>(null);
   const inAppVideoPlayer = useVideoPlayer(null, (p) => { p.loop = false; });
+  const vpAutoPlayRef = useRef(false);
+
   useEffect(() => {
     if (videoViewer?.url) {
+      vpAutoPlayRef.current = true;
       inAppVideoPlayer.replace({ uri: videoViewer.url });
-      inAppVideoPlayer.play();
       setVpRate(1);
       setVpMuted(false);
       setVpLooping(false);
+      setVpCurrentTime(0);
     } else {
+      vpAutoPlayRef.current = false;
       inAppVideoPlayer.pause();
     }
   }, [videoViewer?.url]);
@@ -811,7 +815,13 @@ export default function SessionScreen() {
     inAppVideoPlayer.timeUpdateEventInterval = 0.5;
     const s1 = inAppVideoPlayer.addListener("playingChange", ({ isPlaying }) => setVpIsPlaying(isPlaying));
     const s2 = inAppVideoPlayer.addListener("timeUpdate", ({ currentTime }) => setVpCurrentTime(currentTime));
-    const s3 = inAppVideoPlayer.addListener("statusChange", ({ status }) => setVpStatus(status));
+    const s3 = inAppVideoPlayer.addListener("statusChange", ({ status }) => {
+      setVpStatus(status);
+      if (status === "readyToPlay" && vpAutoPlayRef.current) {
+        vpAutoPlayRef.current = false;
+        inAppVideoPlayer.play();
+      }
+    });
     return () => { s1.remove(); s2.remove(); s3.remove(); };
   }, []);
 
