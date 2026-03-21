@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { eq, and, ne, inArray } from "drizzle-orm";
 import agoraToken from "agora-token";
-import { db, sessionsTable, sessionParticipantsTable, usersTable } from "@workspace/db";
+import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable } from "@workspace/db";
 import { sendPushNotifications } from "../lib/pushNotifications.js";
+import { emitToSession } from "../lib/socketio.js";
 const { RtcTokenBuilder, RtcRole } = agoraToken;
 
 const router = Router();
@@ -88,6 +89,43 @@ router.post("/sessions/:id/video-call", async (req, res) => {
   }
 
   res.json({ appId: APP_ID, channel, token, uid });
+});
+
+router.post("/sessions/:id/call-log", async (req, res) => {
+  const userIdStr = req.headers["x-user-id"];
+  if (!userIdStr) return res.status(401).json({ error: "Unauthorized" });
+  const uid = parseInt(userIdStr as string, 10);
+  const sessionId = parseInt(req.params.id, 10);
+  if (isNaN(sessionId)) return res.status(400).json({ error: "Invalid session id" });
+
+  const { mode = "voice", status = "missed", duration = 0 } = req.body ?? {};
+
+  try {
+    const content = JSON.stringify({ mode, status, duration: Math.round(duration) });
+    const [msg] = await db.insert(messagesTable).values({
+      sessionId,
+      senderId: uid,
+      content,
+      type: "call" as any,
+      status: "sent",
+    }).returning();
+
+    const [sender] = await db.select({
+      id: usersTable.id,
+      name: usersTable.name,
+      username: usersTable.username,
+      avatarUrl: usersTable.avatarUrl,
+      createdAt: usersTable.createdAt,
+      lastSeenAt: usersTable.lastSeenAt,
+    }).from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+
+    const fullMsg = { ...msg, sender, reactions: [] };
+    emitToSession(sessionId, "new_message", fullMsg);
+
+    res.json(fullMsg);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.get("/sessions/:id/call-page", async (req, res) => {

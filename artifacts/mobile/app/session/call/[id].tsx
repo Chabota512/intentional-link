@@ -31,6 +31,8 @@ export default function CallScreen() {
   const [error, setError] = useState<string | null>(null);
   const [speakerOn, setSpeakerOn] = useState(!isVoice);
   const ringbackActiveRef = React.useRef(false);
+  const callAnsweredRef = React.useRef(false);
+  const callStartTimeRef = React.useRef<number | null>(null);
 
   useEffect(() => {
     joinCall();
@@ -111,6 +113,10 @@ export default function CallScreen() {
         startRingback();
       } else if (msg.type === "participantJoined") {
         stopRingback();
+        if (!callAnsweredRef.current) {
+          callAnsweredRef.current = true;
+          callStartTimeRef.current = Date.now();
+        }
       } else if (msg.type === "participantLeft") {
         if (msg.count === 0) startRingback();
       }
@@ -122,6 +128,15 @@ export default function CallScreen() {
       stopRingback();
       InCallManager.stop();
     }
+    const answered = callAnsweredRef.current;
+    const duration = answered && callStartTimeRef.current
+      ? Math.round((Date.now() - callStartTimeRef.current) / 1000)
+      : 0;
+    post(`/sessions/${sessionId}/call-log`, {
+      mode: isVoice ? "voice" : "video",
+      status: answered ? "answered" : "missed",
+      duration,
+    }).catch(() => {});
     router.replace(`/session/${sessionId}` as any);
   }
 

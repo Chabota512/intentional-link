@@ -381,6 +381,33 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
       );
     }
 
+    if (message.type === "call") {
+      let callData: { mode?: string; status?: string; duration?: number } = {};
+      try { callData = JSON.parse(message.content); } catch {}
+      const isVoiceCall = callData.mode === "voice";
+      const missed = callData.status === "missed";
+      const dur = callData.duration ?? 0;
+      const formatCallDur = (s: number) =>
+        s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+      const iconName = isVoiceCall ? "phone" : "video";
+      const callColor = missed ? colors.danger : (isOwn ? "rgba(255,255,255,0.9)" : colors.text);
+      return (
+        <View style={styles.callRow}>
+          <Feather name={missed ? "phone-missed" : iconName} size={14} color={missed ? colors.danger : (isOwn ? "rgba(255,255,255,0.8)" : colors.accent)} />
+          <View>
+            <Text style={[styles.callLabel, { color: callColor, fontFamily: "Inter_500Medium" }]}>
+              {missed ? "Missed " : ""}{isVoiceCall ? "Voice" : "Video"} call
+            </Text>
+            {!missed && dur > 0 && (
+              <Text style={[styles.callDuration, { color: isOwn ? "rgba(255,255,255,0.6)" : colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                {formatCallDur(dur)}
+              </Text>
+            )}
+          </View>
+        </View>
+      );
+    }
+
     return (
       <Text style={[styles.bubbleText, { color: isOwn ? "#fff" : colors.text, fontFamily: "Inter_400Regular" }]}>
         {message.content}
@@ -2220,6 +2247,9 @@ const styles = StyleSheet.create({
   bubbleOwn: { borderBottomRightRadius: 4 },
   bubbleOther: { borderBottomLeftRadius: 4, borderWidth: 1 },
   bubbleText: { fontSize: 15, lineHeight: 21 },
+  callRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 2 },
+  callLabel: { fontSize: 14 },
+  callDuration: { fontSize: 12, marginTop: 1 },
   imageBubble: {
     width: 200,
     height: 150,
