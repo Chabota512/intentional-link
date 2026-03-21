@@ -103,7 +103,7 @@ export default function AuthScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
+            <View style={[styles.logoContainer, { backgroundColor: colors.accent }]}>
               <Image source={appIcon} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={[styles.appName, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Intentional Link</Text>
