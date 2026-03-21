@@ -284,7 +284,6 @@ router.delete("/users/me/data", async (req, res): Promise<void> => {
 
   // Remove this user from sessions they joined but didn't create
   await db.delete(sessionParticipantsTable).where(eq(sessionParticipantsTable.userId, userId));
-  await db.delete(messagesTable).where(eq(messagesTable.senderId, userId));
 
   await db.update(usersTable)
     .set({ avatarUrl: null, pushToken: null })
