@@ -75,6 +75,7 @@ function RootLayoutNav() {
         <Stack.Screen name="contacts/add" options={{ presentation: "modal" }} />
         <Stack.Screen name="privacy" options={{ presentation: "card" }} />
         <Stack.Screen name="notifications-settings" options={{ presentation: "card" }} />
+        <Stack.Screen name="contact-us" options={{ presentation: "card" }} />
       </Stack>
       <OfflineBanner />
       <PresenceDialog />

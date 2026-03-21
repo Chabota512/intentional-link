@@ -327,7 +327,14 @@ export default function ProfileScreen() {
           <SettingsRow
             icon="shield"
             label="Version"
-            sublabel="1.0.0"
+            sublabel="1.1.0"
+            colors={colors}
+          />
+          <SettingsRow
+            icon="phone"
+            label="Contact Us"
+            sublabel="Bluegold.ltd — Get in touch"
+            onPress={() => router.push("/contact-us" as any)}
             colors={colors}
             last
           />
