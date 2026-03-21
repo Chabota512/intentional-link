@@ -1553,41 +1553,31 @@ export default function SessionScreen() {
         onRequestClose={() => setAttachMenuVisible(false)}
       >
         <Pressable style={styles.attachOverlay} onPress={() => setAttachMenuVisible(false)}>
-          <View style={[styles.attachSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.attachTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+          <Pressable onPress={() => {}} style={[styles.attachSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.attachTitle, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
               Send attachment
             </Text>
-            <Pressable
-              style={({ pressed }) => [styles.attachOption, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
-              onPress={handlePickImage}
-            >
-              <View style={[styles.attachOptionIcon, { backgroundColor: "#E3F2FD" }]}>
-                <Feather name="image" size={22} color="#1976D2" />
-              </View>
-              <View>
-                <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Photo</Text>
-                <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Choose from library</Text>
-              </View>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.attachOption, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
-              onPress={handlePickFile}
-            >
-              <View style={[styles.attachOptionIcon, { backgroundColor: "#F3E5F5" }]}>
-                <Feather name="file-text" size={22} color="#7B1FA2" />
-              </View>
-              <View>
-                <Text style={[styles.attachOptionLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>File</Text>
-                <Text style={[styles.attachOptionSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>Any document or file</Text>
-              </View>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.attachCancelBtn, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.8 : 1 }]}
-              onPress={() => setAttachMenuVisible(false)}
-            >
-              <Text style={[styles.attachCancelText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>Cancel</Text>
-            </Pressable>
-          </View>
+            <View style={styles.attachOptionsRow}>
+              <Pressable
+                style={({ pressed }) => [styles.attachIconTile, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
+                onPress={handlePickImage}
+              >
+                <View style={[styles.attachIconCircle, { backgroundColor: "#E3F2FD" }]}>
+                  <Feather name="image" size={24} color="#1976D2" />
+                </View>
+                <Text style={[styles.attachIconLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Photo</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.attachIconTile, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
+                onPress={handlePickFile}
+              >
+                <View style={[styles.attachIconCircle, { backgroundColor: "#F3E5F5" }]}>
+                  <Feather name="file-text" size={24} color="#7B1FA2" />
+                </View>
+                <Text style={[styles.attachIconLabel, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>File</Text>
+              </Pressable>
+            </View>
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -2372,36 +2362,35 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     padding: 16,
-    gap: 10,
+    gap: 14,
+    minWidth: 220,
   },
   attachTitle: {
-    fontSize: 15,
+    fontSize: 12,
     textAlign: "center",
-    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
-  attachOption: {
+  attachOptionsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    padding: 14,
-    borderRadius: 14,
+    gap: 12,
+    justifyContent: "center",
   },
-  attachOptionIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
+  attachIconTile: {
+    alignItems: "center",
+    gap: 8,
+    padding: 14,
+    borderRadius: 16,
+    flex: 1,
+  },
+  attachIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
   },
-  attachOptionLabel: { fontSize: 15 },
-  attachOptionSub: { fontSize: 12, marginTop: 1 },
-  attachCancelBtn: {
-    padding: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  attachCancelText: { fontSize: 15 },
+  attachIconLabel: { fontSize: 13 },
   onlineDot: {
     position: "absolute",
     bottom: 1,
