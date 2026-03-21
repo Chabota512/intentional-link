@@ -1362,12 +1362,6 @@ export default function SessionScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {attachMenuVisible && (
-        <Pressable
-          style={[StyleSheet.absoluteFillObject, { zIndex: 15 }]}
-          onPress={() => setAttachMenuVisible(false)}
-        />
-      )}
       <View style={[styles.navBar, { paddingTop: topPad + 8, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <Pressable
           style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]}
