@@ -1191,10 +1191,11 @@ export default function SessionScreen() {
           </View>
           <Pressable style={styles.navMeta} onPress={openParticipants}>
             <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]}>
-              <Text style={{ color: colors.textSecondary }}>{`${totalPeople} participant${totalPeople !== 1 ? "s" : ""} · `}</Text>
+              <Text style={{ color: colors.textSecondary }}>{`${totalPeople} participant${totalPeople !== 1 ? "s" : ""}`}</Text>
+              <Text style={{ color: colors.textTertiary }}>{" ›"}</Text>
+              <Text style={{ color: colors.textSecondary }}>{" · "}</Text>
               <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
             </Text>
-            <Feather name="chevron-right" size={12} color={colors.textTertiary} />
           </Pressable>
         </View>
         <View style={styles.navActions}>
