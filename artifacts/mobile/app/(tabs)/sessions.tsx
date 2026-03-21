@@ -171,15 +171,13 @@ export default function SessionsScreen() {
                 name={avatarUser.name}
                 avatarUrl={avatarUser.avatarUrl}
                 size={50}
-                presenceStatus={onlineUserIds.has(avatarUser.id) ? "online" : undefined}
-                showDot={isActive && onlineUserIds.has(avatarUser.id)}
+                presenceStatus="online"
+                showDot={true}
               />
             ) : (
               <View style={[styles.groupAvatar, { backgroundColor: isActive ? colors.accentSoft : colors.surfaceAlt }]}>
                 <Feather name={isActive ? "zap" : "archive"} size={20} color={isActive ? colors.accent : colors.textSecondary} />
-                {isActive && someOnline && (
-                  <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
-                )}
+                <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.surface }]} />
               </View>
             )}
           </View>
