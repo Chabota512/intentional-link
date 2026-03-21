@@ -141,6 +141,7 @@ artifacts/mobile/
 │   └── contacts/
 │       └── add.tsx          # Add contact modal
 ├── context/AuthContext.tsx  # Auth state (user, login, register, logout, updateUser)
+├── context/SocketContext.tsx # Socket.IO client (connects on auth, handles real-time events)
 ├── hooks/useApi.ts              # Fetch wrapper with auth headers + uploadFile helper
 ├── hooks/useTheme.ts            # Theme from constants/colors.ts
 ├── hooks/useHeartbeat.ts        # Sends POST /users/heartbeat every 30s

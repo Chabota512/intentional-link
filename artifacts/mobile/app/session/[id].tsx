@@ -33,6 +33,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import { useLocalDiscovery } from "@/context/LocalDiscoveryContext";
+import { useSocket } from "@/context/SocketContext";
 import { confirmAction } from "@/utils/confirm";
 import { formatTime, formatRelative } from "@/utils/date";
 import { isOnline, formatLastSeen } from "@/utils/lastSeen";
@@ -471,6 +472,7 @@ export default function SessionScreen() {
   const { get, post, patch, del, uploadFile, getFileUrl } = useApi();
   const { user } = useAuth();
   const { getPresenceStatus } = useLocalDiscovery();
+  const { isConnected: socketConnected, typingUsers, onlineUserIds, emitTypingStart, emitTypingStop, emitMarkRead, joinSession, leaveSession } = useSocket();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const flatListRef = useRef<FlatList>(null);
@@ -479,8 +481,6 @@ export default function SessionScreen() {
   const [sheetView, setSheetView] = useState<SheetView>("participants");
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
-  const [pollFailed, setPollFailed] = useState(false);
-  const consecutivePollErrors = useRef(0);
   const [attachMenuVisible, setAttachMenuVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
@@ -571,11 +571,18 @@ export default function SessionScreen() {
 
   useEffect(() => {
     if (!session || session.status !== "active") return;
+    joinSession(sessionId);
+    emitMarkRead(sessionId);
+    return () => {
+      leaveSession(sessionId);
+    };
+  }, [session, sessionId]);
+
+  useEffect(() => {
+    if (!session || session.status !== "active" || socketConnected) return;
     const interval = setInterval(async () => {
       try {
         const newMsgs = await get(`/sessions/${sessionId}/messages/poll?since=${lastMsgId.current}`);
-        consecutivePollErrors.current = 0;
-        setPollFailed(false);
         if (newMsgs.length > 0) {
           lastMsgId.current = newMsgs[newMsgs.length - 1].id;
           queryClient.setQueryData(["messages", sessionId], (old: Message[] = []) => {
@@ -584,13 +591,45 @@ export default function SessionScreen() {
             return fresh.length > 0 ? [...old, ...fresh] : old;
           });
         }
-      } catch {
-        consecutivePollErrors.current += 1;
-        if (consecutivePollErrors.current >= 3) setPollFailed(true);
-      }
-    }, 2000);
+      } catch {}
+    }, 3000);
     return () => clearInterval(interval);
-  }, [session, sessionId]);
+  }, [session, sessionId, socketConnected]);
+
+  useEffect(() => {
+    if (messages.length > 0 && session?.status === "active") {
+      emitMarkRead(sessionId);
+    }
+  }, [messages.length]);
+
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (value.trim() && session?.status === "active") {
+      emitTypingStart(sessionId);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        emitTypingStop(sessionId);
+      }, 3000);
+    } else if (!value.trim()) {
+      emitTypingStop(sessionId);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+    }
+  };
+
+  const sessionTypingUserIds = typingUsers.get(sessionId);
+  const typingParticipantNames = session?.participants
+    .filter((p) => sessionTypingUserIds?.has(p.userId))
+    .map((p) => p.user.name) ?? [];
+  if (session?.creator && sessionTypingUserIds?.has(session.creator.id) && session.creator.id !== user?.id) {
+    const creatorName = session.creator.name;
+    if (!typingParticipantNames.includes(creatorName)) {
+      typingParticipantNames.push(creatorName);
+    }
+  }
 
   useEffect(() => {
     if (messages.length > 0 && !isLoadingOlderRef.current) {
@@ -749,6 +788,11 @@ export default function SessionScreen() {
     if (!trimmed) return;
     setText("");
     setInputHeight(21);
+    emitTypingStop(sessionId);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sendMutation.mutate({ content: trimmed, type: "text" });
   };
@@ -990,8 +1034,13 @@ export default function SessionScreen() {
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
+  const getEffectivePresence = (userId: number, lastSeenAt?: string | null) => {
+    if (onlineUserIds.has(userId)) return "online";
+    return getPresenceStatus(userId, lastSeenAt);
+  };
+
   const onlineParticipants = session?.participants.filter(p =>
-    getPresenceStatus(p.userId, p.user.lastSeenAt) !== "offline"
+    getEffectivePresence(p.userId, p.user.lastSeenAt) !== "offline"
   ) ?? [];
   const localParticipants = session?.participants.filter(p =>
     getPresenceStatus(p.userId, p.user.lastSeenAt) === "local"
@@ -1215,11 +1264,11 @@ export default function SessionScreen() {
         keyboardVerticalOffset={0}
         style={{ flex: 1 }}
       >
-        {pollFailed && isActive && (
+        {!socketConnected && isActive && (
           <View style={[styles.pollErrorBanner, { backgroundColor: "#FFF3CD", borderBottomColor: "#FFEAA7" }]}>
             <Feather name="wifi-off" size={14} color="#856404" />
             <Text style={[styles.pollErrorText, { color: "#856404", fontFamily: "Inter_500Medium" }]}>
-              Connection issues — trying to reconnect…
+              Reconnecting…
             </Text>
           </View>
         )}
@@ -1309,6 +1358,26 @@ export default function SessionScreen() {
           />
         )}
 
+        {typingParticipantNames.length > 0 && canSend && (
+          <Animated.View entering={FadeIn.duration(200)} style={[styles.typingBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <View style={styles.typingDots}>
+              {[0, 1, 2].map((i) => (
+                <Animated.View
+                  key={i}
+                  style={[styles.typingDot, { backgroundColor: colors.accent }]}
+                />
+              ))}
+            </View>
+            <Text style={[styles.typingText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+              {typingParticipantNames.length === 1
+                ? `${typingParticipantNames[0]} is typing…`
+                : typingParticipantNames.length === 2
+                ? `${typingParticipantNames[0]} and ${typingParticipantNames[1]} are typing…`
+                : `${typingParticipantNames[0]} and ${typingParticipantNames.length - 1} others are typing…`}
+            </Text>
+          </Animated.View>
+        )}
+
         {canSend && (
           <View style={[styles.inputBar, {
             backgroundColor: colors.surface,
@@ -1364,7 +1433,7 @@ export default function SessionScreen() {
                     placeholder="Type a message…"
                     placeholderTextColor={colors.textTertiary}
                     value={text}
-                    onChangeText={setText}
+                    onChangeText={handleTextChange}
                     onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
                     multiline
                     maxLength={2000}
@@ -1591,7 +1660,7 @@ export default function SessionScreen() {
               <View style={[styles.participantRow, { borderBottomColor: colors.border }]}>
                 {(() => {
                   const creatorId = session.creator?.id ?? session.creatorId;
-                  const creatorStatus = getPresenceStatus(creatorId, session.creator?.lastSeenAt);
+                  const creatorStatus = getEffectivePresence(creatorId, session.creator?.lastSeenAt);
                   const statusColor = creatorStatus === "local" ? "#FF6B9D" : creatorStatus === "online" ? colors.success : colors.textSecondary;
                   const statusText = creatorStatus === "local" ? "On this network" : creatorStatus === "online" ? "Online" : `Last seen ${formatLastSeen(session.creator?.lastSeenAt)}`;
                   return (
@@ -1620,7 +1689,7 @@ export default function SessionScreen() {
               </View>
 
               {session.participants.filter(p => p.userId !== session.creatorId).map((p) => {
-                const pStatus = getPresenceStatus(p.userId, p.user.lastSeenAt);
+                const pStatus = getEffectivePresence(p.userId, p.user.lastSeenAt);
                 const pStatusColor = pStatus === "local" ? "#FF6B9D" : pStatus === "online" ? colors.success : colors.textSecondary;
                 const pStatusText = pStatus === "local" ? "On this network" : pStatus === "online" ? "Online" : `Last seen ${formatLastSeen(p.user.lastSeenAt)}`;
                 return (
@@ -2145,5 +2214,26 @@ const styles = StyleSheet.create({
   },
   reactionPickerEmoji: {
     padding: 8,
+  },
+  typingBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  typingDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  typingDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    opacity: 0.6,
+  },
+  typingText: {
+    fontSize: 12,
   },
 });

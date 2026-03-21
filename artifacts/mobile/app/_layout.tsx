@@ -19,6 +19,7 @@ import Feather from "@expo/vector-icons/Feather";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { LocalDiscoveryProvider } from "@/context/LocalDiscoveryContext";
+import { SocketProvider } from "@/context/SocketContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -98,15 +99,17 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <LocalDiscoveryProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <HeartbeatProvider>
-                    <RootLayoutNav />
-                  </HeartbeatProvider>
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </LocalDiscoveryProvider>
+            <SocketProvider>
+              <LocalDiscoveryProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <KeyboardProvider>
+                    <HeartbeatProvider>
+                      <RootLayoutNav />
+                    </HeartbeatProvider>
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </LocalDiscoveryProvider>
+            </SocketProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>

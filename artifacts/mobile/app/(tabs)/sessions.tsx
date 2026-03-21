@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
+import { useSocket } from "@/context/SocketContext";
 import { formatRelative } from "@/utils/date";
 
 interface Participant {
@@ -58,10 +59,12 @@ export default function SessionsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
 
+  const { isConnected: socketConnected } = useSocket();
+
   const { data: sessions = [], isLoading, isError, isRefetching, refetch } = useQuery<Session[]>({
     queryKey: ["sessions"],
     queryFn: () => get("/sessions"),
-    refetchInterval: 5000,
+    refetchInterval: socketConnected ? 30000 : 5000,
   });
 
   const filtered = sessions
