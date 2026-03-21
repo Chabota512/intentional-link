@@ -1163,7 +1163,7 @@ export default function SessionScreen() {
     ? localParticipants.length > 0
       ? `${localParticipants.length + 1} nearby`
       : totalActive === 1
-        ? "only you active"
+        ? "only you is active"
         : `${totalActive} active`
     : "Completed";
 
