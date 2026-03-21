@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Platform,
   TextInput,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -175,7 +176,15 @@ export default function SessionsScreen() {
         )}
         <View style={styles.sessionCardRow}>
           <View style={{ position: "relative" }}>
-            {avatarUser ? (
+            {item.imageUrl ? (
+              <>
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.sessionImage}
+                />
+                <View style={[styles.onlineDot, { backgroundColor: groupDotColor, borderColor: colors.surface }]} />
+              </>
+            ) : avatarUser ? (
               <UserAvatar
                 name={avatarUser.name}
                 avatarUrl={avatarUser.avatarUrl}
@@ -185,7 +194,9 @@ export default function SessionsScreen() {
               />
             ) : (
               <View style={[styles.groupAvatar, { backgroundColor: isActive ? colors.accentSoft : colors.surfaceAlt }]}>
-                <Feather name={isActive ? "zap" : "archive"} size={20} color={isActive ? colors.accent : colors.textSecondary} />
+                <Text style={[styles.groupAvatarLetter, { color: isActive ? colors.accent : colors.textSecondary, fontFamily: "Inter_700Bold" }]}>
+                  {item.title.trim().charAt(0).toUpperCase()}
+                </Text>
                 <View style={[styles.onlineDot, { backgroundColor: groupDotColor, borderColor: colors.surface }]} />
               </View>
             )}
@@ -497,6 +508,15 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
+  },
+  groupAvatarLetter: {
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  sessionImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   onlineDot: {
     position: "absolute",
