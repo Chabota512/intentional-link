@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import Animated, { FadeInDown, FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeIn, FadeOut, useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { TextInput } from "react-native";
 import * as Haptics from "expo-haptics";
 import * as SMS from "expo-sms";
@@ -32,7 +32,7 @@ import * as ExpoLinking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Audio, Video, ResizeMode, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
-import { VideoView, useVideoPlayer } from "expo-video";
+import { VideoView, useVideoPlayer, useEvent } from "expo-video";
 import { LightSensor } from "expo-sensors";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi, ApiError } from "@/hooks/useApi";
@@ -793,10 +793,82 @@ export default function SessionScreen() {
     if (videoViewer?.url) {
       inAppVideoPlayer.replace({ uri: videoViewer.url });
       inAppVideoPlayer.play();
+      setVpRate(1);
+      setVpMuted(false);
+      setVpLooping(false);
     } else {
       inAppVideoPlayer.pause();
     }
   }, [videoViewer?.url]);
+
+  const { isPlaying: vpIsPlaying } = useEvent(inAppVideoPlayer, "playingChange", { isPlaying: false });
+  const { currentTime: vpCurrentTime } = useEvent(inAppVideoPlayer, "timeUpdate", { currentTime: 0, bufferedPosition: 0 });
+  const { status: vpStatus } = useEvent(inAppVideoPlayer, "statusChange", { status: "idle" as const, error: undefined });
+
+  const [vpRate, setVpRate] = useState(1);
+  const [vpMuted, setVpMuted] = useState(false);
+  const [vpLooping, setVpLooping] = useState(false);
+  const [vpSpeedOpen, setVpSpeedOpen] = useState(false);
+  const [vpBarWidth, setVpBarWidth] = useState(1);
+  const [vpControlsVisible, setVpControlsVisible] = useState(true);
+  const vpControlsOpacity = useSharedValue(1);
+  const vpHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vpAnimStyle = useAnimatedStyle(() => ({ opacity: vpControlsOpacity.value }));
+  const vpDuration = (vpStatus === "readyToPlay" ? inAppVideoPlayer.duration : 0) || 0;
+
+  const vpFormatTime = (s: number) => {
+    const clamped = Math.max(0, s);
+    const m = Math.floor(clamped / 60);
+    const sec = Math.floor(clamped % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const vpShowControls = () => {
+    if (vpHideTimer.current) clearTimeout(vpHideTimer.current);
+    setVpControlsVisible(true);
+    vpControlsOpacity.value = withTiming(1, { duration: 180 });
+    vpHideTimer.current = setTimeout(() => {
+      vpControlsOpacity.value = withTiming(0, { duration: 350 });
+      setVpControlsVisible(false);
+    }, 3500);
+  };
+
+  const vpHandleTap = () => {
+    if (vpControlsVisible) {
+      if (vpHideTimer.current) clearTimeout(vpHideTimer.current);
+      vpControlsOpacity.value = withTiming(0, { duration: 250 });
+      setVpControlsVisible(false);
+    } else {
+      vpShowControls();
+    }
+  };
+
+  const vpTogglePlay = () => {
+    if (vpIsPlaying) inAppVideoPlayer.pause();
+    else inAppVideoPlayer.play();
+    vpShowControls();
+  };
+
+  const vpSetRate = (rate: number) => {
+    inAppVideoPlayer.playbackRate = rate;
+    setVpRate(rate);
+    setVpSpeedOpen(false);
+    vpShowControls();
+  };
+
+  const vpToggleMute = () => {
+    const next = !vpMuted;
+    inAppVideoPlayer.muted = next;
+    setVpMuted(next);
+    vpShowControls();
+  };
+
+  const vpToggleLoop = () => {
+    const next = !vpLooping;
+    inAppVideoPlayer.loop = next;
+    setVpLooping(next);
+    vpShowControls();
+  };
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -2489,20 +2561,105 @@ export default function SessionScreen() {
 
       <Modal visible={videoViewer !== null} transparent animationType="fade" onRequestClose={() => setVideoViewer(null)}>
         <View style={{ flex: 1, backgroundColor: "#000" }}>
-          <View style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Pressable onPress={() => setVideoViewer(null)} style={{ padding: 6 }}>
-              <Feather name="x" size={24} color="#fff" />
+          {/* Video layer — tapping toggles controls */}
+          <Pressable style={{ flex: 1 }} onPress={vpHandleTap}>
+            <VideoView
+              player={inAppVideoPlayer}
+              style={{ flex: 1, width: "100%" }}
+              contentFit="contain"
+              nativeControls={false}
+            />
+          </Pressable>
+
+          {/* Controls overlay */}
+          <Animated.View
+            style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, vpAnimStyle]}
+            pointerEvents={vpControlsVisible ? "box-none" : "none"}
+          >
+            {/* Top bar */}
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, paddingTop: insets.top + 8, paddingBottom: 16, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.55)" }}>
+              <Pressable onPress={() => setVideoViewer(null)} style={{ padding: 8 }}>
+                <Feather name="x" size={22} color="#fff" />
+              </Pressable>
+              <Text style={{ flex: 1, color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+                {videoViewer?.name}
+              </Text>
+              {/* Loop */}
+              <Pressable onPress={vpToggleLoop} style={{ padding: 8, backgroundColor: vpLooping ? "rgba(255,107,157,0.3)" : "rgba(255,255,255,0.12)", borderRadius: 8 }}>
+                <Feather name="repeat" size={17} color={vpLooping ? "#FF6B9D" : "#fff"} />
+              </Pressable>
+              {/* Mute */}
+              <Pressable onPress={vpToggleMute} style={{ padding: 8, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8 }}>
+                <Feather name={vpMuted ? "volume-x" : "volume-2"} size={17} color="#fff" />
+              </Pressable>
+              {/* Speed */}
+              <Pressable onPress={() => { setVpSpeedOpen(true); vpShowControls(); }} style={{ paddingVertical: 6, paddingHorizontal: 10, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8 }}>
+                <Text style={{ color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{vpRate}×</Text>
+              </Pressable>
+            </View>
+
+            {/* Centre playback controls */}
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 32 }} pointerEvents="box-none">
+              <Pressable onPress={() => { inAppVideoPlayer.seekBy(-10); vpShowControls(); }} style={{ alignItems: "center", gap: 4 }}>
+                <Feather name="rotate-ccw" size={28} color="#fff" />
+                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, fontFamily: "Inter_500Medium" }}>10s</Text>
+              </Pressable>
+              <Pressable onPress={vpTogglePlay} style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" }}>
+                <Feather name={vpIsPlaying ? "pause" : "play"} size={30} color="#fff" style={vpIsPlaying ? {} : { marginLeft: 4 }} />
+              </Pressable>
+              <Pressable onPress={() => { inAppVideoPlayer.seekBy(10); vpShowControls(); }} style={{ alignItems: "center", gap: 4 }}>
+                <Feather name="rotate-cw" size={28} color="#fff" />
+                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, fontFamily: "Inter_500Medium" }}>10s</Text>
+              </Pressable>
+            </View>
+
+            {/* Bottom bar — seek bar + time */}
+            <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, paddingBottom: insets.bottom + 16, paddingHorizontal: 16, paddingTop: 16, backgroundColor: "rgba(0,0,0,0.55)", gap: 8 }}>
+              {/* Seek bar */}
+              <View
+                style={{ height: 28, justifyContent: "center" }}
+                onLayout={(e) => setVpBarWidth(e.nativeEvent.layout.width)}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderGrant={(e) => {
+                  const ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / vpBarWidth));
+                  inAppVideoPlayer.currentTime = ratio * vpDuration;
+                  vpShowControls();
+                }}
+                onResponderMove={(e) => {
+                  const ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / vpBarWidth));
+                  inAppVideoPlayer.currentTime = ratio * vpDuration;
+                }}
+              >
+                <View style={{ height: 3, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2 }}>
+                  <View style={{ width: `${Math.min(100, (vpCurrentTime / Math.max(vpDuration, 0.001)) * 100)}%`, height: "100%", backgroundColor: "#FF6B9D", borderRadius: 2 }} />
+                </View>
+                <View style={{ position: "absolute", left: `${Math.min(100, (vpCurrentTime / Math.max(vpDuration, 0.001)) * 100)}%`, width: 13, height: 13, borderRadius: 7, backgroundColor: "#fff", top: 7.5, marginLeft: -6.5 }} />
+              </View>
+              {/* Time row */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, fontFamily: "Inter_500Medium" }}>{vpFormatTime(vpCurrentTime)}</Text>
+                <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, fontFamily: "Inter_500Medium" }}>{vpFormatTime(vpDuration)}</Text>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Speed picker sheet */}
+          {vpSpeedOpen && (
+            <Pressable style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "flex-end" }} onPress={() => setVpSpeedOpen(false)}>
+              <View style={{ width: "100%", backgroundColor: "#1a1a1a", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: insets.bottom + 16, paddingTop: 12 }}>
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_600SemiBold", textAlign: "center", marginBottom: 12, letterSpacing: 1 }}>PLAYBACK SPEED</Text>
+                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                  <Pressable key={rate} onPress={() => vpSetRate(rate)} style={{ paddingVertical: 14, paddingHorizontal: 24, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Text style={{ color: rate === vpRate ? "#FF6B9D" : "#fff", fontSize: 16, fontFamily: rate === vpRate ? "Inter_600SemiBold" : "Inter_400Regular" }}>
+                      {rate === 1 ? "Normal" : `${rate}×`}
+                    </Text>
+                    {rate === vpRate && <Feather name="check" size={18} color="#FF6B9D" />}
+                  </Pressable>
+                ))}
+              </View>
             </Pressable>
-            <Text style={{ flex: 1, color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
-              {videoViewer?.name}
-            </Text>
-          </View>
-          <VideoView
-            player={inAppVideoPlayer}
-            style={{ flex: 1, width: "100%" }}
-            contentFit="contain"
-            nativeControls
-          />
+          )}
         </View>
       </Modal>
 
