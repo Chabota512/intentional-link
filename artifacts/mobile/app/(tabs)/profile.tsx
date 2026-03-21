@@ -183,57 +183,43 @@ export default function ProfileScreen() {
   };
 
   const handleDeleteData = () => {
-    Alert.alert(
+    confirmAction(
       "Clear All Data",
       "This will permanently delete all your chats, messages, and reset your profile photo. Your account stays active. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear Data",
-          style: "destructive",
-          onPress: async () => {
-            setDeletingData(true);
-            try {
-              await del("/users/me/data");
-              // Clear all cached queries so chats, messages, and contacts refresh immediately
-              await queryClient.invalidateQueries();
-              // Re-fetch user from server to pick up cleared avatar and push token
-              await refreshUser();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Done", "Your data has been cleared.");
-            } catch (e: any) {
-              Alert.alert("Error", e.message || "Failed to clear data.");
-            } finally {
-              setDeletingData(false);
-            }
-          },
-        },
-      ]
+      "Clear Data",
+      async () => {
+        setDeletingData(true);
+        try {
+          await del("/users/me/data");
+          await queryClient.invalidateQueries();
+          await refreshUser();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert("Done", "Your data has been cleared.");
+        } catch (e: any) {
+          Alert.alert("Error", e.message || "Failed to clear data.");
+        } finally {
+          setDeletingData(false);
+        }
+      }
     );
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
+    confirmAction(
       "Delete Account",
       "This will permanently delete your account, all chats, and all messages. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete Account",
-          style: "destructive",
-          onPress: async () => {
-            setDeletingAccount(true);
-            try {
-              await del("/users/me");
-              await logout();
-              router.replace("/auth");
-            } catch (e: any) {
-              Alert.alert("Error", e.message || "Failed to delete account.");
-              setDeletingAccount(false);
-            }
-          },
-        },
-      ]
+      "Delete Account",
+      async () => {
+        setDeletingAccount(true);
+        try {
+          await del("/users/me");
+          await logout();
+          router.replace("/auth");
+        } catch (e: any) {
+          Alert.alert("Error", e.message || "Failed to delete account.");
+          setDeletingAccount(false);
+        }
+      }
     );
   };
 

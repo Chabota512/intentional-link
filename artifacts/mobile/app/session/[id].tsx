@@ -1559,17 +1559,11 @@ export default function SessionScreen() {
   };
 
   const handleDeleteSession = () => {
-    Alert.alert(
+    confirmAction(
       "Delete Chat",
       "This will permanently delete the chat and all messages. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteSessionMutation.mutate(),
-        },
-      ]
+      "Delete",
+      () => deleteSessionMutation.mutate()
     );
   };
 

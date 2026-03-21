@@ -230,7 +230,7 @@ export default function ContactsScreen() {
       <View style={styles.requestActions}>
         <Pressable
           style={({ pressed }) => [styles.declineBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-          onPress={() => declineMutation.mutate(item.id)}
+          onPress={() => confirmAction("Decline Request", `Decline the contact request from ${item.senderName}?`, "Decline", () => declineMutation.mutate(item.id))}
           disabled={declineMutation.isPending}
         >
           <Text style={[styles.declineBtnText, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
@@ -264,7 +264,7 @@ export default function ContactsScreen() {
       </View>
       <Pressable
         style={({ pressed }) => [styles.cancelBtn, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
-        onPress={() => cancelMutation.mutate(item.id)}
+        onPress={() => confirmAction("Cancel Request", `Cancel your contact request to ${item.recipientName}?`, "Cancel Request", () => cancelMutation.mutate(item.id), false)}
         disabled={cancelMutation.isPending}
       >
         <Text style={[styles.cancelBtnText, { color: colors.textSecondary, fontFamily: "Inter_500Medium" }]}>
