@@ -43,7 +43,7 @@ artifacts-monorepo/
 - **Token validation**: API middleware validates `Authorization: Bearer <token>` header on protected routes
 - **Contacts**: Add/remove trusted contacts by searching username. Shows online/last seen status.
 - **Sessions**: Create focus sessions, invite contacts, join sessions
-- **Messaging**: Real-time polling every 2s for new messages within a session
+- **Messaging**: Real-time via Socket.IO WebSocket (polling kept as fallback)
 - **Media messages**: Send images (photo picker), files (document picker), voice notes (recorded audio)
 - **Online/last seen**: Heartbeat every 30s updates `lastSeenAt`; contacts show "Online" or "Xm ago"
 - **Archive**: Past completed sessions are retained for review
@@ -94,8 +94,29 @@ All at `/api/*`:
 - `GET/POST /sessions/:id/messages` — list/send messages; sends push notification to other participants
 - `GET /sessions/:id/messages/poll?since=` — poll for new messages
 - `POST /sessions/:id/messages/:msgId/play` — mark voice note as read
+- `GET /messages/search?q=&sessionId=` — search messages across sessions
+- `GET /sessions/:id/media?type=&limit=&offset=` — get session media (images, files, voice notes)
 - `POST /storage/upload` — multipart upload; stores file as bytea in DB, returns `{ uploadId, url }`
 - `GET /storage/uploads/:id` — stream file from DB by upload UUID
+
+## Real-Time (Socket.IO)
+
+WebSocket server runs alongside Express on the same HTTP server. Auth via JWT token on connection handshake.
+
+**Events emitted by server:**
+- `new_message` — broadcast to session room when a message is sent
+- `message_status_update` — broadcast when message status changes (delivered/read)
+- `typing_start` / `typing_stop` — relayed between session participants
+- `presence_update` — broadcast when a user goes online/offline
+- `messages_read` — broadcast when a user reads messages in a session
+- `reaction_added` / `reaction_removed` — broadcast on emoji reaction changes
+
+**Events from client:**
+- `join_session` / `leave_session` — join/leave a session room
+- `typing_start` / `typing_stop` — signal typing state (auto-expires after 5s)
+- `mark_read` — signal that messages have been read
+
+**Files:** `artifacts/api-server/src/lib/socketio.ts`, `artifacts/api-server/src/index.ts`
 
 ## Auth mechanism
 

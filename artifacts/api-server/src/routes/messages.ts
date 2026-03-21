@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import { eq, and, lt, gt, ne, desc, inArray } from "drizzle-orm";
+import { eq, and, lt, gt, ne, desc, inArray, ilike, or } from "drizzle-orm";
 import { db, messagesTable, usersTable, sessionsTable, sessionParticipantsTable, messageReactionsTable } from "@workspace/db";
 import { SendMessageBody, GetMessagesResponseItem } from "@workspace/api-zod";
 import { sendPushNotifications } from "../lib/pushNotifications";
+import { emitToSession, isUserOnline } from "../lib/socketio";
 
 const router: IRouter = Router();
 
@@ -105,7 +106,7 @@ router.get("/sessions/:sessionId/messages", async (req, res): Promise<void> => {
   }
   msgs.reverse();
 
-  await db.update(messagesTable)
+  const readUpdated = await db.update(messagesTable)
     .set({ status: "read" })
     .where(
       and(
@@ -113,7 +114,17 @@ router.get("/sessions/:sessionId/messages", async (req, res): Promise<void> => {
         ne(messagesTable.senderId, userId),
         ne(messagesTable.status, "read")
       )
-    );
+    )
+    .returning({ id: messagesTable.id, senderId: messagesTable.senderId });
+
+  if (readUpdated.length > 0) {
+    emitToSession(sessionId, "message_status_update", {
+      sessionId,
+      messageIds: readUpdated.map(m => m.id),
+      status: "read",
+      readBy: userId,
+    });
+  }
 
   const formatted = await formatMessages(msgs);
   res.json(formatted);
@@ -167,18 +178,10 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
   const [formatted] = await formatMessages([msg]);
   res.status(201).json(formatted);
 
+  emitToSession(sessionId, "new_message", formatted);
+
   (async () => {
     try {
-      const [sender] = await db.select({ name: usersTable.name })
-        .from(usersTable)
-        .where(eq(usersTable.id, userId))
-        .limit(1);
-
-      const [session] = await db.select({ name: sessionsTable.title, creatorId: sessionsTable.creatorId })
-        .from(sessionsTable)
-        .where(eq(sessionsTable.id, sessionId))
-        .limit(1);
-
       const participants = await db
         .select({ userId: sessionParticipantsTable.userId })
         .from(sessionParticipantsTable)
@@ -188,20 +191,52 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
           eq(sessionParticipantsTable.status, "joined")
         ));
 
-      const otherUserIds = participants.map(p => p.userId);
-      if (session && session.creatorId !== userId) otherUserIds.push(session.creatorId);
+      const [session] = await db.select({ creatorId: sessionsTable.creatorId })
+        .from(sessionsTable)
+        .where(eq(sessionsTable.id, sessionId))
+        .limit(1);
 
-      if (otherUserIds.length === 0) return;
+      const otherUserIds = participants.map(p => p.userId);
+      if (session && session.creatorId !== userId && !otherUserIds.includes(session.creatorId)) {
+        otherUserIds.push(session.creatorId);
+      }
+
+      const onlineRecipients = otherUserIds.filter(id => isUserOnline(id));
+      if (onlineRecipients.length > 0) {
+        const deliveredIds = [msg.id];
+        await db.update(messagesTable)
+          .set({ status: "delivered" })
+          .where(and(eq(messagesTable.id, msg.id), eq(messagesTable.status, "sent")));
+
+        emitToSession(sessionId, "message_status_update", {
+          sessionId,
+          messageIds: deliveredIds,
+          status: "delivered",
+        });
+      }
+
+      const offlineUserIds = otherUserIds.filter(id => !isUserOnline(id));
+      if (offlineUserIds.length === 0) return;
 
       const others = await db.select({ pushToken: usersTable.pushToken })
         .from(usersTable)
-        .where(inArray(usersTable.id, otherUserIds));
+        .where(inArray(usersTable.id, offlineUserIds));
 
       const tokens = others.map(u => u.pushToken).filter(Boolean) as string[];
       if (tokens.length === 0) return;
 
+      const [sender] = await db.select({ name: usersTable.name })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+
+      const [sessionRow] = await db.select({ name: sessionsTable.title })
+        .from(sessionsTable)
+        .where(eq(sessionsTable.id, sessionId))
+        .limit(1);
+
       const senderName = sender?.name || "Someone";
-      const sessionName = session?.name || "a session";
+      const sessionName = sessionRow?.name || "a session";
       const notifBody = type === "voice"
         ? `${senderName} sent a voice note`
         : type === "image"
@@ -315,10 +350,120 @@ router.post("/sessions/:sessionId/messages/:messageId/react", async (req, res): 
   if (existing) {
     await db.delete(messageReactionsTable).where(eq(messageReactionsTable.id, existing.id));
     res.json({ action: "removed" });
+
+    emitToSession(sessionId, "reaction_removed", {
+      messageId,
+      userId,
+      emoji,
+      sessionId,
+    });
   } else {
     await db.insert(messageReactionsTable).values({ messageId, userId, emoji });
     res.json({ action: "added" });
+
+    emitToSession(sessionId, "reaction_added", {
+      messageId,
+      userId,
+      emoji,
+      sessionId,
+    });
   }
+});
+
+router.get("/messages/search", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const q = req.query.q as string;
+  if (!q || q.trim().length === 0) {
+    res.json({ results: [] });
+    return;
+  }
+
+  const sessionIdFilter = req.query.sessionId ? parseInt(req.query.sessionId as string, 10) : undefined;
+
+  const participantRows = await db
+    .select({ sessionId: sessionParticipantsTable.sessionId })
+    .from(sessionParticipantsTable)
+    .where(and(eq(sessionParticipantsTable.userId, userId), eq(sessionParticipantsTable.status, "joined")));
+
+  const creatorRows = await db
+    .select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.creatorId, userId));
+
+  const allSessionIds = [...new Set([
+    ...participantRows.map(r => r.sessionId),
+    ...creatorRows.map(r => r.id),
+  ])];
+
+  if (allSessionIds.length === 0) {
+    res.json({ results: [] });
+    return;
+  }
+
+  const targetSessionIds = sessionIdFilter
+    ? allSessionIds.filter(id => id === sessionIdFilter)
+    : allSessionIds;
+
+  if (targetSessionIds.length === 0) {
+    res.json({ results: [] });
+    return;
+  }
+
+  const searchTerm = `%${q.trim()}%`;
+
+  const msgs = await db.select({
+    id: messagesTable.id,
+    sessionId: messagesTable.sessionId,
+    senderId: messagesTable.senderId,
+    content: messagesTable.content,
+    type: messagesTable.type,
+    createdAt: messagesTable.createdAt,
+  })
+    .from(messagesTable)
+    .where(
+      and(
+        inArray(messagesTable.sessionId, targetSessionIds),
+        ilike(messagesTable.content, searchTerm)
+      )
+    )
+    .orderBy(desc(messagesTable.createdAt))
+    .limit(50);
+
+  const sessionIds = [...new Set(msgs.map(m => m.sessionId))];
+  const senderIds = [...new Set(msgs.map(m => m.senderId))];
+
+  const [sessions, senders] = await Promise.all([
+    sessionIds.length > 0
+      ? db.select({ id: sessionsTable.id, title: sessionsTable.title, status: sessionsTable.status })
+          .from(sessionsTable)
+          .where(inArray(sessionsTable.id, sessionIds))
+      : [],
+    senderIds.length > 0
+      ? db.select({ id: usersTable.id, name: usersTable.name, username: usersTable.username, avatarUrl: usersTable.avatarUrl })
+          .from(usersTable)
+          .where(inArray(usersTable.id, senderIds))
+      : [],
+  ]);
+
+  const sessionMap = new Map(sessions.map(s => [s.id, s]));
+  const senderMap = new Map(senders.map(s => [s.id, s]));
+
+  const results = msgs.map(m => ({
+    id: m.id,
+    content: m.content,
+    type: m.type,
+    createdAt: m.createdAt,
+    session: sessionMap.get(m.sessionId) ?? { id: m.sessionId, title: "Unknown", status: "active" },
+    sender: senderMap.get(m.senderId) ?? { id: m.senderId, name: "Unknown", username: "unknown", avatarUrl: null },
+  }));
+
+  res.json({ results });
 });
 
 export default router;

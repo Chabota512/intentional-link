@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray, ne } from "drizzle-orm";
+import { eq, and, inArray, ne, desc } from "drizzle-orm";
 import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable } from "@workspace/db";
 import {
   CreateSessionBody,
@@ -495,6 +495,96 @@ router.delete("/sessions/:sessionId/leave", async (req, res): Promise<void> => {
   }
 
   res.sendStatus(204);
+});
+
+router.get("/sessions/:sessionId/media", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  const userId = parseInt(userIdStr, 10);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
+  const sessionId = parseInt(raw, 10);
+
+  const membership = await getSessionMembership(sessionId, userId);
+  if (!membership) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (!membership.isCreator && membership.participant?.status !== "joined") {
+    res.status(403).json({ error: "You are not a member of this session" });
+    return;
+  }
+
+  const rawLimit = parseInt(req.query.limit as string || "50", 10);
+  const limit = Math.min(Math.max(rawLimit, 1), 100);
+  const rawOffset = parseInt(req.query.offset as string || "0", 10);
+  const offset = Math.max(rawOffset, 0);
+  const typeFilter = req.query.type as string | undefined;
+
+  const validTypes = ["image", "file", "voice"];
+  if (typeFilter && !validTypes.includes(typeFilter)) {
+    res.status(400).json({ error: "Invalid type filter. Use 'image', 'file', or 'voice'" });
+    return;
+  }
+  const targetTypes = typeFilter ? [typeFilter] : validTypes;
+
+  const media = await db.select({
+    id: messagesTable.id,
+    type: messagesTable.type,
+    content: messagesTable.content,
+    attachmentUrl: messagesTable.attachmentUrl,
+    attachmentName: messagesTable.attachmentName,
+    attachmentSize: messagesTable.attachmentSize,
+    senderId: messagesTable.senderId,
+    createdAt: messagesTable.createdAt,
+  })
+    .from(messagesTable)
+    .where(
+      and(
+        eq(messagesTable.sessionId, sessionId),
+        inArray(messagesTable.type, targetTypes)
+      )
+    )
+    .orderBy(desc(messagesTable.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  const senderIds = [...new Set(media.map(m => m.senderId))];
+  const senders = senderIds.length > 0
+    ? await db.select({ id: usersTable.id, name: usersTable.name, username: usersTable.username, avatarUrl: usersTable.avatarUrl })
+        .from(usersTable)
+        .where(inArray(usersTable.id, senderIds))
+    : [];
+
+  const senderMap = new Map(senders.map(s => [s.id, s]));
+
+  const images = media.filter(m => m.type === "image").map(m => ({
+    ...m,
+    sender: senderMap.get(m.senderId) ?? null,
+  }));
+
+  const files = media.filter(m => m.type === "file").map(m => ({
+    ...m,
+    sender: senderMap.get(m.senderId) ?? null,
+  }));
+
+  const voiceNotes = media.filter(m => m.type === "voice").map(m => ({
+    ...m,
+    sender: senderMap.get(m.senderId) ?? null,
+  }));
+
+  res.json({
+    images,
+    files,
+    voiceNotes,
+    total: media.length,
+    offset,
+    limit,
+  });
 });
 
 export default router;
