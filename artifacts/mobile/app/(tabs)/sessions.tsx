@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   Pressable,
   ActivityIndicator,
   RefreshControl,
@@ -413,73 +414,124 @@ export default function SessionsScreen() {
         />
       )}
 
-      {/* Avatar Preview Modal */}
+      {/* Chat Info Sheet */}
       <Modal
         visible={previewSession !== null}
-        transparent
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="pageSheet"
         onRequestClose={() => setPreviewSession(null)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setPreviewSession(null)}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            {/* Close button */}
-            <Pressable
-              style={[styles.modalCloseBtn, { backgroundColor: "rgba(255,255,255,0.15)" }]}
-              onPress={() => setPreviewSession(null)}
-            >
-              <Feather name="x" size={20} color="#fff" />
+        <View style={[styles.infoSheet, { backgroundColor: colors.background }]}>
+          {/* Sheet header */}
+          <View style={[styles.infoSheetHeader, { borderBottomColor: colors.border }]}>
+            <View style={{ width: 22 }} />
+            <Text style={[styles.infoSheetHeaderTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>Chat Info</Text>
+            <Pressable onPress={() => setPreviewSession(null)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+              <Feather name="x" size={22} color={colors.textSecondary} />
             </Pressable>
+          </View>
 
-            {/* Large avatar */}
-            {previewSession?.imageUrl ? (
-              <Image
-                source={{ uri: getFileUrl(previewSession.imageUrl) }}
-                style={styles.modalAvatar}
-              />
-            ) : previewAvatarUser?.avatarUrl ? (
-              <Image
-                source={{ uri: getFileUrl(previewAvatarUser.avatarUrl) }}
-                style={styles.modalAvatar}
-              />
-            ) : (
-              <View style={[styles.modalAvatarPlaceholder, { backgroundColor: colors.accentSoft }]}>
-                <Text style={[styles.modalAvatarLetter, { color: colors.accent, fontFamily: "Inter_700Bold" }]}>
-                  {previewSession?.title.trim().charAt(0).toUpperCase() ?? "?"}
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Title + description block */}
+            <View style={[styles.infoBlock, { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+              {/* Avatar */}
+              <View style={styles.infoAvatarWrap}>
+                {previewSession?.imageUrl ? (
+                  <Image
+                    source={{ uri: getFileUrl(previewSession.imageUrl) }}
+                    style={styles.infoAvatar}
+                  />
+                ) : previewAvatarUser?.avatarUrl ? (
+                  <Image
+                    source={{ uri: getFileUrl(previewAvatarUser.avatarUrl) }}
+                    style={styles.infoAvatar}
+                  />
+                ) : (
+                  <View style={[styles.infoAvatarPlaceholder, { backgroundColor: colors.accentSoft }]}>
+                    <Text style={[styles.infoAvatarLetter, { color: colors.accent, fontFamily: "Inter_700Bold" }]}>
+                      {previewSession?.title.trim().charAt(0).toUpperCase() ?? "?"}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={[styles.infoTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>
+                {previewSession?.title}
+              </Text>
+              {previewSession?.description ? (
+                <Text style={[styles.infoDesc, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  {previewSession.description}
+                </Text>
+              ) : (
+                <Text style={[styles.infoDesc, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+                  No description
+                </Text>
+              )}
+
+              {/* Meta pill */}
+              <View style={[styles.infoMetaPill, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                <Feather name="users" size={13} color={colors.textSecondary} />
+                <Text style={[styles.infoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  {previewSession?.participants.length ?? 0} participant{(previewSession?.participants.length ?? 0) !== 1 ? "s" : ""}
+                </Text>
+                <Text style={[styles.infoMetaText, { color: colors.border }]}>·</Text>
+                <View style={[styles.infoStatusDot, { backgroundColor: previewSession?.status === "active" ? colors.success : colors.textTertiary }]} />
+                <Text style={[styles.infoMetaText, { color: previewSession?.status === "active" ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }]}>
+                  {previewSession?.status === "active" ? "Active" : "Ended"}
                 </Text>
               </View>
-            )}
+            </View>
 
-            {/* Chat name */}
-            <Text style={[styles.modalTitle, { fontFamily: "Inter_700Bold" }]} numberOfLines={2}>
-              {previewSession?.title}
+            {/* Participants section */}
+            <Text style={[styles.infoSectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
+              PARTICIPANTS
             </Text>
+            {previewSession?.participants.map((p) => {
+              const pStatus = getEffectivePresence(p.userId, p.user.lastSeenAt);
+              const statusColor = pStatus === "local" ? "#FF6B9D" : pStatus === "online" ? colors.success : colors.textSecondary;
+              const statusText = pStatus === "local" ? "On this network" : pStatus === "online" ? "Online" : "Offline";
+              return (
+                <View key={p.id} style={[styles.infoParticipantRow, { borderBottomColor: colors.border }]}>
+                  <UserAvatar
+                    name={p.user.name}
+                    avatarUrl={p.user.avatarUrl}
+                    size={44}
+                    presenceStatus={pStatus}
+                    showDot
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.infoParticipantName, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>
+                      {p.user.name}
+                    </Text>
+                    <Text style={[styles.infoParticipantSub, { color: statusColor, fontFamily: "Inter_400Regular" }]}>
+                      {statusText}
+                    </Text>
+                  </View>
+                  {p.userId === previewSession.creatorId && (
+                    <View style={[styles.infoRolePill, { backgroundColor: colors.accentSoft }]}>
+                      <Text style={[styles.infoRolePillText, { color: colors.accent, fontFamily: "Inter_500Medium" }]}>Creator</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
 
-            {/* Action buttons */}
-            <View style={styles.modalActions}>
+            {/* Open chat button */}
+            <View style={styles.infoFooter}>
               <Pressable
-                style={({ pressed }) => [styles.modalActionBtn, { backgroundColor: "rgba(255,255,255,0.15)", opacity: pressed ? 0.7 : 1 }]}
-                onPress={() => {
-                  setPreviewSession(null);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push(`/session/media/${previewSession?.id}` as any);
-                }}
-              >
-                <Feather name="image" size={24} color="#fff" />
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [styles.modalActionBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
+                style={({ pressed }) => [styles.infoOpenBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
                 onPress={() => {
                   setPreviewSession(null);
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push(`/session/${previewSession?.id}`);
                 }}
               >
-                <Feather name="message-circle" size={24} color="#fff" />
+                <Feather name="message-circle" size={18} color="#fff" />
+                <Text style={[styles.infoOpenBtnText, { fontFamily: "Inter_600SemiBold" }]}>Open Chat</Text>
               </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
+          </ScrollView>
+        </View>
       </Modal>
     </View>
   );
@@ -651,60 +703,57 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emptyBtnText: { color: "#fff", fontSize: 15 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.88)",
+  infoSheet: { flex: 1 },
+  infoSheetHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  modalContent: {
+  infoSheetHeaderTitle: { fontSize: 16 },
+  infoBlock: { padding: 20, gap: 8, paddingBottom: 20 },
+  infoAvatarWrap: { marginBottom: 4 },
+  infoAvatar: { width: 72, height: 72, borderRadius: 36 },
+  infoAvatarPlaceholder: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
+  infoAvatarLetter: { fontSize: 30, lineHeight: 36 },
+  infoTitle: { fontSize: 22, lineHeight: 28 },
+  infoDesc: { fontSize: 14, lineHeight: 20 },
+  infoMetaPill: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: 16,
-    paddingHorizontal: 24,
-    width: "100%",
-  },
-  modalCloseBtn: {
-    position: "absolute",
-    top: -48,
-    right: 24,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalAvatar: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-  },
-  modalAvatarPlaceholder: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalAvatarLetter: {
-    fontSize: 72,
-    lineHeight: 80,
-  },
-  modalTitle: {
-    fontSize: 22,
-    color: "#fff",
-    textAlign: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
     marginTop: 4,
   },
-  modalActions: {
+  infoMetaText: { fontSize: 13 },
+  infoStatusDot: { width: 7, height: 7, borderRadius: 4 },
+  infoSectionLabel: { fontSize: 11, letterSpacing: 0.8, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+  infoParticipantRow: {
     flexDirection: "row",
-    gap: 24,
-    marginTop: 8,
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  modalActionBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  infoParticipantName: { fontSize: 15 },
+  infoParticipantSub: { fontSize: 13 },
+  infoRolePill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+  infoRolePillText: { fontSize: 11 },
+  infoFooter: { padding: 20 },
+  infoOpenBtn: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
   },
+  infoOpenBtnText: { color: "#fff", fontSize: 15 },
 });
