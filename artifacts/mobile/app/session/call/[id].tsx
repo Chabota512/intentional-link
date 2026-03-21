@@ -6,13 +6,12 @@ import {
   ActivityIndicator,
   Pressable,
   Platform,
-  Alert,
+
 } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
 import InCallManager from "react-native-incall-manager";
@@ -34,10 +33,18 @@ export default function CallScreen() {
 
   useEffect(() => {
     joinCall();
+    if (Platform.OS === "web") {
+      const handler = (e: MessageEvent) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === "endCall") leaveCall();
+        } catch {}
+      };
+      window.addEventListener("message", handler);
+      return () => window.removeEventListener("message", handler);
+    }
     return () => {
-      if (Platform.OS !== "web") {
-        InCallManager.stop();
-      }
+      InCallManager.stop();
     };
   }, []);
 
@@ -91,19 +98,6 @@ export default function CallScreen() {
     router.replace(`/session/${sessionId}` as any);
   }
 
-  function handleEnd() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (Platform.OS === "web") {
-      if (window.confirm(`Leave ${isVoice ? "voice" : "video"} call?`)) {
-        leaveCall();
-      }
-    } else {
-      Alert.alert(`Leave ${isVoice ? "voice" : "video"} call?`, "You will exit the call.", [
-        { text: "Stay", style: "cancel" },
-        { text: "Leave", style: "destructive", onPress: leaveCall },
-      ]);
-    }
-  }
 
   if (loading) {
     return (
@@ -138,10 +132,6 @@ export default function CallScreen() {
           <View style={styles.liveDot} />
           <Text style={styles.liveText}>{isVoice ? "VOICE" : "VIDEO"}</Text>
         </View>
-        <Pressable style={styles.endBtn} onPress={handleEnd}>
-          <Feather name="phone-off" size={18} color="#fff" />
-          <Text style={styles.endBtnText}>End</Text>
-        </Pressable>
       </View>
 
       {Platform.OS === "web" ? (
@@ -228,20 +218,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 1,
-  },
-  endBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#FF3B30",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  endBtnText: {
-    color: "#fff",
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
   },
   webview: {
     flex: 1,

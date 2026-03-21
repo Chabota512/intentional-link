@@ -283,7 +283,7 @@ async function endCall() {
   if (window.ReactNativeWebView) {
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'endCall' }));
   } else {
-    window.close();
+    window.parent.postMessage(JSON.stringify({ type: 'endCall' }), '*');
   }
 }
 
