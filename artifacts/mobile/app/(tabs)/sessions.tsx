@@ -173,7 +173,15 @@ export default function SessionsScreen() {
           </View>
         )}
         <View style={styles.sessionCardRow}>
-          <View style={{ position: "relative" }}>
+          <Pressable
+            style={{ position: "relative" }}
+            onPress={(e) => {
+              e.stopPropagation();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push(`/session/media/${item.id}` as any);
+            }}
+            hitSlop={6}
+          >
             {item.imageUrl ? (
               <>
                 <Image
@@ -198,7 +206,7 @@ export default function SessionsScreen() {
                 <View style={[styles.onlineDot, { backgroundColor: groupDotColor, borderColor: colors.surface }]} />
               </View>
             )}
-          </View>
+          </Pressable>
 
           <View style={styles.sessionContent}>
             <View style={styles.sessionTopRow}>
