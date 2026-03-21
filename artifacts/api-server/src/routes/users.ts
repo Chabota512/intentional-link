@@ -24,11 +24,12 @@ router.post("/users/register", async (req, res): Promise<void> => {
     return;
   }
 
-  const { username, name, password } = parsed.data;
+  const { username: rawUsername, name, password } = parsed.data;
+  const username = rawUsername.trim().toLowerCase();
 
   let existing: (typeof usersTable.$inferSelect)[];
   try {
-    existing = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+    existing = await db.select().from(usersTable).where(ilike(usersTable.username, username)).limit(1);
   } catch {
     res.status(503).json({ error: "Service temporarily unavailable. Please try again." });
     return;
@@ -42,7 +43,7 @@ router.post("/users/register", async (req, res): Promise<void> => {
 
   let user;
   try {
-    [user] = await db.insert(usersTable).values({ username, name, passwordHash }).returning();
+    [user] = await db.insert(usersTable).values({ username, name: name.trim(), passwordHash }).returning();
   } catch (err: any) {
     if (err.code === "23505") {
       res.status(409).json({ error: "Username already taken" });
@@ -71,12 +72,13 @@ router.post("/users/login", async (req, res): Promise<void> => {
     return;
   }
 
-  const { username, password } = parsed.data;
+  const { username: rawUsername, password } = parsed.data;
+  const username = rawUsername.trim().toLowerCase();
 
   let user: typeof usersTable.$inferSelect | undefined;
   try {
     [user] = await db.select().from(usersTable)
-      .where(or(eq(usersTable.username, username), ilike(usersTable.name, username)))
+      .where(or(ilike(usersTable.username, username), ilike(usersTable.name, username)))
       .limit(1);
   } catch {
     res.status(503).json({ error: "Service temporarily unavailable. Please try again." });
@@ -157,14 +159,15 @@ router.put("/users/me", async (req, res): Promise<void> => {
   const updates: Record<string, string | null> = {};
   if (name) updates.name = name.trim();
   if (username) {
+    const normalizedUsername = username.trim().toLowerCase();
     const existing = await db.select().from(usersTable)
-      .where(and(eq(usersTable.username, username.trim()), ne(usersTable.id, userId)))
+      .where(and(ilike(usersTable.username, normalizedUsername), ne(usersTable.id, userId)))
       .limit(1);
     if (existing.length > 0) {
       res.status(409).json({ error: "Username already taken" });
       return;
     }
-    updates.username = username.trim();
+    updates.username = normalizedUsername;
   }
   if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
   if (pushToken !== undefined && typeof pushToken === "string") updates.pushToken = pushToken;
