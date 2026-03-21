@@ -128,6 +128,7 @@ function VoicePlayer({
   senderAvatarUrl,
   isOwn,
   onPlayed,
+  durationHint,
 }: {
   url: string;
   colors: any;
@@ -135,6 +136,7 @@ function VoicePlayer({
   senderAvatarUrl?: string | null;
   isOwn?: boolean;
   onPlayed?: () => void;
+  durationHint?: number;
 }) {
   const soundRef = useRef<Audio.Sound | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -241,7 +243,9 @@ function VoicePlayer({
   const progress = duration > 0 ? Math.min(position / duration, 1) : 0;
   const timeLabel = duration > 0
     ? `${formatDur(position)} / ${formatDur(duration)}`
-    : "Voice note";
+    : durationHint && durationHint > 0
+    ? formatDur(durationHint * 1000)
+    : "--:--";
 
   return (
     <View style={[styles.voicePlayerRow]}>
@@ -363,6 +367,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
 
     if (message.type === "voice" && message.attachmentUrl) {
       const url = getFileUrl(message.attachmentUrl);
+      const durationHint = message.content ? parseInt(message.content, 10) : 0;
       return (
         <VoicePlayer
           url={url}
@@ -371,6 +376,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
           senderAvatarUrl={isOwn ? currentUser?.avatarUrl : message.sender.avatarUrl}
           isOwn={isOwn}
           onPlayed={!isOwn ? onPlayed : undefined}
+          durationHint={isNaN(durationHint) ? 0 : durationHint}
         />
       );
     }
@@ -1060,7 +1066,7 @@ export default function SessionScreen() {
         const uploaded = await uploadFile(uri, fileName, 0, contentType);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         sendMutation.mutate({
-          content: "",
+          content: String(recordingSeconds),
           type: "voice",
           attachmentUrl: uploaded.objectPath,
           attachmentName: fileName,
