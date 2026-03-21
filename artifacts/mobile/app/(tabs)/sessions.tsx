@@ -80,6 +80,7 @@ export default function SessionsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
   const [previewSession, setPreviewSession] = useState<Session | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const { isConnected: socketConnected, onlineUserIds } = useSocket();
   const { getPresenceStatus } = useLocalDiscovery();
@@ -181,7 +182,12 @@ export default function SessionsScreen() {
             onPress={(e) => {
               e.stopPropagation();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setPreviewSession(item);
+              const imgUrl = item.imageUrl
+                ? getFileUrl(item.imageUrl)
+                : avatarUser?.avatarUrl
+                ? getFileUrl(avatarUser.avatarUrl)
+                : null;
+              if (imgUrl) setPreviewImageUrl(imgUrl);
             }}
             hitSlop={6}
           >
@@ -531,6 +537,26 @@ export default function SessionsScreen() {
             </View>
           </ScrollView>
         </View>
+      </Modal>
+
+      <Modal
+        visible={previewImageUrl !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImageUrl(null)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" }}
+          onPress={() => setPreviewImageUrl(null)}
+        >
+          {previewImageUrl && (
+            <Image
+              source={{ uri: previewImageUrl }}
+              style={{ width: "88%", height: "88%", borderRadius: 12 }}
+              resizeMode="contain"
+            />
+          )}
+        </Pressable>
       </Modal>
     </View>
   );
