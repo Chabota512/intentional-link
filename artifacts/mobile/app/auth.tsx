@@ -50,18 +50,24 @@ export default function AuthScreen() {
     strong: colors.success,
   };
 
+  const isFormValid = mode === "login"
+    ? username.trim().length > 0 && password.trim().length > 0
+    : name.trim().length > 0 && username.trim().length > 0 && password.length >= 6;
+
+  const getValidationError = () => {
+    if (mode === "register" && !name.trim()) return "Please enter your full name";
+    if (!username.trim()) return "Please enter your username";
+    if (!password.trim()) return "Please enter your password";
+    if (mode === "register" && password.length < 6) return "Password must be at least 6 characters";
+    return null;
+  };
+
   const handleSubmit = async () => {
     setError("");
-    if (!username.trim() || !password.trim()) {
-      setError("Please fill in all fields");
-      return;
-    }
-    if (mode === "register" && !name.trim()) {
-      setError("Please enter your name");
-      return;
-    }
-    if (mode === "register" && password.length < 6) {
-      setError("Password must be at least 6 characters");
+    const validationError = getValidationError();
+    if (validationError) {
+      setError(validationError);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
@@ -234,7 +240,12 @@ export default function AuthScreen() {
               <Pressable
                 style={({ pressed }) => [
                   styles.primaryBtn,
-                  { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 },
+                  {
+                    backgroundColor: isFormValid ? colors.accent : colors.textTertiary,
+                    opacity: loading ? 0.7 : pressed ? 0.85 : 1,
+                    shadowOpacity: isFormValid ? 0.3 : 0,
+                    elevation: isFormValid ? 5 : 0,
+                  },
                 ]}
                 onPress={handleSubmit}
                 disabled={loading}
