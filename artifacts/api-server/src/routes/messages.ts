@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, lt, gt, ne, desc, inArray, ilike, or } from "drizzle-orm";
+import { eq, and, lt, gt, ne, desc, inArray, ilike } from "drizzle-orm";
 import { db, messagesTable, usersTable, sessionsTable, sessionParticipantsTable, messageReactionsTable } from "@workspace/db";
 import { SendMessageBody, GetMessagesResponseItem } from "@workspace/api-zod";
 import { sendPushNotifications } from "../lib/pushNotifications";
