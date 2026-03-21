@@ -469,7 +469,7 @@ function InlineVideoPlayer({ url, isOwn, colors, onLongPress }: {
   );
 }
 
-function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, senderPresenceStatus, onAvatarPress, onImagePress }: {
+function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, colors, getFileUrl, onPlayed, onLongPress, onReact, onReactionPress, senderPresenceStatus, onAvatarPress, onImagePress }: {
   message: Message;
   isOwn: boolean;
   showSender: boolean;
@@ -480,6 +480,7 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
   onPlayed?: () => void;
   onLongPress?: () => void;
   onReact?: (emoji: string) => void;
+  onReactionPress?: (reaction: Reaction, isMine: boolean) => void;
   senderPresenceStatus?: "online" | "offline" | "local";
   onAvatarPress?: (user: { name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" }) => void;
   onImagePress?: (url: string) => void;
@@ -670,21 +671,20 @@ function MessageBubble({ message, isOwn, showSender, showAvatar, currentUser, co
               return (
                 <Pressable
                   key={r.emoji}
-                  onPress={() => onReact?.(r.emoji)}
-                  style={[
+                  onPress={() => onReactionPress ? onReactionPress(r, isMine) : onReact?.(r.emoji)}
+                  style={({ pressed }) => [
                     styles.reactionPill,
                     {
                       backgroundColor: isMine ? colors.accentSoft : colors.surfaceAlt,
                       borderColor: isMine ? colors.accent : colors.border,
+                      opacity: pressed ? 0.7 : 1,
                     },
                   ]}
                 >
                   <Text style={styles.reactionEmoji}>{r.emoji}</Text>
-                  {r.count > 1 && (
-                    <Text style={[styles.reactionCount, { color: isMine ? colors.accent : colors.textSecondary }]}>
-                      {r.count}
-                    </Text>
-                  )}
+                  <Text style={[styles.reactionCount, { color: isMine ? colors.accent : colors.textSecondary }]}>
+                    {r.count}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -753,6 +753,7 @@ export default function SessionScreen() {
   const [attachMenuVisible, setAttachMenuVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
+  const [reactorsModal, setReactorsModal] = useState<{ reaction: Reaction; messageId: number } | null>(null);
   const [customEmojiInput, setCustomEmojiInput] = useState("");
   const [showCustomEmoji, setShowCustomEmoji] = useState(false);
   const [reactionKeyboardHeight, setReactionKeyboardHeight] = useState(0);
@@ -1703,6 +1704,13 @@ export default function SessionScreen() {
                   onPlayed={item.type === "voice" && !isOwn ? () => markPlayedMutation.mutate(item.id) : undefined}
                   onLongPress={() => setActionMenuMessage(item)}
                   onReact={(emoji) => reactMutation.mutate({ messageId: item.id, emoji })}
+                  onReactionPress={(reaction, isMine) => {
+                    if (isMine) {
+                      reactMutation.mutate({ messageId: item.id, emoji: reaction.emoji });
+                    } else {
+                      setReactorsModal({ reaction, messageId: item.id });
+                    }
+                  }}
                   senderPresenceStatus={isOwn ? "online" : getEffectivePresence(item.senderId, item.sender.lastSeenAt) as any}
                   onAvatarPress={setProfileViewUser}
                   onImagePress={openImageViewer}
@@ -2466,6 +2474,62 @@ export default function SessionScreen() {
             )}
           </View>
         </View>
+      </Modal>
+
+      <Modal
+        visible={reactorsModal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReactorsModal(null)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}
+          onPress={() => setReactorsModal(null)}
+        >
+          <Pressable style={[{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: insets.bottom + 24, borderWidth: 1, borderColor: colors.border }]}>
+            <View style={{ alignItems: "center", paddingTop: 12, paddingBottom: 8 }}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border }} />
+            </View>
+            {reactorsModal && (
+              <>
+                <View style={{ paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+                  <Text style={{ fontSize: 24, textAlign: "center" }}>{reactorsModal.reaction.emoji}</Text>
+                  <Text style={[{ color: colors.textSecondary, fontSize: 13, textAlign: "center", marginTop: 2, fontFamily: "Inter_400Regular" }]}>
+                    {reactorsModal.reaction.count} {reactorsModal.reaction.count === 1 ? "person" : "people"} reacted
+                  </Text>
+                </View>
+                <View style={{ paddingTop: 8, paddingHorizontal: 16 }}>
+                  {(reactorsModal.reaction.reactors ?? reactorsModal.reaction.userIds.map(id => ({ id, name: "User" }))).map((reactor) => {
+                    const isMe = reactor.id === user?.id;
+                    return (
+                      <View key={reactor.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, gap: 12 }}>
+                        <View style={[{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: colors.accentSoft }]}>
+                          <Text style={[{ fontSize: 15, fontFamily: "Inter_700Bold", color: colors.accent }]}>
+                            {reactor.name.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={[{ flex: 1, fontSize: 15, fontFamily: "Inter_500Medium", color: colors.text }]}>
+                          {isMe ? "You" : reactor.name}
+                        </Text>
+                        {isMe && (
+                          <Pressable
+                            style={({ pressed }) => [{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.danger + "20", opacity: pressed ? 0.7 : 1 }]}
+                            onPress={() => {
+                              setReactorsModal(null);
+                              reactMutation.mutate({ messageId: reactorsModal.messageId, emoji: reactorsModal.reaction.emoji });
+                            }}
+                          >
+                            <Text style={[{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.danger }]}>Remove</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
