@@ -152,7 +152,7 @@ export default function SessionsScreen() {
       ? formatRelative(item.lastMessage.createdAt)
       : formatRelative(item.createdAt);
 
-    const groupDotColor = isActive ? "#34C759" : "#94A3B8";
+    const groupDotColor = isActive ? "#007AFF" : "#94A3B8";
 
     const avatarUser = others.length === 1 ? others[0].user : null;
     const nameStr = others.length > 0
@@ -484,8 +484,8 @@ export default function SessionsScreen() {
                   {previewSession?.participants.length ?? 0} participant{(previewSession?.participants.length ?? 0) !== 1 ? "s" : ""}
                 </Text>
                 <Text style={[styles.infoMetaText, { color: colors.border }]}>·</Text>
-                <View style={[styles.infoStatusDot, { backgroundColor: previewSession?.status === "active" ? colors.success : colors.textTertiary }]} />
-                <Text style={[styles.infoMetaText, { color: previewSession?.status === "active" ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }]}>
+                <View style={[styles.infoStatusDot, { backgroundColor: previewSession?.status === "active" ? "#007AFF" : colors.textTertiary }]} />
+                <Text style={[styles.infoMetaText, { color: previewSession?.status === "active" ? "#007AFF" : colors.textTertiary, fontFamily: "Inter_500Medium" }]}>
                   {previewSession?.status === "active" ? "Active" : "Ended"}
                 </Text>
               </View>
