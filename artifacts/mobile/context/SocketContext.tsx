@@ -306,6 +306,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     });
 
+    socket.on("pending_invite_request", (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["pendingInvites", data?.sessionId] });
+    });
+
+    socket.on("pending_invite_approved", (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["pendingInvites", data?.sessionId] });
+      queryClient.invalidateQueries({ queryKey: ["session", data?.sessionId] });
+    });
+
     const appStateSub = AppState.addEventListener("change", (state) => {
       appStateRef.current = state;
       if (state === "active" && !socket.connected) {

@@ -1266,6 +1266,48 @@ export default function SessionScreen() {
     },
   });
 
+  type PendingInvite = {
+    id: number;
+    sessionId: number;
+    invitedUserId: number;
+    requestedByUserId: number;
+    status: string;
+    createdAt: string;
+    invitedUserName: string | null;
+    invitedUserAvatarUrl: string | null;
+    requestedByName: string;
+  };
+
+  const { data: pendingInvites = [] } = useQuery<PendingInvite[]>({
+    queryKey: ["pendingInvites", sessionId],
+    queryFn: () => get(`/sessions/${sessionId}/pending-invites`),
+    enabled: !!sessionId && (hasJoined || isCreator),
+    refetchInterval: 15000,
+  });
+
+  const approvePendingMutation = useMutation({
+    mutationFn: (inviteId: number) => post(`/sessions/${sessionId}/pending-invites/${inviteId}/approve`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pendingInvites", sessionId] });
+      queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to approve invite");
+    },
+  });
+
+  const rejectPendingMutation = useMutation({
+    mutationFn: (inviteId: number) => post(`/sessions/${sessionId}/pending-invites/${inviteId}/reject`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pendingInvites", sessionId] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e.message || "Failed to reject invite");
+    },
+  });
+
   const markPlayedMutation = useMutation({
     mutationFn: (messageId: number) => post(`/sessions/${sessionId}/messages/${messageId}/play`),
     onSuccess: () => {
@@ -1604,7 +1646,7 @@ export default function SessionScreen() {
   const isParticipant = session?.participants.some((p) => p.userId === user?.id);
   const isActive = session?.status === "active";
   const canSend = isActive && (isCreator || hasJoined);
-  const canInvite = isActive && (isCreator || hasJoined);
+  const canInvite = isCreator || hasJoined;
 
   const participantIds = new Set(session?.participants.map((p) => p.userId) ?? []);
   const uninvitedContacts = contacts.filter((c) => !participantIds.has(c.contactUser.id));
@@ -2352,26 +2394,6 @@ export default function SessionScreen() {
                   <Feather name="stop-circle" size={20} color={colors.danger} />
                   <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>End Chat</Text>
                 </Pressable>
-                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
-                <Pressable
-                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
-                  onPress={() => { setMoreMenuVisible(false); handleDeleteSession(); }}
-                >
-                  <Feather name="trash-2" size={20} color={colors.danger} />
-                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Chat</Text>
-                </Pressable>
-              </>
-            )}
-            {!isActive && isCreator && (
-              <>
-                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
-                <Pressable
-                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
-                  onPress={() => { setMoreMenuVisible(false); handleDeleteSession(); }}
-                >
-                  <Feather name="trash-2" size={20} color={colors.danger} />
-                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Chat</Text>
-                </Pressable>
               </>
             )}
             {isActive && !isCreator && hasJoined && (
@@ -2383,6 +2405,18 @@ export default function SessionScreen() {
                 >
                   <Feather name="log-out" size={20} color={colors.danger} />
                   <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Leave Session</Text>
+                </Pressable>
+              </>
+            )}
+            {(isCreator || hasJoined) && (
+              <>
+                <View style={[styles.moreMenuDivider, { backgroundColor: colors.border }]} />
+                <Pressable
+                  style={({ pressed }) => [styles.moreMenuItem, { opacity: pressed ? 0.6 : 1 }]}
+                  onPress={() => { setMoreMenuVisible(false); handleDeleteSession(); }}
+                >
+                  <Feather name="trash-2" size={20} color={colors.danger} />
+                  <Text style={[styles.moreMenuItemText, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>Delete Chat</Text>
                 </Pressable>
               </>
             )}
@@ -2533,6 +2567,68 @@ export default function SessionScreen() {
                   </Pressable>
                 </View>
               </View>
+              {pendingInvites.length > 0 && (
+                <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
+                  <Text style={{ color: colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 11, letterSpacing: 0.5, marginBottom: 8 }}>
+                    PENDING APPROVAL
+                  </Text>
+                  {pendingInvites.map((pi) => (
+                    <View key={pi.id} style={{
+                      backgroundColor: colors.surfaceAlt,
+                      borderRadius: 12,
+                      padding: 12,
+                      marginBottom: 8,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}>
+                      <Text style={{ color: colors.text, fontFamily: "Inter_500Medium", fontSize: 14, marginBottom: 4 }}>
+                        {pi.requestedByName} wants to add {pi.invitedUserName || "someone"}
+                      </Text>
+                      <Text style={{ color: colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 12, marginBottom: 10 }}>
+                        Needs approval from any existing member
+                      </Text>
+                      {pi.requestedByUserId !== user?.id && (
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                          <Pressable
+                            style={({ pressed }) => ({
+                              flex: 1,
+                              backgroundColor: colors.success,
+                              borderRadius: 8,
+                              paddingVertical: 8,
+                              alignItems: "center",
+                              opacity: pressed ? 0.8 : 1,
+                            })}
+                            onPress={() => approvePendingMutation.mutate(pi.id)}
+                          >
+                            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Approve</Text>
+                          </Pressable>
+                          <Pressable
+                            style={({ pressed }) => ({
+                              flex: 1,
+                              backgroundColor: colors.surfaceAlt,
+                              borderRadius: 8,
+                              paddingVertical: 8,
+                              alignItems: "center",
+                              borderWidth: 1,
+                              borderColor: colors.border,
+                              opacity: pressed ? 0.8 : 1,
+                            })}
+                            onPress={() => rejectPendingMutation.mutate(pi.id)}
+                          >
+                            <Text style={{ color: colors.danger, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Reject</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                      {pi.requestedByUserId === user?.id && (
+                        <Text style={{ color: colors.textTertiary, fontFamily: "Inter_400Regular", fontSize: 12, fontStyle: "italic" }}>
+                          Waiting for approval...
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+
               <Text style={[styles.chatInfoSectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
                 PARTICIPANTS
               </Text>

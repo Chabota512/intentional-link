@@ -60,7 +60,8 @@ artifacts-monorepo/
 - **Read receipts**: Own messages show single grey tick (sent), double grey (delivered), double blue #2196F3 (read)
 - **Voice notes**: VoicePlayer shows sender avatar, waveform, duration; raise-to-ear switches playback to earpiece (iOS auto via PlayAndRecord category); marks voice notes as read after playback
 - **Online presence dots**: UserAvatar shows green dot for online users in all locations (contacts, participants panel, chat)
-- **Delete Session**: Creator can delete session from chat screen via trash icon in navbar
+- **Delete Session**: Any joined participant (not just creator) can delete a session (including ended sessions) from chat screen via more menu
+- **Invite approval flow**: Non-creator participants can propose adding new members; proposal creates a pending invite requiring approval from any other existing member. Creator invites are instant. Pending invites shown in session sheet with Approve/Reject buttons.
 - **Session logo**: Create-session modal supports image upload for session cover art
 - **Push notifications**: App registers device token on launch; server sends push when new message arrives or contact request is made; uses Expo push notification service
 - **Expanded Settings page**: Full-featured settings with Account, Privacy, Sessions, About, and Danger Zone sections; includes account deletion and data clearing
@@ -76,6 +77,7 @@ artifacts-monorepo/
 - `contacts` — id, userId, contactUserId, status (pending|accepted), createdAt
 - `sessions` — id, name, description, imageUrl, creatorId, status, createdAt, endedAt
 - `session_participants` — id, sessionId, userId, status (invited|joined)
+- `pending_invites` — id, sessionId, invitedUserId, requestedByUserId, status (pending|approved|rejected), approvedByUserId, createdAt
 - `messages` — id, sessionId, senderId, content, type (text|image|file|voice), attachmentUrl, attachmentName, attachmentSize, replyToId, status (sent|delivered|read), createdAt
 - `uploads` — id (uuid), data (bytea), contentType, filename, fileSize, uploadedBy (FK→users), createdAt
 
@@ -100,8 +102,11 @@ All at `/api/*`:
 - `GET /contacts/requests` — list pending incoming contact requests
 - `GET/POST /sessions` — list/create sessions
 - `GET/PATCH /sessions/:id` — get/update session (includes creator + participant lastSeenAt)
-- `DELETE /sessions/:id` — delete session (creator only)
-- `POST /sessions/:id/invite` — invite participant
+- `DELETE /sessions/:id` — delete session (any joined member or creator)
+- `POST /sessions/:id/invite` — invite participant (creator: instant invite; non-creator: creates pending invite requiring approval)
+- `GET /sessions/:id/pending-invites` — list pending invite requests for a session
+- `POST /sessions/:id/pending-invites/:inviteId/approve` — approve a pending invite (cannot approve own request)
+- `POST /sessions/:id/pending-invites/:inviteId/reject` — reject a pending invite
 - `POST /sessions/:id/join` — join session
 - `GET/POST /sessions/:id/messages` — list/send messages; sends push notification to other participants
 - `GET /sessions/:id/messages/poll?since=` — poll for new messages

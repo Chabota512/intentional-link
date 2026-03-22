@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, inArray, ne, desc, count as drizzleCount, sql, gt } from "drizzle-orm";
-import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable, sessionReadCursorsTable, messageReactionsTable } from "@workspace/db";
+import { db, sessionsTable, sessionParticipantsTable, usersTable, messagesTable, sessionReadCursorsTable, messageReactionsTable, pendingInvitesTable } from "@workspace/db";
 import {
   CreateSessionBody,
   UpdateSessionBody,
@@ -372,9 +372,15 @@ router.delete("/sessions/:sessionId", async (req, res): Promise<void> => {
     return;
   }
 
-  if (session.creatorId !== userId) {
-    res.status(403).json({ error: "Only the session creator can delete this session" });
-    return;
+  const isMember = session.creatorId === userId;
+  if (!isMember) {
+    const [participant] = await db.select().from(sessionParticipantsTable)
+      .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId), eq(sessionParticipantsTable.status, "joined")))
+      .limit(1);
+    if (!participant) {
+      res.status(403).json({ error: "Only joined session members can delete this session" });
+      return;
+    }
   }
 
   const sessionMessages = await db.select({ id: messagesTable.id }).from(messagesTable).where(eq(messagesTable.sessionId, sessionId));
@@ -407,11 +413,6 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
     return;
   }
 
-  if (membership.session.status !== "active") {
-    res.status(400).json({ error: "Cannot invite to a completed session" });
-    return;
-  }
-
   if (!membership.isCreator && (!membership.participant || membership.participant.status !== "joined")) {
     res.status(403).json({ error: "Only joined participants can invite others" });
     return;
@@ -423,40 +424,207 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
     return;
   }
 
-  const existing = await db.select().from(sessionParticipantsTable)
-    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, parsed.data.userId)))
-    .limit(1);
-
-  if (existing.length === 0) {
-    await db.insert(sessionParticipantsTable).values({
-      sessionId,
-      userId: parsed.data.userId,
-      status: "invited",
-    });
-  } else if (existing[0].status !== "joined") {
-    await db.update(sessionParticipantsTable)
-      .set({ status: "invited", joinedAt: null })
-      .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, parsed.data.userId)));
-  }
-
-  const [invitedUser] = await db.select({ id: usersTable.id, pushToken: usersTable.pushToken, name: usersTable.name })
-    .from(usersTable).where(eq(usersTable.id, parsed.data.userId)).limit(1);
   const [inviter] = await db.select({ name: usersTable.name })
     .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
 
-  if (invitedUser && inviter) {
-    const inviteTitle = "Chat Invitation";
-    const inviteBody = `${inviter.name} invited you to join "${membership.session.title}"`;
-    const inviteData = { sessionId, type: "chat-invite" };
-    await saveNotification(invitedUser.id, "invite", inviteTitle, inviteBody, inviteData);
-    emitToUser(parsed.data.userId, "session_invite", { sessionId, fromUserId: userId, title: membership.session.title });
-    if (invitedUser.pushToken) {
-      await sendPushNotification(invitedUser.pushToken, inviteTitle, inviteBody, inviteData);
+  if (membership.isCreator) {
+    const existing = await db.select().from(sessionParticipantsTable)
+      .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, parsed.data.userId)))
+      .limit(1);
+
+    if (existing.length === 0) {
+      await db.insert(sessionParticipantsTable).values({
+        sessionId,
+        userId: parsed.data.userId,
+        status: "invited",
+      });
+    } else if (existing[0].status !== "joined") {
+      await db.update(sessionParticipantsTable)
+        .set({ status: "invited", joinedAt: null })
+        .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, parsed.data.userId)));
+    }
+
+    const [invitedUser] = await db.select({ id: usersTable.id, pushToken: usersTable.pushToken, name: usersTable.name })
+      .from(usersTable).where(eq(usersTable.id, parsed.data.userId)).limit(1);
+
+    if (invitedUser && inviter) {
+      const inviteTitle = "Chat Invitation";
+      const inviteBody = `${inviter.name} invited you to join "${membership.session.title}"`;
+      const inviteData = { sessionId, type: "chat-invite" };
+      await saveNotification(invitedUser.id, "invite", inviteTitle, inviteBody, inviteData);
+      emitToUser(parsed.data.userId, "session_invite", { sessionId, fromUserId: userId, title: membership.session.title });
+      if (invitedUser.pushToken) {
+        await sendPushNotification(invitedUser.pushToken, inviteTitle, inviteBody, inviteData);
+      }
+    }
+  } else {
+    const [existingPending] = await db.select().from(pendingInvitesTable)
+      .where(and(
+        eq(pendingInvitesTable.sessionId, sessionId),
+        eq(pendingInvitesTable.invitedUserId, parsed.data.userId),
+        eq(pendingInvitesTable.status, "pending"),
+      )).limit(1);
+
+    if (!existingPending) {
+      await db.insert(pendingInvitesTable).values({
+        sessionId,
+        invitedUserId: parsed.data.userId,
+        requestedByUserId: userId,
+      });
+    }
+
+    const [invitedUser] = await db.select({ name: usersTable.name })
+      .from(usersTable).where(eq(usersTable.id, parsed.data.userId)).limit(1);
+
+    const otherMemberIds: number[] = [];
+    if (membership.session.creatorId !== userId) otherMemberIds.push(membership.session.creatorId);
+    const otherParticipants = await db.select({ userId: sessionParticipantsTable.userId })
+      .from(sessionParticipantsTable)
+      .where(and(
+        eq(sessionParticipantsTable.sessionId, sessionId),
+        eq(sessionParticipantsTable.status, "joined"),
+        ne(sessionParticipantsTable.userId, userId),
+      ));
+    otherParticipants.forEach(p => { if (!otherMemberIds.includes(p.userId)) otherMemberIds.push(p.userId); });
+
+    for (const memberId of otherMemberIds) {
+      emitToUser(memberId, "pending_invite_request", {
+        sessionId,
+        invitedUserName: invitedUser?.name || "Someone",
+        requestedByName: inviter?.name || "A member",
+      });
     }
   }
 
   const result = await getSessionWithParticipants(sessionId);
   res.json(result);
+});
+
+router.get("/sessions/:sessionId/pending-invites", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  if (!userIdStr) { res.status(401).json({ error: "Missing x-user-id header" }); return; }
+  const userId = parseInt(userIdStr, 10);
+  const sessionId = parseInt(req.params.sessionId, 10);
+
+  const membership = await getSessionMembership(sessionId, userId);
+  if (!membership) { res.status(404).json({ error: "Session not found" }); return; }
+  if (!membership.isCreator && (!membership.participant || membership.participant.status !== "joined")) {
+    res.status(403).json({ error: "Only session members can view pending invites" }); return;
+  }
+
+  const pendingList = await db
+    .select({
+      id: pendingInvitesTable.id,
+      sessionId: pendingInvitesTable.sessionId,
+      invitedUserId: pendingInvitesTable.invitedUserId,
+      requestedByUserId: pendingInvitesTable.requestedByUserId,
+      status: pendingInvitesTable.status,
+      createdAt: pendingInvitesTable.createdAt,
+      invitedUserName: usersTable.name,
+      invitedUserAvatarUrl: usersTable.avatarUrl,
+    })
+    .from(pendingInvitesTable)
+    .leftJoin(usersTable, eq(usersTable.id, pendingInvitesTable.invitedUserId))
+    .where(and(
+      eq(pendingInvitesTable.sessionId, sessionId),
+      eq(pendingInvitesTable.status, "pending"),
+    ));
+
+  const enriched = await Promise.all(pendingList.map(async (pi) => {
+    const [requester] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, pi.requestedByUserId)).limit(1);
+    return { ...pi, requestedByName: requester?.name || "Unknown" };
+  }));
+
+  res.json(enriched);
+});
+
+router.post("/sessions/:sessionId/pending-invites/:inviteId/approve", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  if (!userIdStr) { res.status(401).json({ error: "Missing x-user-id header" }); return; }
+  const userId = parseInt(userIdStr, 10);
+  const sessionId = parseInt(req.params.sessionId, 10);
+  const inviteId = parseInt(req.params.inviteId, 10);
+
+  const membership = await getSessionMembership(sessionId, userId);
+  if (!membership) { res.status(404).json({ error: "Session not found" }); return; }
+  if (!membership.isCreator && (!membership.participant || membership.participant.status !== "joined")) {
+    res.status(403).json({ error: "Only session members can approve invites" }); return;
+  }
+
+  const [pending] = await db.select().from(pendingInvitesTable)
+    .where(and(eq(pendingInvitesTable.id, inviteId), eq(pendingInvitesTable.sessionId, sessionId), eq(pendingInvitesTable.status, "pending")))
+    .limit(1);
+
+  if (!pending) { res.status(404).json({ error: "Pending invite not found" }); return; }
+
+  if (pending.requestedByUserId === userId) {
+    res.status(403).json({ error: "You cannot approve your own invite request" }); return;
+  }
+
+  await db.update(pendingInvitesTable)
+    .set({ status: "approved", approvedByUserId: userId })
+    .where(eq(pendingInvitesTable.id, inviteId));
+
+  const existing = await db.select().from(sessionParticipantsTable)
+    .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, pending.invitedUserId)))
+    .limit(1);
+
+  if (existing.length === 0) {
+    await db.insert(sessionParticipantsTable).values({
+      sessionId,
+      userId: pending.invitedUserId,
+      status: "invited",
+    });
+  } else if (existing[0].status !== "joined") {
+    await db.update(sessionParticipantsTable)
+      .set({ status: "invited", joinedAt: null })
+      .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, pending.invitedUserId)));
+  }
+
+  const [invitedUser] = await db.select({ id: usersTable.id, pushToken: usersTable.pushToken, name: usersTable.name })
+    .from(usersTable).where(eq(usersTable.id, pending.invitedUserId)).limit(1);
+  const [approver] = await db.select({ name: usersTable.name })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+
+  if (invitedUser) {
+    const inviteTitle = "Chat Invitation";
+    const inviteBody = `You've been invited to join "${membership.session.title}"`;
+    const inviteData = { sessionId, type: "chat-invite" };
+    await saveNotification(invitedUser.id, "invite", inviteTitle, inviteBody, inviteData);
+    emitToUser(pending.invitedUserId, "session_invite", { sessionId, fromUserId: userId, title: membership.session.title });
+    if (invitedUser.pushToken) {
+      await sendPushNotification(invitedUser.pushToken, inviteTitle, inviteBody, inviteData);
+    }
+  }
+
+  emitToUser(pending.requestedByUserId, "pending_invite_approved", {
+    sessionId,
+    invitedUserName: invitedUser?.name || "Someone",
+    approvedByName: approver?.name || "A member",
+  });
+
+  const result = await getSessionWithParticipants(sessionId);
+  res.json(result);
+});
+
+router.post("/sessions/:sessionId/pending-invites/:inviteId/reject", async (req, res): Promise<void> => {
+  const userIdStr = req.headers["x-user-id"] as string;
+  if (!userIdStr) { res.status(401).json({ error: "Missing x-user-id header" }); return; }
+  const userId = parseInt(userIdStr, 10);
+  const sessionId = parseInt(req.params.sessionId, 10);
+  const inviteId = parseInt(req.params.inviteId, 10);
+
+  const membership = await getSessionMembership(sessionId, userId);
+  if (!membership) { res.status(404).json({ error: "Session not found" }); return; }
+  if (!membership.isCreator && (!membership.participant || membership.participant.status !== "joined")) {
+    res.status(403).json({ error: "Only session members can reject invites" }); return;
+  }
+
+  await db.update(pendingInvitesTable)
+    .set({ status: "rejected" })
+    .where(and(eq(pendingInvitesTable.id, inviteId), eq(pendingInvitesTable.sessionId, sessionId), eq(pendingInvitesTable.status, "pending")));
+
+  res.json({ success: true });
 });
 
 router.post("/sessions/:sessionId/join", async (req, res): Promise<void> => {

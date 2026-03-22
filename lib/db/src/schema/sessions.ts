@@ -38,6 +38,16 @@ export const insertSessionSchema = createInsertSchema(sessionsTable).omit({ id: 
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessionsTable.$inferSelect;
 
+export const pendingInvitesTable = pgTable("pending_invites", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => sessionsTable.id, { onDelete: "cascade" }),
+  invitedUserId: integer("invited_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  requestedByUserId: integer("requested_by_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  status: text("status", { enum: ["pending", "approved", "rejected"] }).notNull().default("pending"),
+  approvedByUserId: integer("approved_by_user_id").references(() => usersTable.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertParticipantSchema = createInsertSchema(sessionParticipantsTable).omit({ id: true, createdAt: true });
 export type InsertParticipant = z.infer<typeof insertParticipantSchema>;
 export type SessionParticipant = typeof sessionParticipantsTable.$inferSelect;
