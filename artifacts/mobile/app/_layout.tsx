@@ -19,6 +19,7 @@ import Colors from "@/constants/colors";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IncomingCallBanner } from "@/components/IncomingCallBanner";
+import { IncomingMessageBanner } from "@/components/IncomingMessageBanner";
 import { PresenceDialog } from "@/components/PresenceDialog";
 import { AuthProvider } from "@/context/AuthContext";
 import { LocalDiscoveryProvider } from "@/context/LocalDiscoveryContext";
@@ -90,6 +91,7 @@ function RootLayoutNav() {
         <Stack.Screen name="contact-us" options={{ presentation: "card" }} />
       </Stack>
       <IncomingCallBanner />
+      <IncomingMessageBanner />
       <OfflineBanner />
       <PresenceDialog />
     </>

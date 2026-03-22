@@ -767,7 +767,7 @@ export default function SessionScreen() {
   const { get, post, patch, del, uploadFile, getFileUrl } = useApi();
   const { user } = useAuth();
   const { getPresenceStatus } = useLocalDiscovery();
-  const { isConnected: socketConnected, typingUsers, recordingUsers, onlineUserIds, emitTypingStart, emitTypingStop, emitRecordingStart, emitRecordingStop, emitMarkRead, joinSession, leaveSession } = useSocket();
+  const { isConnected: socketConnected, typingUsers, recordingUsers, onlineUserIds, emitTypingStart, emitTypingStop, emitRecordingStart, emitRecordingStop, emitMarkRead, joinSession, leaveSession, setActiveSessionId } = useSocket();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const flatListRef = useRef<FlatList>(null);
@@ -1082,8 +1082,10 @@ export default function SessionScreen() {
     if (!session || session.status !== "active") return;
     joinSession(sessionId);
     emitMarkRead(sessionId);
+    setActiveSessionId(sessionId);
     return () => {
       leaveSession(sessionId);
+      setActiveSessionId(null);
     };
   }, [session, sessionId]);
 

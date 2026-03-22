@@ -24,6 +24,13 @@ export interface IncomingCallData {
   callerName: string;
 }
 
+export interface IncomingMessageData {
+  sessionId: number;
+  senderName: string;
+  content: string;
+  type: string;
+}
+
 interface SocketContextValue {
   socket: Socket | null;
   isConnected: boolean;
@@ -34,7 +41,11 @@ interface SocketContextValue {
   unreadNotifCount: number;
   presenceDialogData: PresenceDialogData | null;
   incomingCall: IncomingCallData | null;
+  incomingMessage: IncomingMessageData | null;
+  activeSessionId: number | null;
+  setActiveSessionId: (id: number | null) => void;
   dismissIncomingCall: () => void;
+  dismissIncomingMessage: () => void;
   dismissPresenceDialog: () => void;
   emitTypingStart: (sessionId: number) => void;
   emitTypingStop: (sessionId: number) => void;
@@ -59,6 +70,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [presenceDialogData, setPresenceDialogData] = useState<PresenceDialogData | null>(null);
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
+  const [incomingMessage, setIncomingMessage] = useState<IncomingMessageData | null>(null);
+  const activeSessionIdRef = useRef<number | null>(null);
+  const [activeSessionId, setActiveSessionIdState] = useState<number | null>(null);
   const appStateRef = useRef<AppStateStatus>("active");
 
   useEffect(() => {
@@ -100,6 +114,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         return [...old, message];
       });
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
+
+      if (activeSessionIdRef.current !== sessionId && message.type !== "call") {
+        const senderName = message.sender?.name || message.sender?.username || "Someone";
+        let content = message.content || "";
+        if (message.type === "image") content = "Sent a photo";
+        else if (message.type === "file") content = "Sent a file";
+        else if (message.type === "voice") content = "Sent a voice note";
+        setIncomingMessage({ sessionId, senderName, content, type: message.type });
+      }
     });
 
     socket.on("message_status_update", (data: any) => {
@@ -306,6 +329,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setIncomingCall(null);
   }, []);
 
+  const dismissIncomingMessage = useCallback(() => {
+    setIncomingMessage(null);
+  }, []);
+
+  const setActiveSessionId = useCallback((id: number | null) => {
+    activeSessionIdRef.current = id;
+    setActiveSessionIdState(id);
+  }, []);
+
   const emitTypingStart = useCallback((sessionId: number) => {
     socketRef.current?.emit("typing_start", { sessionId });
   }, []);
@@ -346,7 +378,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         unreadNotifCount,
         presenceDialogData,
         incomingCall,
+        incomingMessage,
+        activeSessionId,
+        setActiveSessionId,
         dismissIncomingCall,
+        dismissIncomingMessage,
         dismissPresenceDialog,
         emitTypingStart,
         emitTypingStop,
