@@ -424,15 +424,6 @@ async function broadcastPresence(userId: number, status: "online" | "offline", p
   const presenceVisibility = privSettings?.presenceVisibility ?? "all";
   const isDndActive = dndSettings?.isDndActive ?? false;
 
-  let whitelistedIds = new Set<number>();
-  if (status === "online" && presenceVisibility === "specific") {
-    const whitelist = await db
-      .select({ allowedContactId: presenceWhitelistTable.allowedContactId })
-      .from(presenceWhitelistTable)
-      .where(eq(presenceWhitelistTable.userId, userId));
-    whitelistedIds = new Set(whitelist.map(w => w.allowedContactId));
-  }
-
   const participantRows = await db
     .select({ sessionId: sessionParticipantsTable.sessionId })
     .from(sessionParticipantsTable)
@@ -448,21 +439,36 @@ async function broadcastPresence(userId: number, status: "online" | "offline", p
     ...creatorRows.map((r) => r.id),
   ]);
 
-  if (status === "offline" || presenceVisibility === "all") {
+  // When going offline, broadcast real offline status to everyone (no filtering needed)
+  if (status === "offline") {
     for (const sessionId of sessionIds) {
       io.to(`session:${sessionId}`).emit("presence_update", {
         userId,
-        status,
-        isDndActive: status === "online" ? isDndActive : false,
-        lastSeenAt: status === "offline" ? new Date().toISOString() : null,
+        status: "offline",
+        isDndActive: false,
+        lastSeenAt: new Date().toISOString(),
       });
     }
     return;
   }
 
+  // status === "online" from here
+  // If visibility is "none", no one sees this user as online
   if (presenceVisibility === "none") {
     return;
   }
+
+  // Build this user's whitelist (only needed for "specific" visibility)
+  let myWhitelistedIds = new Set<number>();
+  if (presenceVisibility === "specific") {
+    const whitelist = await db
+      .select({ allowedContactId: presenceWhitelistTable.allowedContactId })
+      .from(presenceWhitelistTable)
+      .where(eq(presenceWhitelistTable.userId, userId));
+    myWhitelistedIds = new Set(whitelist.map(w => w.allowedContactId));
+  }
+
+  const hiddenLastSeenAt = prevLastSeenAt ? prevLastSeenAt.toISOString() : new Date().toISOString();
 
   for (const sessionId of sessionIds) {
     const sessionParticipants = await db
@@ -485,15 +491,48 @@ async function broadcastPresence(userId: number, status: "online" | "offline", p
       otherUserIds.add(sessionInfo.creatorId);
     }
 
-    const hiddenLastSeenAt = prevLastSeenAt ? prevLastSeenAt.toISOString() : new Date().toISOString();
+    const otherUserIdsArr = Array.from(otherUserIds);
+    if (otherUserIdsArr.length === 0) continue;
+
+    // Fetch each observer's privacy settings and whether they have userId in their whitelist
+    // This is needed for the reciprocal hiding rule:
+    // If observer is hiding from userId, they should also not see userId as online
+    const [observerPrivSettings, observerWhitelistsForMe] = await Promise.all([
+      db.select({ userId: userPrivacySettingsTable.userId, presenceVisibility: userPrivacySettingsTable.presenceVisibility })
+        .from(userPrivacySettingsTable)
+        .where(inArray(userPrivacySettingsTable.userId, otherUserIdsArr)),
+      db.select({ userId: presenceWhitelistTable.userId })
+        .from(presenceWhitelistTable)
+        .where(and(
+          inArray(presenceWhitelistTable.userId, otherUserIdsArr),
+          eq(presenceWhitelistTable.allowedContactId, userId),
+        )),
+    ]);
+
+    const observerPrivMap = new Map(observerPrivSettings.map(p => [p.userId, p.presenceVisibility]));
+    // Set of observer user IDs who have userId in their personal whitelist
+    const observersWhoWhitelistedMe = new Set(observerWhitelistsForMe.map(w => w.userId));
 
     for (const otherUserId of otherUserIds) {
-      const canSee = whitelistedIds.has(otherUserId);
+      // Can I show myself to this observer? (based on my own settings)
+      const iAllowThemToSeeMe = presenceVisibility === "all" || myWhitelistedIds.has(otherUserId);
+
+      // Is this observer hiding from me? (reciprocal rule)
+      // If they are hiding from me, I should not appear online to them,
+      // because they won't want to reveal themselves either
+      const observerVisibility = observerPrivMap.get(otherUserId) ?? "all";
+      const observerIsHidingFromMe =
+        observerVisibility === "none" ||
+        (observerVisibility === "specific" && !observersWhoWhitelistedMe.has(otherUserId));
+
+      // Show as online only if BOTH: I allow them to see me AND they are not hiding from me
+      const showOnline = iAllowThemToSeeMe && !observerIsHidingFromMe;
+
       emitToUser(otherUserId, "presence_update", {
         userId,
-        status: canSee ? "online" : "offline",
-        isDndActive: canSee ? isDndActive : false,
-        lastSeenAt: canSee ? null : hiddenLastSeenAt,
+        status: showOnline ? "online" : "offline",
+        isDndActive: showOnline ? isDndActive : false,
+        lastSeenAt: showOnline ? null : hiddenLastSeenAt,
       });
     }
   }
