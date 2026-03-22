@@ -2494,8 +2494,7 @@ export default function SessionScreen() {
                           setEditTitle(session.title);
                           setEditDescription(session.description || "");
                         }
-                        setSheetVisible(false);
-                        setTimeout(() => setEditModalVisible(true), 300);
+                        setEditModalVisible(true);
                       }}
                     >
                       <Feather name="edit-2" size={16} color={colors.textSecondary} />
