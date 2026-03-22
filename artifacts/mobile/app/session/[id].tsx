@@ -797,13 +797,6 @@ export default function SessionScreen() {
   const vpAutoPlayRef = useRef(false);
 
   useEffect(() => {
-    if (session) {
-      setEditTitle(session.title);
-      setEditDescription(session.description || "");
-    }
-  }, [session]);
-
-  useEffect(() => {
     if (videoViewer?.url) {
       vpAutoPlayRef.current = true;
       inAppVideoPlayer.loop = false;
@@ -998,6 +991,13 @@ export default function SessionScreen() {
       return failureCount < 2;
     },
   });
+
+  useEffect(() => {
+    if (session) {
+      setEditTitle(session.title);
+      setEditDescription(session.description || "");
+    }
+  }, [session]);
 
   const isNotMember = sessionError instanceof ApiError && sessionError.status === 403;
 
