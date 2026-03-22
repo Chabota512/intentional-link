@@ -2499,16 +2499,32 @@ export default function SessionScreen() {
                     )}
                   </View>
                 </View>
-                <View style={[styles.chatInfoMeta, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-                  <Feather name="users" size={13} color={colors.textSecondary} />
-                  <Text style={[styles.chatInfoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                    {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
-                  </Text>
-                  <Text style={[styles.chatInfoMetaSep, { color: colors.border }]}>·</Text>
-                  <View style={[styles.chatInfoStatusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
-                  <Text style={[styles.chatInfoMetaText, { color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }]}>
-                    {isActive ? "Active" : "Ended"}
-                  </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={[styles.chatInfoMeta, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, flex: 1 }]}>
+                    <Feather name="users" size={13} color={colors.textSecondary} />
+                    <Text style={[styles.chatInfoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                      {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
+                    </Text>
+                    <Text style={[styles.chatInfoMetaSep, { color: colors.border }]}>·</Text>
+                    <View style={[styles.chatInfoStatusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
+                    <Text style={[styles.chatInfoMetaText, { color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }]}>
+                      {isActive ? "Active" : "Ended"}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.chatInfoMeta,
+                      { backgroundColor: colors.accentSoft, borderColor: colors.accent, opacity: pressed ? 0.8 : 1 },
+                    ]}
+                    onPress={() => {
+                      setSheetVisible(false);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push(`/session/media/${sessionId}` as any);
+                    }}
+                  >
+                    <Feather name="image" size={13} color={colors.accent} />
+                    <Text style={[styles.chatInfoMetaText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>Media</Text>
+                  </Pressable>
                 </View>
               </View>
               <Text style={[styles.chatInfoSectionLabel, { color: colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
@@ -2581,28 +2597,17 @@ export default function SessionScreen() {
                 );
               })}
 
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              {isActive && isCreator && (
                 <Pressable
-                  style={({ pressed }) => [styles.inviteMoreBtn, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1, flex: 1 }]}
-                  onPress={() => router.push(`/session/media/${sessionId}` as any)}
+                  style={({ pressed }) => [styles.inviteMoreBtn, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1 }]}
+                  onPress={() => setSheetView("invite")}
                 >
-                  <Feather name="image" size={18} color={colors.accent} />
+                  <Feather name="user-plus" size={18} color={colors.accent} />
                   <Text style={[styles.inviteMoreText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-                    See Media
+                    Invite More Contacts
                   </Text>
                 </Pressable>
-                {isActive && isCreator && (
-                  <Pressable
-                    style={({ pressed }) => [styles.inviteMoreBtn, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1, flex: 1 }]}
-                    onPress={() => setSheetView("invite")}
-                  >
-                    <Feather name="user-plus" size={18} color={colors.accent} />
-                    <Text style={[styles.inviteMoreText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-                      Invite More Contacts
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
+              )}
             </ScrollView>
           ) : (
             <ScrollView contentContainerStyle={[styles.sheetScroll, { padding: 16 }]} showsVerticalScrollIndicator={false}>
