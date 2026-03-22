@@ -114,7 +114,7 @@ export default function ActivityScreen() {
 
   const notifications = data?.notifications ?? [];
   const unreadCount = data?.unreadCount ?? 0;
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 67 : 0);
 
   const handlePress = useCallback(
     (notif: AppNotification) => {

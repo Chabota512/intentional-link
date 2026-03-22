@@ -80,7 +80,7 @@ export default function MediaGalleryScreen() {
   const videos = data?.videos ?? [];
   const files = data?.files ?? [];
 
-  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
+  const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
   const imageCountRef = useRef(0);

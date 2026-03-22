@@ -113,7 +113,7 @@ export default function ProfileScreen() {
   const totalSessions = sessions.length;
   const totalContacts = contacts.length;
 
-  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
+  const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
 

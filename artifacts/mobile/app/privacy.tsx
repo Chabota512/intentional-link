@@ -176,7 +176,7 @@ export default function PrivacyScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 8, borderBottomColor: colors.border }]}>
           <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
             <Feather name="arrow-left" size={22} color={colors.text} />
           </Pressable>

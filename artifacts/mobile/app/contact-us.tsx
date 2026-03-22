@@ -76,7 +76,7 @@ const openLink = (url: string) => {
 export default function ContactUsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
+  const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 16 : 0);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

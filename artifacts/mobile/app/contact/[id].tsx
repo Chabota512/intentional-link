@@ -91,7 +91,7 @@ export default function ContactChatsScreen() {
     })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
+  const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
   const renderSession = ({ item }: { item: Session }) => {

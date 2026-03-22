@@ -402,8 +402,13 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
     return;
   }
 
-  if (!membership.isCreator) {
-    res.status(403).json({ error: "Only the session creator can invite participants" });
+  if (membership.session.status !== "active") {
+    res.status(400).json({ error: "Cannot invite to a completed session" });
+    return;
+  }
+
+  if (!membership.isCreator && (!membership.participant || membership.participant.status !== "joined")) {
+    res.status(403).json({ error: "Only joined participants can invite others" });
     return;
   }
 

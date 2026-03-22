@@ -67,7 +67,7 @@ export default function SearchScreen() {
     return Array.from(map.values());
   }, [results]);
 
-  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
+  const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
   const renderResult = ({ item }: { item: SearchResult }) => {

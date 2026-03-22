@@ -272,7 +272,7 @@ export default function SessionsScreen() {
     );
   };
 
-  const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
+  const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
   const previewOthers = previewSession?.participants.filter((p) => p.userId !== user?.id) ?? [];

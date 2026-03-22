@@ -1601,12 +1601,13 @@ export default function SessionScreen() {
   const isActive = session?.status === "active";
   const isCreator = session?.creatorId === user?.id;
   const canSend = isActive && (isCreator || hasJoined);
+  const canInvite = isActive && (isCreator || hasJoined);
 
   const participantIds = new Set(session?.participants.map((p) => p.userId) ?? []);
   const uninvitedContacts = contacts.filter((c) => !participantIds.has(c.contactUser.id));
 
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 67 : 0);
 
   const getEffectivePresence = (userId: number, lastSeenAt?: string | null) => {
     if (onlineUserIds.has(userId)) return "online";
@@ -1631,7 +1632,7 @@ export default function SessionScreen() {
   if (isNotMember) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.navBar, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 8, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <View style={[styles.navBar, { paddingTop: Math.max(insets.top, 20) + (Platform.OS === "web" ? 67 : 0) + 8, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
           <Pressable style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]} onPress={() => router.back()}>
             <Feather name="arrow-left" size={22} color={colors.text} />
           </Pressable>
@@ -1928,7 +1929,7 @@ export default function SessionScreen() {
                 <Text style={[styles.emptyMessagesText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
                   {canSend ? "Start the conversation" : "No messages yet"}
                 </Text>
-                {isActive && isCreator && uninvitedContacts.length > 0 && (
+                {canInvite && uninvitedContacts.length > 0 && (
                   <Pressable
                     style={({ pressed }) => [styles.inviteHint, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1 }]}
                     onPress={openInvite}
@@ -2438,7 +2439,7 @@ export default function SessionScreen() {
       >
         <View style={[styles.sheetContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
-            {sheetView === "invite" && isCreator ? (
+            {sheetView === "invite" && canInvite ? (
               <>
                 <Pressable onPress={() => setSheetView("participants")} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
                   <Feather name="arrow-left" size={22} color={colors.text} />
@@ -2599,7 +2600,7 @@ export default function SessionScreen() {
                 );
               })}
 
-              {isActive && isCreator && (
+              {canInvite && uninvitedContacts.length > 0 && (
                 <Pressable
                   style={({ pressed }) => [styles.inviteMoreBtn, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1 }]}
                   onPress={() => setSheetView("invite")}
@@ -2693,7 +2694,7 @@ export default function SessionScreen() {
           <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, vpAnimStyle]} pointerEvents="box-none">
 
             {/* TOP BAR */}
-            <View style={{ position: "absolute", top: 0, left: 0, right: 0, paddingTop: insets.top + 8, paddingBottom: 14, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, paddingTop: Math.max(insets.top, 20) + 8, paddingBottom: 14, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.5)" }}>
               <Pressable onPress={() => setVideoViewer(null)} style={{ padding: 8 }}>
                 <Feather name="x" size={22} color="#fff" />
               </Pressable>
