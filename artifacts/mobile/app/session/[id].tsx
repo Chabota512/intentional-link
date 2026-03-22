@@ -790,6 +790,9 @@ export default function SessionScreen() {
   const [profileViewUser, setProfileViewUser] = useState<{ name: string; username?: string; avatarUrl?: string | null; presenceStatus?: "online" | "offline" | "local" } | null>(null);
   const [viewerImageIndex, setViewerImageIndex] = useState<number | null>(null);
   const [videoViewer, setVideoViewer] = useState<{ url: string; name: string } | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editTitle, setEditTitle] = useState(session.title);
+  const [editDescription, setEditDescription] = useState(session.description || "");
   const inAppVideoPlayer = useVideoPlayer(null);
   const vpAutoPlayRef = useRef(false);
 
@@ -1750,6 +1753,19 @@ export default function SessionScreen() {
           </View>
         </Pressable>
         <View style={styles.navActions}>
+          {isCreator && (
+            <Pressable
+              style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setEditTitle(session.title);
+                setEditDescription(session.description || "");
+                setEditModalVisible(true);
+              }}
+            >
+              <Feather name="edit-2" size={18} color={colors.text} />
+            </Pressable>
+          )}
           <Pressable
             style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
             onPress={() => {
@@ -2849,6 +2865,88 @@ export default function SessionScreen() {
             )}
           </Pressable>
         </Pressable>
+      </Modal>
+
+      <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 32 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <Text style={{ fontSize: 18, color: colors.text, fontFamily: "Inter_600SemiBold" }}>Edit Chat</Text>
+              <Pressable onPress={() => setEditModalVisible(false)}>
+                <Feather name="x" size={24} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_500Medium", marginBottom: 6 }}>Title</Text>
+              <TextInput
+                style={{ 
+                  borderWidth: 1, 
+                  borderColor: colors.border, 
+                  borderRadius: 12, 
+                  paddingHorizontal: 12, 
+                  paddingVertical: 10, 
+                  fontSize: 15, 
+                  color: colors.text,
+                  fontFamily: "Inter_400Regular"
+                }}
+                placeholder="Chat title"
+                placeholderTextColor={colors.textTertiary}
+                value={editTitle}
+                onChangeText={setEditTitle}
+              />
+            </View>
+
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, fontFamily: "Inter_500Medium", marginBottom: 6 }}>Description</Text>
+              <TextInput
+                style={{ 
+                  borderWidth: 1, 
+                  borderColor: colors.border, 
+                  borderRadius: 12, 
+                  paddingHorizontal: 12, 
+                  paddingVertical: 10, 
+                  fontSize: 15, 
+                  color: colors.text,
+                  fontFamily: "Inter_400Regular",
+                  minHeight: 80,
+                  textAlignVertical: "top"
+                }}
+                placeholder="Chat description"
+                placeholderTextColor={colors.textTertiary}
+                value={editDescription}
+                onChangeText={setEditDescription}
+                multiline
+              />
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <Pressable 
+                style={({ pressed }) => ({ flex: 1, backgroundColor: colors.surfaceAlt, borderRadius: 12, paddingVertical: 14, opacity: pressed ? 0.8 : 1 })}
+                onPress={() => setEditModalVisible(false)}
+              >
+                <Text style={{ textAlign: "center", color: colors.text, fontFamily: "Inter_600SemiBold" }}>Cancel</Text>
+              </Pressable>
+              <Pressable 
+                style={({ pressed }) => ({ flex: 1, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, opacity: pressed ? 0.8 : 1 })}
+                onPress={async () => {
+                  try {
+                    await patch(`/sessions/${sessionId}`, {
+                      title: editTitle,
+                      description: editDescription
+                    });
+                    setEditModalVisible(false);
+                    refetch();
+                  } catch (e) {
+                    Alert.alert("Error", "Failed to update chat");
+                  }
+                }}
+              >
+                <Text style={{ textAlign: "center", color: "#fff", fontFamily: "Inter_600SemiBold" }}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
