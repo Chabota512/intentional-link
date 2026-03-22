@@ -30,7 +30,7 @@ export default function CallScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [speakerOn, setSpeakerOn] = useState(!isVoice);
-  const ringbackActiveRef = React.useRef(false);
+  const [participants, setParticipants] = useState<{ ringing: string[]; offline: string[]; dnd: string[] }>({ ringing: [], offline: [], dnd: [] });
   const callAnsweredRef = React.useRef(false);
   const callStartTimeRef = React.useRef<number | null>(null);
 
@@ -46,24 +46,28 @@ export default function CallScreen() {
       window.addEventListener("message", handler);
       return () => window.removeEventListener("message", handler);
     }
-    return () => {
-      InCallManager.stop();
-    };
+    return () => InCallManager.stop();
   }, []);
 
   async function joinCall() {
     setLoading(true);
     setError(null);
     try {
-      const data = await post<{ appId: string; channel: string; token: string; uid: number }>(
+      const data = await post<{ appId: string; channel: string; token: string; uid: number; participants?: { ringing: string[]; offline: string[]; dnd: string[] } }>(
         `/sessions/${sessionId}/video-call`,
         { mode: isVoice ? "voice" : "video" }
       );
+      if (data.participants) {
+        setParticipants(data.participants);
+      }
       const params = new URLSearchParams({
         appId: data.appId,
         channel: data.channel,
         token: data.token,
         uid: String(data.uid),
+        ringing: (data.participants?.ringing || []).join(","),
+        offline: (data.participants?.offline || []).join(","),
+        dnd: (data.participants?.dnd || []).join(","),
       });
       const pageUrl = `${BASE_URL}/api/sessions/${sessionId}/call-page?mode=${isVoice ? "voice" : "video"}&${params.toString()}`;
       setCallUrl(pageUrl);
@@ -79,29 +83,10 @@ export default function CallScreen() {
     }
   }
 
-  function startRingback() {
-    if (Platform.OS !== "web" && !ringbackActiveRef.current) {
-      try {
-        InCallManager.startRingback("_BUNDLE_");
-        ringbackActiveRef.current = true;
-      } catch {}
-    }
-  }
-
-  function stopRingback() {
-    if (Platform.OS !== "web" && ringbackActiveRef.current) {
-      try {
-        InCallManager.stopRingback();
-        ringbackActiveRef.current = false;
-      } catch {}
-    }
-  }
-
   function handleMessage(event: WebViewMessageEvent) {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === "endCall") {
-        stopRingback();
         leaveCall();
       } else if (msg.type === "toggleSpeaker") {
         const next = !speakerOn;
@@ -109,23 +94,17 @@ export default function CallScreen() {
         if (Platform.OS !== "web") {
           InCallManager.setSpeakerphoneOn(next);
         }
-      } else if (msg.type === "callConnected") {
-        startRingback();
       } else if (msg.type === "participantJoined") {
-        stopRingback();
         if (!callAnsweredRef.current) {
           callAnsweredRef.current = true;
           callStartTimeRef.current = Date.now();
         }
-      } else if (msg.type === "participantLeft") {
-        if (msg.count === 0) startRingback();
       }
     } catch {}
   }
 
   function leaveCall() {
     if (Platform.OS !== "web") {
-      stopRingback();
       InCallManager.stop();
     }
     const answered = callAnsweredRef.current;
@@ -146,6 +125,30 @@ export default function CallScreen() {
       <View style={[styles.center, { backgroundColor: "#111", paddingTop: insets.top }]}>
         <ActivityIndicator color="#FF6B9D" size="large" />
         <Text style={styles.loadingText}>Connecting…</Text>
+        {participants.ringing.length > 0 && (
+          <View style={styles.participantStatusRow}>
+            <View style={[styles.statusIndicator, { backgroundColor: "#4CAF50" }]} />
+            <Text style={styles.participantStatusText}>
+              Ringing: {participants.ringing.join(", ")}
+            </Text>
+          </View>
+        )}
+        {participants.offline.length > 0 && (
+          <View style={styles.participantStatusRow}>
+            <View style={[styles.statusIndicator, { backgroundColor: "#94A3B8" }]} />
+            <Text style={styles.participantStatusText}>
+              Offline: {participants.offline.join(", ")}
+            </Text>
+          </View>
+        )}
+        {participants.dnd.length > 0 && (
+          <View style={styles.participantStatusRow}>
+            <View style={[styles.statusIndicator, { backgroundColor: "#FF9800" }]} />
+            <Text style={styles.participantStatusText}>
+              Do Not Disturb: {participants.dnd.join(", ")}
+            </Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -218,6 +221,23 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontFamily: "Inter_400Regular",
     color: "#fff",
+  },
+  participantStatusRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    marginTop: 4,
+    paddingHorizontal: 24,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  participantStatusText: {
+    fontSize: 13,
+    color: "#ccc",
+    fontFamily: "Inter_400Regular",
   },
   errorText: {
     fontSize: 15,

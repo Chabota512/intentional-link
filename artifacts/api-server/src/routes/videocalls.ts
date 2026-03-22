@@ -28,6 +28,7 @@ router.post("/sessions/:id/video-call", async (req, res) => {
 
   const uid = parseInt(userId as string, 10);
   const mode: string = req.body?.mode ?? "video";
+  let participantStatus: { ringing: string[]; offline: string[]; dnd: string[] } = { ringing: [], offline: [], dnd: [] };
 
   const channel = channelName(sessionId);
   const expireTime = Math.floor(Date.now() / 1000) + 4 * 60 * 60;
@@ -96,7 +97,7 @@ router.post("/sessions/:id/video-call", async (req, res) => {
           }
         }
 
-        const { emitToUser } = await import("../lib/socketio.js");
+        const { emitToUser, isUserOnline } = await import("../lib/socketio.js");
         const notifiableUsers: typeof memberRows = [];
 
         for (const member of memberRows) {
@@ -104,7 +105,6 @@ router.post("/sessions/:id/video-call", async (req, res) => {
           const callerWhitelisted = whitelistedByDndMap.get(member.id) === true;
 
           if (inDnd && !callerWhitelisted) {
-            // Notify the caller that this recipient is in DND
             emitToUser(uid, "call_blocked_dnd", {
               userId: member.id,
               message: `${memberRows.find(m => m.id === member.id) ? caller.name : "This contact"} is in Do Not Disturb mode`,
@@ -127,13 +127,40 @@ router.post("/sessions/:id/video-call", async (req, res) => {
             await sendPushNotifications(pushTokens, `📞 ${notifTitle}`, notifBody, notifData);
           }
         }
+
+        const allMemberNames = await db
+          .select({ id: usersTable.id, name: usersTable.name })
+          .from(usersTable)
+          .where(inArray(usersTable.id, otherUserIds));
+
+        const nameMap = new Map(allMemberNames.map(m => [m.id, m.name || "Unknown"]));
+
+        const ringingNames: string[] = [];
+        const offlineNames: string[] = [];
+        const dndNames: string[] = [];
+
+        for (const id of otherUserIds) {
+          const name = nameMap.get(id) || "Unknown";
+          const inDnd = dndMap.get(id) === true;
+          const callerWhitelisted = whitelistedByDndMap.get(id) === true;
+
+          if (inDnd && !callerWhitelisted) {
+            dndNames.push(name);
+          } else if (isUserOnline(id)) {
+            ringingNames.push(name);
+          } else {
+            offlineNames.push(name);
+          }
+        }
+
+        participantStatus = { ringing: ringingNames, offline: offlineNames, dnd: dndNames };
       }
     }
   } catch {
     // Notification failure should not block the call
   }
 
-  res.json({ appId: APP_ID, channel, token, uid });
+  res.json({ appId: APP_ID, channel, token, uid, participants: participantStatus });
 });
 
 router.post("/sessions/:id/call-log", async (req, res) => {
@@ -377,8 +404,10 @@ router.get("/sessions/:id/call-page", async (req, res) => {
 <!-- Waiting for others overlay (shown after connected but no one else yet) -->
 <div id="waiting-overlay" class="hidden">
   <div class="waiting-spinner"></div>
-  <div class="waiting-text">Waiting for others to connect…</div>
-  <div class="waiting-sub">Ringing participants</div>
+  <div class="waiting-text">Waiting for others to join…</div>
+  <div id="ringing-info" class="waiting-sub" style="color:#4CAF50;"></div>
+  <div id="offline-info" class="waiting-sub" style="color:#94A3B8;"></div>
+  <div id="dnd-info" class="waiting-sub" style="color:#FF9800;"></div>
 </div>
 
 <div id="controls">
@@ -449,6 +478,13 @@ async function init() {
   const channel = params.get('channel');
   const token = params.get('token');
   const uid = parseInt(params.get('uid') || '0');
+
+  const ringingNames = (params.get('ringing') || '').split(',').filter(Boolean);
+  const offlineNames = (params.get('offline') || '').split(',').filter(Boolean);
+  const dndNames = (params.get('dnd') || '').split(',').filter(Boolean);
+  if (ringingNames.length > 0) document.getElementById('ringing-info').textContent = 'Ringing: ' + ringingNames.join(', ');
+  if (offlineNames.length > 0) document.getElementById('offline-info').textContent = 'Offline: ' + offlineNames.join(', ');
+  if (dndNames.length > 0) document.getElementById('dnd-info').textContent = 'Do Not Disturb: ' + dndNames.join(', ');
 
   if (!appId || !channel || !token) {
     document.getElementById('status-text').textContent = 'Missing call parameters.';
