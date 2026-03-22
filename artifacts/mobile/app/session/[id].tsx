@@ -1657,7 +1657,7 @@ export default function SessionScreen() {
                 <>
                   <Text style={[styles.joinLinkSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
                     {sessionPreview.creatorName} invited you to join "{sessionPreview.title}"
-                    {sessionPreview.participantCount > 1 ? ` · ${sessionPreview.participantCount} participant${sessionPreview.participantCount !== 1 ? "s" : ""}` : ""}
+                    {sessionPreview.participantCount > 1 ? ` · ${sessionPreview.participantCount} contact${sessionPreview.participantCount !== 1 ? "s" : ""}` : ""}
                   </Text>
                   {sessionPreview.status !== "active" && (
                     <Text style={[styles.joinLinkSub, { color: colors.danger, fontFamily: "Inter_500Medium" }]}>
@@ -1752,7 +1752,7 @@ export default function SessionScreen() {
               </Text>
               <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
                 <Text style={{ color: colors.textTertiary }}>{"› "}</Text>
-                <Text style={{ color: colors.textSecondary }}>{`${totalPeople} participant${totalPeople !== 1 ? "s" : ""}`}</Text>
+                <Text style={{ color: colors.textSecondary }}>{`${totalPeople} contact${totalPeople !== 1 ? "s" : ""}`}</Text>
                 <Text style={{ color: colors.textSecondary }}>{" · "}</Text>
                 <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
               </Text>
@@ -2505,7 +2505,7 @@ export default function SessionScreen() {
                   <View style={[styles.chatInfoMeta, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                     <Feather name="users" size={13} color={colors.textSecondary} />
                     <Text style={[styles.chatInfoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                      {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
+                      {totalPeople} contact{totalPeople !== 1 ? "s" : ""}
                     </Text>
                     <Text style={[styles.chatInfoMetaSep, { color: colors.border }]}>·</Text>
                     <View style={[styles.chatInfoStatusDot, { backgroundColor: isActive ? colors.success : colors.textTertiary }]} />
