@@ -13,6 +13,7 @@ import {
   Platform,
 } from "react-native";
 import Slider from "@react-native-community/slider";
+import { Audio } from "expo-av";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -242,6 +243,45 @@ export default function NotificationsSettingsScreen() {
   const [showWhitelistModal, setShowWhitelistModal] = useState(false);
   const [now, setNow] = useState(Date.now());
   const pendingDndOn = useRef(false);
+
+  const [playingTest, setPlayingTest] = useState(false);
+  const testSoundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (testSoundRef.current) {
+        testSoundRef.current.stopAsync().catch(() => {});
+        testSoundRef.current.unloadAsync().catch(() => {});
+        testSoundRef.current = null;
+      }
+    };
+  }, []);
+
+  const playTestSound = async () => {
+    if (playingTest) return;
+    setPlayingTest(true);
+    try {
+      if (testSoundRef.current) {
+        await testSoundRef.current.unloadAsync().catch(() => {});
+        testSoundRef.current = null;
+      }
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(
+        require("@/assets/sounds/notification.mp3"),
+        { volume: settings.notificationVolume / 100, shouldPlay: true }
+      );
+      testSoundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          testSoundRef.current = null;
+          setPlayingTest(false);
+        }
+      });
+    } catch {
+      setPlayingTest(false);
+    }
+  };
 
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editStart, setEditStart] = useState<string | null>(null);
@@ -522,6 +562,19 @@ export default function NotificationsSettingsScreen() {
                 />
                 <Text style={[styles.volumeLabel, { color: colors.textSecondary }]}>{settings.notificationVolume}%</Text>
               </View>
+              <Pressable
+                style={[styles.testSoundBtn, { borderTopColor: colors.border }]}
+                onPress={playTestSound}
+                disabled={playingTest}
+              >
+                {playingTest
+                  ? <ActivityIndicator size="small" color={colors.accent} />
+                  : <Feather name="play-circle" size={16} color={colors.accent} />
+                }
+                <Text style={[styles.testSoundText, { color: colors.accent }]}>
+                  {playingTest ? "Playing…" : "Test Sound"}
+                </Text>
+              </Pressable>
             </View>
 
           </ScrollView>
@@ -887,6 +940,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     minWidth: 36,
     textAlign: "right",
+  },
+  testSoundBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  testSoundText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
   },
 
   modalBackdrop: {
