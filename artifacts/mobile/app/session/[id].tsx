@@ -1760,21 +1760,6 @@ export default function SessionScreen() {
           </View>
         </Pressable>
         <View style={styles.navActions}>
-          {isCreator && (
-            <Pressable
-              style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                if (session) {
-                  setEditTitle(session.title);
-                  setEditDescription(session.description || "");
-                }
-                setEditModalVisible(true);
-              }}
-            >
-              <Feather name="edit-2" size={18} color={colors.text} />
-            </Pressable>
-          )}
           <Pressable
             style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
             onPress={() => {
@@ -2500,6 +2485,22 @@ export default function SessionScreen() {
                       </Text>
                     )}
                   </View>
+                  {isCreator && (
+                    <Pressable
+                      style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.5 : 1 })}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        if (session) {
+                          setEditTitle(session.title);
+                          setEditDescription(session.description || "");
+                        }
+                        setSheetVisible(false);
+                        setTimeout(() => setEditModalVisible(true), 300);
+                      }}
+                    >
+                      <Feather name="edit-2" size={16} color={colors.textSecondary} />
+                    </Pressable>
+                  )}
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <View style={[styles.chatInfoMeta, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
