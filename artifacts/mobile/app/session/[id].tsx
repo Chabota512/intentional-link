@@ -1781,12 +1781,12 @@ export default function SessionScreen() {
       </View>
 
       {session.description && (
-        <Animated.View entering={FadeIn} style={[styles.descBanner, { backgroundColor: colors.accentSoft, borderBottomColor: colors.border }]}>
+        <Pressable onPress={() => openParticipants()} style={({ pressed }) => [styles.descBanner, { backgroundColor: colors.accentSoft, borderBottomColor: colors.border, opacity: pressed ? 0.7 : 1 }]}>
           <Feather name="info" size={14} color={colors.accent} />
           <Text style={[styles.descText, { color: colors.accent, fontFamily: "Inter_400Regular" }]} numberOfLines={2}>
             {session.description}
           </Text>
-        </Animated.View>
+        </Pressable>
       )}
 
       {!isCreator && isParticipant && !hasJoined && isActive && (
