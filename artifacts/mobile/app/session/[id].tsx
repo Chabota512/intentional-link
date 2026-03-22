@@ -1754,6 +1754,15 @@ export default function SessionScreen() {
             style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push(`/session/media/${sessionId}` as any);
+            }}
+          >
+            <Feather name="image" size={20} color={colors.text} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push(`/session/call/${sessionId}?mode=voice` as any);
             }}
           >
