@@ -20,7 +20,8 @@ import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import UserAvatar from "@/components/UserAvatar";
 import { formatRelative } from "@/utils/date";
-import { isOnline } from "@/utils/lastSeen";
+import { formatLastSeen } from "@/utils/lastSeen";
+import { useSocket } from "@/context/SocketContext";
 
 const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -69,6 +70,8 @@ export default function ContactChatsScreen() {
   const { user: me } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const contactUserId = parseInt(id, 10);
+
+  const { onlineUserIds, lastSeenByUserId } = useSocket();
 
   const { data: contacts = [] } = useQuery<Contact[]>({
     queryKey: ["contacts"],
@@ -182,16 +185,22 @@ export default function ContactChatsScreen() {
               name={contact.name}
               avatarUrl={contact.avatarUrl}
               size={36}
-              isOnline={isOnline(contact.lastSeenAt)}
+              presenceStatus={onlineUserIds.has(contactUserId) ? "online" : "offline"}
               showDot
             />
             <View>
               <Text style={[styles.headerName, { color: colors.text, fontFamily: "Inter_700Bold" }]}>
                 {contact.name}
               </Text>
-              <Text style={[styles.headerSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                {sharedSessions.length} shared chat{sharedSessions.length !== 1 ? "s" : ""}
-              </Text>
+              {onlineUserIds.has(contactUserId) ? (
+                <Text style={[styles.headerSub, { color: colors.success, fontFamily: "Inter_500Medium" }]}>
+                  Online
+                </Text>
+              ) : (
+                <Text style={[styles.headerSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  {formatLastSeen(lastSeenByUserId.get(contactUserId) ?? contact.lastSeenAt)}
+                </Text>
+              )}
             </View>
           </View>
         ) : (

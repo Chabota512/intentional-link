@@ -767,7 +767,7 @@ export default function SessionScreen() {
   const { get, post, patch, del, uploadFile, getFileUrl } = useApi();
   const { user } = useAuth();
   const { getPresenceStatus } = useLocalDiscovery();
-  const { isConnected: socketConnected, typingUsers, recordingUsers, onlineUserIds, emitTypingStart, emitTypingStop, emitRecordingStart, emitRecordingStop, emitMarkRead, joinSession, leaveSession, setActiveSessionId } = useSocket();
+  const { isConnected: socketConnected, typingUsers, recordingUsers, onlineUserIds, lastSeenByUserId, emitTypingStart, emitTypingStop, emitRecordingStart, emitRecordingStop, emitMarkRead, joinSession, leaveSession, setActiveSessionId } = useSocket();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const flatListRef = useRef<FlatList>(null);
@@ -1796,12 +1796,24 @@ export default function SessionScreen() {
               <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
                 {session.title}
               </Text>
-              <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
-                <Text style={{ color: colors.textTertiary }}>{"› "}</Text>
-                <Text style={{ color: colors.textSecondary }}>{`${totalPeople} contact${totalPeople !== 1 ? "s" : ""}`}</Text>
-                <Text style={{ color: colors.textSecondary }}>{" · "}</Text>
-                <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
-              </Text>
+              {isDirect && headerPerson ? (
+                onlineUserIds.has(headerPerson.id) ? (
+                  <Text style={[styles.navSub, { color: colors.success, fontFamily: "Inter_500Medium" }]} numberOfLines={1}>
+                    Online
+                  </Text>
+                ) : (
+                  <Text style={[styles.navSub, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
+                    {formatLastSeen(lastSeenByUserId.get(headerPerson.id) ?? headerPerson.lastSeenAt)}
+                  </Text>
+                )
+              ) : (
+                <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
+                  <Text style={{ color: colors.textTertiary }}>{"› "}</Text>
+                  <Text style={{ color: colors.textSecondary }}>{`${totalPeople} contact${totalPeople !== 1 ? "s" : ""}`}</Text>
+                  <Text style={{ color: colors.textSecondary }}>{" · "}</Text>
+                  <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
+                </Text>
+              )}
             </View>
           </View>
         </Pressable>

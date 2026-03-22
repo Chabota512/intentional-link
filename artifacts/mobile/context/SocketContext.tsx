@@ -38,6 +38,7 @@ interface SocketContextValue {
   recordingUsers: Map<number, Set<number>>;
   onlineUserIds: Set<number>;
   dndUserIds: Set<number>;
+  lastSeenByUserId: Map<number, string>;
   unreadNotifCount: number;
   presenceDialogData: PresenceDialogData | null;
   incomingCall: IncomingCallData | null;
@@ -67,6 +68,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [recordingUsers, setRecordingUsers] = useState<Map<number, Set<number>>>(new Map());
   const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
   const [dndUserIds, setDndUserIds] = useState<Set<number>>(new Set());
+  const [lastSeenByUserId, setLastSeenByUserId] = useState<Map<number, string>>(new Map());
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [presenceDialogData, setPresenceDialogData] = useState<PresenceDialogData | null>(null);
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
@@ -234,7 +236,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    socket.on("presence_update", (data: { userId: number; status: string; isDndActive?: boolean }) => {
+    socket.on("presence_update", (data: { userId: number; status: string; isDndActive?: boolean; lastSeenAt?: string | null }) => {
       if (data.userId === user.id) return;
       setOnlineUserIds((prev) => {
         const next = new Set(prev);
@@ -246,6 +248,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         if (data.isDndActive) next.add(data.userId); else next.delete(data.userId);
         return next;
       });
+      if (data.status === "offline" && data.lastSeenAt) {
+        setLastSeenByUserId((prev) => {
+          const next = new Map(prev);
+          next.set(data.userId, data.lastSeenAt as string);
+          return next;
+        });
+      }
     });
 
     socket.on("call_blocked_dnd", (data: { userId: number; message: string }) => {
@@ -384,6 +393,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         recordingUsers,
         onlineUserIds,
         dndUserIds,
+        lastSeenByUserId,
         unreadNotifCount,
         presenceDialogData,
         incomingCall,

@@ -23,9 +23,10 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { useApi } from "@/hooks/useApi";
-import { isOnline, formatLastSeen } from "@/utils/lastSeen";
+import { formatLastSeen } from "@/utils/lastSeen";
 import { confirmAction } from "@/utils/confirm";
 import { useLocalDiscovery } from "@/context/LocalDiscoveryContext";
+import { useSocket } from "@/context/SocketContext";
 
 interface ContactUser {
   id: number;
@@ -148,12 +149,22 @@ export default function ContactsScreen() {
   };
 
   const { getPresenceStatus } = useLocalDiscovery();
+  const { onlineUserIds, lastSeenByUserId } = useSocket();
 
   const topPad = Math.max(insets.top, 20) + (Platform.OS === "web" ? 16 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
 
-  const localCount = contacts.filter(c => getPresenceStatus(c.contactUser.id, c.contactUser.lastSeenAt) === "local").length;
-  const onlineCount = contacts.filter(c => getPresenceStatus(c.contactUser.id, c.contactUser.lastSeenAt) !== "offline").length;
+  const getEffectivePresence = (userId: number, lastSeenAt?: string | null) => {
+    if (onlineUserIds.has(userId)) return "online" as const;
+    return getPresenceStatus(userId, lastSeenAt);
+  };
+
+  const getEffectiveLastSeen = (userId: number, lastSeenAt?: string | null): string | null | undefined => {
+    return lastSeenByUserId.get(userId) ?? lastSeenAt;
+  };
+
+  const localCount = contacts.filter(c => getEffectivePresence(c.contactUser.id, c.contactUser.lastSeenAt) === "local").length;
+  const onlineCount = contacts.filter(c => getEffectivePresence(c.contactUser.id, c.contactUser.lastSeenAt) !== "offline").length;
 
   const presenceLabel = (status: "local" | "online" | "offline") => {
     if (status === "local") return { text: "On this network", color: "#FF6B9D" };
@@ -162,9 +173,10 @@ export default function ContactsScreen() {
   };
 
   const renderContact = ({ item }: { item: Contact }) => {
-    const status = getPresenceStatus(item.contactUser.id, item.contactUser.lastSeenAt);
+    const status = getEffectivePresence(item.contactUser.id, item.contactUser.lastSeenAt);
+    const effectiveLastSeen = getEffectiveLastSeen(item.contactUser.id, item.contactUser.lastSeenAt);
     const label = status === "offline"
-      ? { text: formatLastSeen(item.contactUser.lastSeenAt), color: colors.textTertiary }
+      ? { text: formatLastSeen(effectiveLastSeen), color: colors.textTertiary }
       : presenceLabel(status);
     return (
       <Pressable
