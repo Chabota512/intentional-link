@@ -42,7 +42,7 @@ artifacts-monorepo/
 - **Auth**: Register/login with username + password (hashed with SHA-256). Login returns an HMAC-signed token.
 - **Token validation**: API middleware validates `Authorization: Bearer <token>` header on protected routes
 - **Contacts**: Add/remove trusted contacts by searching username. Shows online/last seen status.
-- **Sessions**: Create focus sessions, invite contacts, join sessions
+- **Sessions**: Create focus sessions, invite contacts, join sessions. "Show past messages" toggle controls whether new participants see pre-join history.
 - **Messaging**: Real-time via Socket.IO WebSocket (polling kept as fallback)
 - **Media messages**: Send images (photo picker), files (document picker), voice notes (recorded audio)
 - **Online/last seen**: Heartbeat every 30s updates `lastSeenAt`; contacts show "Online" or "Xm ago"

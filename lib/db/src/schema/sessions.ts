@@ -1,4 +1,4 @@
-import { pgTable, text, integer, serial, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, timestamp, unique, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -10,6 +10,7 @@ export const sessionsTable = pgTable("sessions", {
   imageUrl: text("image_url"),
   creatorId: integer("creator_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   status: text("status", { enum: ["active", "completed"] }).notNull().default("active"),
+  showPastMessages: boolean("show_past_messages").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   endedAt: timestamp("ended_at", { withTimezone: true }),
 });
@@ -19,6 +20,7 @@ export const sessionParticipantsTable = pgTable("session_participants", {
   sessionId: integer("session_id").notNull().references(() => sessionsTable.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   status: text("status", { enum: ["invited", "joined", "declined"] }).notNull().default("invited"),
+  joinedAt: timestamp("joined_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

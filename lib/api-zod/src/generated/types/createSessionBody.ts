@@ -9,4 +9,5 @@
 export interface CreateSessionBody {
   title: string;
   description?: string;
+  showPastMessages?: boolean;
 }

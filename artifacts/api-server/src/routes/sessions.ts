@@ -22,6 +22,7 @@ async function getSessionWithParticipants(sessionId: number) {
         userId: sessionParticipantsTable.userId,
         sessionId: sessionParticipantsTable.sessionId,
         status: sessionParticipantsTable.status,
+        joinedAt: sessionParticipantsTable.joinedAt,
         userName: usersTable.name,
         userUsername: usersTable.username,
         userAvatarUrl: usersTable.avatarUrl,
@@ -47,6 +48,7 @@ async function getSessionWithParticipants(sessionId: number) {
         userId: p.userId,
         sessionId: p.sessionId,
         status: p.status,
+        joinedAt: p.joinedAt ?? null,
         user: { id: p.userId, name: p.userName, username: p.userUsername, avatarUrl: p.userAvatarUrl ?? null, createdAt: p.userCreatedAt, lastSeenAt: p.userLastSeenAt },
       })),
     });
@@ -240,6 +242,7 @@ router.post("/sessions", async (req, res): Promise<void> => {
   }
 
   const imageUrl = (req.body as any).imageUrl ?? null;
+  const showPastMessages = (req.body as any).showPastMessages === true;
 
   const [session] = await db.insert(sessionsTable).values({
     title: parsed.data.title,
@@ -247,6 +250,7 @@ router.post("/sessions", async (req, res): Promise<void> => {
     imageUrl: typeof imageUrl === "string" ? imageUrl : null,
     creatorId: userId,
     status: "active",
+    showPastMessages,
   }).returning();
 
   const result = await getSessionWithParticipants(session.id);
@@ -477,7 +481,7 @@ router.post("/sessions/:sessionId/join", async (req, res): Promise<void> => {
 
   if (existing.status !== "joined") {
     await db.update(sessionParticipantsTable)
-      .set({ status: "joined" })
+      .set({ status: "joined", joinedAt: new Date() })
       .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)));
   }
 
@@ -564,11 +568,11 @@ router.post("/sessions/:sessionId/join-link", async (req, res): Promise<void> =>
   if (existing) {
     if (existing.status !== "joined") {
       await db.update(sessionParticipantsTable)
-        .set({ status: "joined" })
+        .set({ status: "joined", joinedAt: new Date() })
         .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, userId)));
     }
   } else {
-    await db.insert(sessionParticipantsTable).values({ sessionId, userId, status: "joined" });
+    await db.insert(sessionParticipantsTable).values({ sessionId, userId, status: "joined", joinedAt: new Date() });
   }
 
   const result = await getSessionWithParticipants(sessionId);

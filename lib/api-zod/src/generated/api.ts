@@ -190,12 +190,14 @@ export const GetSessionResponse = zod.object({
   imageUrl: zod.string().nullish(),
   creatorId: zod.number(),
   status: zod.enum(["active", "completed"]),
+  showPastMessages: zod.boolean().optional(),
   participants: zod.array(
     zod.object({
       id: zod.number(),
       userId: zod.number(),
       sessionId: zod.number(),
       status: zod.enum(["invited", "joined"]),
+      joinedAt: zod.date().nullable().optional(),
       user: zod.object({
         id: zod.number(),
         username: zod.string(),

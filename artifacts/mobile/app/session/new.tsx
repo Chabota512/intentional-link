@@ -11,6 +11,7 @@ import {
   Platform,
   Image,
   FlatList,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -47,6 +48,7 @@ export default function NewSessionScreen() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showPastMessages, setShowPastMessages] = useState(false);
   const [showNoContactsWarning, setShowNoContactsWarning] = useState(false);
 
   const { data: contacts = [], isLoading: loadingContacts } = useQuery<Contact[]>({
@@ -66,7 +68,7 @@ export default function NewSessionScreen() {
   };
 
   const createMutation = useMutation({
-    mutationFn: (data: { title: string; description?: string; imageUrl?: string }) =>
+    mutationFn: (data: { title: string; description?: string; imageUrl?: string; showPastMessages?: boolean }) =>
       post("/sessions", data),
     onSuccess: async (session) => {
       const inviteIds = Array.from(selectedIds);
@@ -118,6 +120,7 @@ export default function NewSessionScreen() {
       title: title.trim(),
       description: description.trim() || undefined,
       imageUrl: imageUrl ?? undefined,
+      showPastMessages,
     });
   };
 
@@ -213,6 +216,23 @@ export default function NewSessionScreen() {
               multiline
               numberOfLines={3}
               maxLength={500}
+            />
+          </View>
+
+          <View style={[styles.toggleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.toggleTextWrapper}>
+              <Text style={[styles.toggleLabel, { color: colors.text, fontFamily: "Inter_500Medium" }]}>
+                Show past messages
+              </Text>
+              <Text style={[styles.toggleHint, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+                New members can see messages sent before they joined
+              </Text>
+            </View>
+            <Switch
+              value={showPastMessages}
+              onValueChange={setShowPastMessages}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor="#fff"
             />
           </View>
 
@@ -375,6 +395,18 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     borderWidth: 2, borderColor: "#fff",
   },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  toggleTextWrapper: { flex: 1, marginRight: 12 },
+  toggleLabel: { fontSize: 15 },
+  toggleHint: { fontSize: 12, marginTop: 2, lineHeight: 16 },
   labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   label: { fontSize: 11, letterSpacing: 0.8 },
   selectedCount: { fontSize: 12 },

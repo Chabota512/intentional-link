@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, lt, gt, ne, desc, inArray, ilike } from "drizzle-orm";
+import { eq, and, lt, gt, gte, ne, desc, inArray, ilike } from "drizzle-orm";
 import { db, messagesTable, usersTable, sessionsTable, sessionParticipantsTable, messageReactionsTable } from "@workspace/db";
 import { SendMessageBody, GetMessagesResponseItem } from "@workspace/api-zod";
 import { sendPushNotification, sendPushNotifications, saveNotification } from "../lib/pushNotifications";
@@ -7,16 +7,31 @@ import { emitToSession, isUserOnline } from "../lib/socketio";
 
 const router: IRouter = Router();
 
-async function canAccessSession(sessionId: number, userId: number): Promise<boolean> {
-  const [session] = await db.select({ creatorId: sessionsTable.creatorId })
+interface SessionAccess {
+  allowed: boolean;
+  isCreator: boolean;
+  messagesVisibleFrom: Date | null;
+}
+
+async function getSessionAccess(sessionId: number, userId: number): Promise<SessionAccess> {
+  const [session] = await db.select({
+    creatorId: sessionsTable.creatorId,
+    showPastMessages: sessionsTable.showPastMessages,
+  })
     .from(sessionsTable)
     .where(eq(sessionsTable.id, sessionId))
     .limit(1);
 
-  if (!session) return false;
-  if (session.creatorId === userId) return true;
+  if (!session) return { allowed: false, isCreator: false, messagesVisibleFrom: null };
 
-  const [participant] = await db.select({ status: sessionParticipantsTable.status })
+  if (session.creatorId === userId) {
+    return { allowed: true, isCreator: true, messagesVisibleFrom: null };
+  }
+
+  const [participant] = await db.select({
+    status: sessionParticipantsTable.status,
+    joinedAt: sessionParticipantsTable.joinedAt,
+  })
     .from(sessionParticipantsTable)
     .where(and(
       eq(sessionParticipantsTable.sessionId, sessionId),
@@ -24,7 +39,17 @@ async function canAccessSession(sessionId: number, userId: number): Promise<bool
     ))
     .limit(1);
 
-  return participant?.status === "joined";
+  if (participant?.status !== "joined") {
+    return { allowed: false, isCreator: false, messagesVisibleFrom: null };
+  }
+
+  const visibleFrom = session.showPastMessages ? null : (participant.joinedAt ?? null);
+  return { allowed: true, isCreator: false, messagesVisibleFrom: visibleFrom };
+}
+
+async function canAccessSession(sessionId: number, userId: number): Promise<boolean> {
+  const access = await getSessionAccess(sessionId, userId);
+  return access.allowed;
 }
 
 async function formatMessages(msgs: (typeof messagesTable.$inferSelect)[]) {
@@ -124,7 +149,8 @@ router.get("/sessions/:sessionId/messages", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
   const sessionId = parseInt(raw, 10);
 
-  if (!(await canAccessSession(sessionId, userId))) {
+  const access = await getSessionAccess(sessionId, userId);
+  if (!access.allowed) {
     res.status(403).json({ error: "You do not have access to this session" });
     return;
   }
@@ -132,18 +158,14 @@ router.get("/sessions/:sessionId/messages", async (req, res): Promise<void> => {
   const limit = parseInt(req.query.limit as string || "50", 10);
   const before = req.query.before ? parseInt(req.query.before as string, 10) : undefined;
 
-  let msgs;
-  if (before) {
-    msgs = await db.select().from(messagesTable)
-      .where(and(eq(messagesTable.sessionId, sessionId), lt(messagesTable.id, before)))
-      .orderBy(desc(messagesTable.createdAt))
-      .limit(limit);
-  } else {
-    msgs = await db.select().from(messagesTable)
-      .where(eq(messagesTable.sessionId, sessionId))
-      .orderBy(desc(messagesTable.createdAt))
-      .limit(limit);
-  }
+  const conditions: any[] = [eq(messagesTable.sessionId, sessionId)];
+  if (before) conditions.push(lt(messagesTable.id, before));
+  if (access.messagesVisibleFrom) conditions.push(gte(messagesTable.createdAt, access.messagesVisibleFrom));
+
+  let msgs = await db.select().from(messagesTable)
+    .where(and(...conditions))
+    .orderBy(desc(messagesTable.createdAt))
+    .limit(limit);
   msgs.reverse();
 
   const formatted = await formatMessages(msgs);
@@ -300,15 +322,19 @@ router.get("/sessions/:sessionId/messages/poll", async (req, res): Promise<void>
   const raw = Array.isArray(req.params.sessionId) ? req.params.sessionId[0] : req.params.sessionId;
   const sessionId = parseInt(raw, 10);
 
-  if (!(await canAccessSession(sessionId, userId))) {
+  const access = await getSessionAccess(sessionId, userId);
+  if (!access.allowed) {
     res.status(403).json({ error: "You do not have access to this session" });
     return;
   }
 
   const since = parseInt(req.query.since as string || "0", 10);
 
+  const conditions: any[] = [eq(messagesTable.sessionId, sessionId), gt(messagesTable.id, since)];
+  if (access.messagesVisibleFrom) conditions.push(gte(messagesTable.createdAt, access.messagesVisibleFrom));
+
   const msgs = await db.select().from(messagesTable)
-    .where(and(eq(messagesTable.sessionId, sessionId), gt(messagesTable.id, since)))
+    .where(and(...conditions))
     .orderBy(messagesTable.createdAt);
 
   const formatted = await formatMessages(msgs);
@@ -452,7 +478,10 @@ router.get("/messages/search", async (req, res): Promise<void> => {
   const sessionIdFilter = req.query.sessionId ? parseInt(req.query.sessionId as string, 10) : undefined;
 
   const participantRows = await db
-    .select({ sessionId: sessionParticipantsTable.sessionId })
+    .select({
+      sessionId: sessionParticipantsTable.sessionId,
+      joinedAt: sessionParticipantsTable.joinedAt,
+    })
     .from(sessionParticipantsTable)
     .where(and(eq(sessionParticipantsTable.userId, userId), eq(sessionParticipantsTable.status, "joined")));
 
@@ -460,6 +489,8 @@ router.get("/messages/search", async (req, res): Promise<void> => {
     .select({ id: sessionsTable.id })
     .from(sessionsTable)
     .where(eq(sessionsTable.creatorId, userId));
+
+  const creatorSessionIds = new Set(creatorRows.map(r => r.id));
 
   const allSessionIds = [...new Set([
     ...participantRows.map(r => r.sessionId),
@@ -500,8 +531,31 @@ router.get("/messages/search", async (req, res): Promise<void> => {
     .orderBy(desc(messagesTable.createdAt))
     .limit(50);
 
-  const sessionIds = [...new Set(msgs.map(m => m.sessionId))];
-  const senderIds = [...new Set(msgs.map(m => m.senderId))];
+  const participantJoinedAtMap = new Map<number, Date | null>();
+  for (const row of participantRows) {
+    participantJoinedAtMap.set(row.sessionId, row.joinedAt);
+  }
+
+  const sessionIdsForShowPast = [...new Set(msgs.map(m => m.sessionId))].filter(id => !creatorSessionIds.has(id));
+  let showPastMap = new Map<number, boolean>();
+  if (sessionIdsForShowPast.length > 0) {
+    const sessionSettings = await db.select({ id: sessionsTable.id, showPastMessages: sessionsTable.showPastMessages })
+      .from(sessionsTable)
+      .where(inArray(sessionsTable.id, sessionIdsForShowPast));
+    showPastMap = new Map(sessionSettings.map(s => [s.id, s.showPastMessages ?? false]));
+  }
+
+  const filteredMsgs = msgs.filter(m => {
+    if (creatorSessionIds.has(m.sessionId)) return true;
+    const showPast = showPastMap.get(m.sessionId) ?? false;
+    if (showPast) return true;
+    const joinedAt = participantJoinedAtMap.get(m.sessionId);
+    if (!joinedAt) return true;
+    return m.createdAt >= joinedAt;
+  });
+
+  const sessionIds = [...new Set(filteredMsgs.map(m => m.sessionId))];
+  const senderIds = [...new Set(filteredMsgs.map(m => m.senderId))];
 
   const [sessions, senders] = await Promise.all([
     sessionIds.length > 0
@@ -520,7 +574,7 @@ router.get("/messages/search", async (req, res): Promise<void> => {
   const senderMap = new Map(senders.map(s => [s.id, s]));
 
   const searchLower = q.trim().toLowerCase();
-  const results = msgs.map(m => {
+  const results = filteredMsgs.map(m => {
     let snippet = m.content;
     const idx = m.content.toLowerCase().indexOf(searchLower);
     if (idx !== -1) {
