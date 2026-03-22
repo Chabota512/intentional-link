@@ -791,10 +791,17 @@ export default function SessionScreen() {
   const [viewerImageIndex, setViewerImageIndex] = useState<number | null>(null);
   const [videoViewer, setVideoViewer] = useState<{ url: string; name: string } | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editTitle, setEditTitle] = useState(session.title);
-  const [editDescription, setEditDescription] = useState(session.description || "");
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const inAppVideoPlayer = useVideoPlayer(null);
   const vpAutoPlayRef = useRef(false);
+
+  useEffect(() => {
+    if (session) {
+      setEditTitle(session.title);
+      setEditDescription(session.description || "");
+    }
+  }, [session]);
 
   useEffect(() => {
     if (videoViewer?.url) {
