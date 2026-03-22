@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
+import { useTabSwipe } from "@/hooks/useTabSwipe";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -106,6 +107,7 @@ function NotifItem({
 export default function ActivityScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const swipeHandlers = useTabSwipe();
   const { data, isLoading, refetch, isRefetching } = useNotifications();
   const markRead = useMarkNotifRead();
   const markAllRead = useMarkAllNotifsRead();
@@ -136,7 +138,7 @@ export default function ActivityScreen() {
   }, [markAllRead]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]} {...swipeHandlers}>
       <View
         style={[
           styles.header,

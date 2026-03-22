@@ -13,6 +13,7 @@ import {
   Image,
   Modal,
 } from "react-native";
+import { useTabSwipe } from "@/hooks/useTabSwipe";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -86,6 +87,7 @@ export default function SessionsScreen() {
   const insets = useSafeAreaInsets();
   const { get, getFileUrl } = useApi();
   const { user } = useAuth();
+  const swipeHandlers = useTabSwipe();
   const [activeFilter, setActiveFilter] = useState<"active" | "completed" | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
@@ -277,7 +279,7 @@ export default function SessionsScreen() {
   const previewAvatarUser = previewOthers.length === 1 ? previewOthers[0].user : null;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]} {...swipeHandlers}>
       <View style={[styles.header, { paddingTop: topPad + 10, borderBottomColor: colors.border }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Chats</Text>

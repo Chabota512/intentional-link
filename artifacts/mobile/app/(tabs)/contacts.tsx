@@ -14,6 +14,7 @@ import {
   Modal,
   useWindowDimensions,
 } from "react-native";
+import { useTabSwipe } from "@/hooks/useTabSwipe";
 import UserAvatar from "@/components/UserAvatar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -71,6 +72,7 @@ export default function ContactsScreen() {
   const insets = useSafeAreaInsets();
   const { get, post, del } = useApi();
   const queryClient = useQueryClient();
+  const swipeHandlers = useTabSwipe({ disabled: true });
   const [activeTab, setActiveTab] = useState<Tab>("contacts");
   const [avatarPreview, setAvatarPreview] = useState<ContactUser | null>(null);
   const { width } = useWindowDimensions();
@@ -275,7 +277,7 @@ export default function ContactsScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]} {...swipeHandlers}>
       <View style={[styles.header, { paddingTop: topPad + 10, borderBottomColor: colors.border }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Contacts</Text>

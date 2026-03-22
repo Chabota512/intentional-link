@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Image,
 } from "react-native";
+import { useTabSwipe } from "@/hooks/useTabSwipe";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -84,6 +85,7 @@ function SectionHeader({ title, colors }: { title: string; colors: any }) {
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const swipeHandlers = useTabSwipe();
   const { user, logout, updateUser, refreshUser } = useAuth();
   const { get, put, del, uploadFile } = useApi();
   const queryClient = useQueryClient();
@@ -232,7 +234,7 @@ export default function ProfileScreen() {
   const initial = user?.name?.charAt(0).toUpperCase() ?? "?";
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]} {...swipeHandlers}>
       <View style={[styles.header, { paddingTop: topPad + 10, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text, fontFamily: "Inter_700Bold" }]}>Settings</Text>
         <Pressable
