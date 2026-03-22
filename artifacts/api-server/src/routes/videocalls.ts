@@ -28,6 +28,20 @@ router.post("/sessions/:id/video-call", async (req, res) => {
 
   const uid = parseInt(userId as string, 10);
   const mode: string = req.body?.mode ?? "video";
+
+  const [sessionRow] = await db.select({ creatorId: sessionsTable.creatorId })
+    .from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
+  if (!sessionRow) return res.status(404).json({ error: "Session not found" });
+
+  if (sessionRow.creatorId !== uid) {
+    const [participant] = await db.select({ userId: sessionParticipantsTable.userId })
+      .from(sessionParticipantsTable)
+      .where(and(
+        eq(sessionParticipantsTable.sessionId, sessionId),
+        eq(sessionParticipantsTable.userId, uid),
+      )).limit(1);
+    if (!participant) return res.status(403).json({ error: "Not a session member" });
+  }
   let participantStatus: { ringing: string[]; offline: string[]; dnd: string[] } = { ringing: [], offline: [], dnd: [] };
 
   const channel = channelName(sessionId);
@@ -48,10 +62,8 @@ router.post("/sessions/:id/video-call", async (req, res) => {
     const [caller] = await db.select({ name: usersTable.name })
       .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
 
-    const [session] = await db.select({ creatorId: sessionsTable.creatorId })
-      .from(sessionsTable).where(eq(sessionsTable.id, sessionId)).limit(1);
-
-    if (caller && session) {
+    if (caller) {
+      const session = sessionRow;
       // Get all member user IDs except the caller
       const participantRows = await db
         .select({ userId: sessionParticipantsTable.userId })
@@ -111,6 +123,12 @@ router.post("/sessions/:id/video-call", async (req, res) => {
             });
           } else {
             notifiableUsers.push(member);
+            emitToUser(member.id, "incoming_call", {
+              sessionId,
+              mode,
+              callerId: uid,
+              callerName: caller.name || "Unknown",
+            });
           }
         }
 

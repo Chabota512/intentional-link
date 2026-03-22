@@ -17,6 +17,13 @@ export interface PresenceDialogData {
   whitelistedContactIds: number[];
 }
 
+export interface IncomingCallData {
+  sessionId: number;
+  mode: string;
+  callerId: number;
+  callerName: string;
+}
+
 interface SocketContextValue {
   socket: Socket | null;
   isConnected: boolean;
@@ -26,6 +33,8 @@ interface SocketContextValue {
   dndUserIds: Set<number>;
   unreadNotifCount: number;
   presenceDialogData: PresenceDialogData | null;
+  incomingCall: IncomingCallData | null;
+  dismissIncomingCall: () => void;
   dismissPresenceDialog: () => void;
   emitTypingStart: (sessionId: number) => void;
   emitTypingStop: (sessionId: number) => void;
@@ -49,6 +58,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [dndUserIds, setDndUserIds] = useState<Set<number>>(new Set());
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [presenceDialogData, setPresenceDialogData] = useState<PresenceDialogData | null>(null);
+  const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
   const appStateRef = useRef<AppStateStatus>("active");
 
   useEffect(() => {
@@ -219,6 +229,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       Alert.alert("Do Not Disturb", data.message ?? "This contact is in Do Not Disturb mode and cannot receive calls right now.");
     });
 
+    socket.on("incoming_call", (data: IncomingCallData) => {
+      setIncomingCall(data);
+    });
+
     socket.on("messages_read", (_data: { userId: number; sessionId: number }) => {
     });
 
@@ -288,6 +302,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setPresenceDialogData(null);
   }, []);
 
+  const dismissIncomingCall = useCallback(() => {
+    setIncomingCall(null);
+  }, []);
+
   const emitTypingStart = useCallback((sessionId: number) => {
     socketRef.current?.emit("typing_start", { sessionId });
   }, []);
@@ -327,6 +345,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         dndUserIds,
         unreadNotifCount,
         presenceDialogData,
+        incomingCall,
+        dismissIncomingCall,
         dismissPresenceDialog,
         emitTypingStart,
         emitTypingStop,

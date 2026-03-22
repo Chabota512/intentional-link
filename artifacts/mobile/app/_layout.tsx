@@ -18,10 +18,11 @@ import Feather from "@expo/vector-icons/Feather";
 import Colors from "@/constants/colors";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { IncomingCallBanner } from "@/components/IncomingCallBanner";
 import { PresenceDialog } from "@/components/PresenceDialog";
 import { AuthProvider } from "@/context/AuthContext";
 import { LocalDiscoveryProvider } from "@/context/LocalDiscoveryContext";
-import { SocketProvider } from "@/context/SocketContext";
+import { SocketProvider, useSocket } from "@/context/SocketContext";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -56,6 +57,7 @@ function OfflineBanner() {
 function HeartbeatProvider({ children }: { children: React.ReactNode }) {
   useHeartbeat();
   usePushNotifications();
+  const { dismissIncomingCall } = useSocket();
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -63,6 +65,7 @@ function HeartbeatProvider({ children }: { children: React.ReactNode }) {
       if (data?.type === "incoming-call" && data?.sessionId) {
         const sessionId = data.sessionId as number;
         const mode = (data.mode as string) ?? "video";
+        dismissIncomingCall();
         expoRouter.push(`/session/call/${sessionId}?mode=${mode}` as any);
       }
     });
@@ -86,6 +89,7 @@ function RootLayoutNav() {
         <Stack.Screen name="notifications-settings" options={{ presentation: "card" }} />
         <Stack.Screen name="contact-us" options={{ presentation: "card" }} />
       </Stack>
+      <IncomingCallBanner />
       <OfflineBanner />
       <PresenceDialog />
     </>
