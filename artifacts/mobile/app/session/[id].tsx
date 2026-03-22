@@ -2500,7 +2500,7 @@ export default function SessionScreen() {
                   </View>
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <View style={[styles.chatInfoMeta, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, flex: 1 }]}>
+                  <View style={[styles.chatInfoMeta, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                     <Feather name="users" size={13} color={colors.textSecondary} />
                     <Text style={[styles.chatInfoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
                       {totalPeople} participant{totalPeople !== 1 ? "s" : ""}
@@ -2523,7 +2523,7 @@ export default function SessionScreen() {
                     }}
                   >
                     <Feather name="image" size={13} color={colors.accent} />
-                    <Text style={[styles.chatInfoMetaText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>Media</Text>
+                    <Text style={[styles.chatInfoMetaText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>See Media</Text>
                   </Pressable>
                 </View>
               </View>
