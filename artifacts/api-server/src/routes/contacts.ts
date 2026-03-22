@@ -282,6 +282,23 @@ router.post("/contacts/requests/:requestId/decline", async (req, res): Promise<v
   }
 
   res.sendStatus(204);
+
+  (async () => {
+    try {
+      const [decliner] = await db.select({ name: usersTable.name })
+        .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+      const declinerName = decliner?.name || "Someone";
+      await saveNotification(userId, "contact_request", "Request Declined", `You declined a connection request`, { fromUserId: deleted.userId });
+      await saveNotification(deleted.userId, "contact_request", "Request Declined", `${declinerName} declined your connection request`, { fromUserId: userId });
+      const [them] = await db.select({ pushToken: usersTable.pushToken })
+        .from(usersTable).where(eq(usersTable.id, deleted.userId)).limit(1);
+      if (them?.pushToken) {
+        await sendPushNotification(them.pushToken, "Request Declined", `${declinerName} declined your connection request`, { fromUserId: userId });
+      }
+    } catch (err) {
+      console.error("[contacts] Failed to send decline notification:", err);
+    }
+  })();
 });
 
 router.delete("/contacts/:contactId/cancel", async (req, res): Promise<void> => {
@@ -300,6 +317,23 @@ router.delete("/contacts/:contactId/cancel", async (req, res): Promise<void> => 
   }
 
   res.sendStatus(204);
+
+  (async () => {
+    try {
+      const [sender] = await db.select({ name: usersTable.name })
+        .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+      const senderName = sender?.name || "Someone";
+      await saveNotification(userId, "contact_request", "Request Cancelled", `You cancelled your connection request to a user`, { fromUserId: deleted.contactUserId });
+      await saveNotification(deleted.contactUserId, "contact_request", "Request Cancelled", `${senderName} cancelled their connection request`, { fromUserId: userId });
+      const [them] = await db.select({ pushToken: usersTable.pushToken })
+        .from(usersTable).where(eq(usersTable.id, deleted.contactUserId)).limit(1);
+      if (them?.pushToken) {
+        await sendPushNotification(them.pushToken, "Request Cancelled", `${senderName} cancelled their connection request`, { fromUserId: userId });
+      }
+    } catch (err) {
+      console.error("[contacts] Failed to send cancel notification:", err);
+    }
+  })();
 });
 
 router.delete("/contacts/:contactId", async (req, res): Promise<void> => {
