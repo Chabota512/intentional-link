@@ -3643,4 +3643,23 @@ const styles = StyleSheet.create({
   insightsStatLabel: { fontSize: 10 },
   insightsDivider: { width: 1, height: 30 },
   insightsEnded: { fontSize: 11, textAlign: "center" },
+  reactionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  reactionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    gap: 3,
+  },
+  reactionEmoji: { fontSize: 14 },
+  reactionCount: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  attachTitle: { fontSize: 15, marginBottom: 10 },
 });

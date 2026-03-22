@@ -451,14 +451,14 @@ export default function NotificationsSettingsScreen() {
             {/* ── DND HERO ── */}
             <View style={styles.heroSection}>
               <Pressable
-                style={[
+                style={({ pressed }) => [
                   styles.dndHero,
                   settings.isDndActive
                     ? { backgroundColor: "#1a1040", borderColor: "#6366F130" }
                     : { backgroundColor: colors.surface, borderColor: colors.border },
+                  { opacity: pressed ? 0.85 : 1 },
                 ]}
                 onPress={() => toggleDnd(!settings.isDndActive)}
-                activeOpacity={0.85}
               >
                 <View style={styles.dndHeroLeft}>
                   <Text style={styles.dndHeroIcon}>{settings.isDndActive ? "🌙" : "🔔"}</Text>
@@ -669,7 +669,7 @@ export default function NotificationsSettingsScreen() {
                   styles.durationChip,
                   { borderColor: showCustomDuration ? "#6366F1" : colors.border, backgroundColor: showCustomDuration ? "#6366F1" : colors.surface },
                 ]}
-                onPress={() => { setShowCustomDuration(true); setCustomDurationInput(""); setCustomDurationError(false); }}
+                onPress={() => { setShowCustomDuration(true); setCustomHours(0); setCustomMinutes(30); }}
               >
                 <Text style={[styles.durationChipText, { color: showCustomDuration ? "#fff" : colors.text }]}>Custom</Text>
               </Pressable>
