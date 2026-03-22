@@ -528,6 +528,17 @@ export default function SessionsScreen() {
             {/* Buttons */}
             <View style={styles.infoFooter}>
               <Pressable
+                style={({ pressed }) => [styles.infoOpenBtn, { backgroundColor: colors.surfaceAlt, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
+                onPress={() => {
+                  setPreviewSession(null);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/session/media/${previewSession?.id}` as any);
+                }}
+              >
+                <Feather name="image" size={18} color={colors.text} />
+                <Text style={[styles.infoOpenBtnText, { color: colors.text, fontFamily: "Inter_600SemiBold" }]}>See Media</Text>
+              </Pressable>
+              <Pressable
                 style={({ pressed }) => [styles.infoOpenBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 }]}
                 onPress={() => {
                   setPreviewSession(null);
