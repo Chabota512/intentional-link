@@ -1,0 +1,145 @@
+Good — this one is **very clear and very common in monorepos**.
+
+---
+
+## 🔴 The actual error
+
+> `Error: Cannot find module 'zod'`
+
+---
+
+## 💥 What this means
+
+Your app is trying to do:
+
+```ts
+require("zod")
+```
+
+But in Railway’s environment:
+
+👉 **`zod` is NOT installed where your API is running**
+
+---
+
+## 🧠 Why this is happening (important)
+
+You’re using:
+
+* Replit (loose installs)
+* pnpm workspace (monorepo)
+* Railway (strict, isolated build)
+
+👉 In a monorepo, dependencies can exist in:
+
+* root `package.json`
+* or individual packages (`api-server`, `mobile`, etc.)
+
+### 🚨 The problem:
+
+Your **`api-server` depends on `zod`**, but:
+
+❌ it is **NOT listed in `api-server/package.json`**
+
+So in production:
+
+* Railway installs only what's declared
+* `zod` is missing → crash
+
+---
+
+## ✅ The fix (correct way)
+
+### Go to your API package:
+
+```bash
+/api-server/package.json
+```
+
+### Add:
+
+```json
+{
+  "dependencies": {
+    "zod": "^3.x.x"
+  }
+}
+```
+
+---
+
+### Then run (at repo root):
+
+```bash
+pnpm install
+```
+
+### Commit:
+
+```bash
+git add .
+git commit -m "fix: add zod to api-server dependencies"
+git push
+```
+
+---
+
+## ⚠️ Why it worked locally but not on Railway
+
+Replit:
+
+* installs everything in a shared environment
+* hoists dependencies
+* hides missing deps
+
+Railway:
+
+* installs per package
+* no hoisting assumptions
+* strict → exposes real issues
+
+---
+
+## 🧩 Alternative cause (less likely but possible)
+
+If `zod` **is already in root**, then the issue is:
+
+👉 Railway is deploying only `/api-server`
+👉 but `node_modules` are not hoisted there
+
+---
+
+## 🛠️ Backup fix (if needed)
+
+Tell your agent:
+
+Fix MODULE_NOT_FOUND: 'zod' in production.
+
+Ensure `zod` is listed under `dependencies` in the api-server package.json (not just root).
+
+Do NOT rely on workspace hoisting.
+
+Then reinstall dependencies and rebuild.
+
+---
+
+## 🔥 Pro tip (this will save you MANY headaches)
+
+In monorepos:
+
+👉 **Every service must declare its own dependencies explicitly**
+
+Even if they exist in root.
+
+---
+
+## 🎯 Summary
+
+* ❌ Problem: `zod` not found
+* 💥 Cause: Not installed in API package
+* ✅ Fix: Add `zod` to `api-server/package.json`
+
+---
+
+If you want, next I can help you:
+👉 structure your monorepo so **Expo (mobile) + API (Railway) + DB all deploy cleanly without these repeated issues**

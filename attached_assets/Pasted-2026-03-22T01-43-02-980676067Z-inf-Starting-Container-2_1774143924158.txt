@@ -1,0 +1,89 @@
+2026-03-22T01:43:02.980676067Z [inf]  Starting Container
+2026-03-22T01:43:03.591774484Z [err]      at Object.<anonymous> (/app/artifacts/api-server/dist/index.cjs:1:17376)
+2026-03-22T01:43:03.591775303Z [err]  }
+2026-03-22T01:43:03.591781312Z [err]      at Module._compile (node:internal/modules/cjs/loader:1521:14)
+2026-03-22T01:43:03.591785485Z [err]  
+2026-03-22T01:43:03.591787674Z [err]      at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2026-03-22T01:43:03.591792239Z [err]  Node.js v20.20.1
+2026-03-22T01:43:03.591792856Z [err]      at Module.load (node:internal/modules/cjs/loader:1266:32)
+2026-03-22T01:43:03.591797723Z [err]  node:internal/modules/cjs/loader:1210
+2026-03-22T01:43:03.591799882Z [err]      at Module._load (node:internal/modules/cjs/loader:1091:12)
+2026-03-22T01:43:03.591806072Z [err]      at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+2026-03-22T01:43:03.591806755Z [err]    throw err;
+2026-03-22T01:43:03.591810505Z [err]    code: 'MODULE_NOT_FOUND',
+2026-03-22T01:43:03.591813625Z [err]    requireStack: [ '/app/artifacts/api-server/dist/index.cjs' ]
+2026-03-22T01:43:03.591847069Z [err]  node:internal/modules/cjs/loader:1210
+2026-03-22T01:43:03.591850866Z [err]    throw err;
+2026-03-22T01:43:03.591854072Z [err]    ^
+2026-03-22T01:43:03.591859622Z [err]  
+2026-03-22T01:43:03.591864370Z [err]  Error: Cannot find module 'zod'
+2026-03-22T01:43:03.591873277Z [err]  Require stack:
+2026-03-22T01:43:03.591878808Z [err]  - /app/artifacts/api-server/dist/index.cjs
+2026-03-22T01:43:03.591884229Z [err]      at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-03-22T01:43:03.591889353Z [err]      at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-03-22T01:43:03.591894387Z [err]      at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-22T01:43:03.591899072Z [err]      at require (node:internal/modules/helpers:182:18)
+2026-03-22T01:43:03.593026283Z [err]      at require (node:internal/modules/helpers:182:18)
+2026-03-22T01:43:03.593030679Z [err]      at Object.<anonymous> (/app/artifacts/api-server/dist/index.cjs:1:17376)
+2026-03-22T01:43:03.593035346Z [err]      at Module._compile (node:internal/modules/cjs/loader:1521:14)
+2026-03-22T01:43:03.593038704Z [err]      at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2026-03-22T01:43:03.593042383Z [err]      at Module.load (node:internal/modules/cjs/loader:1266:32)
+2026-03-22T01:43:03.593045618Z [err]      at Module._load (node:internal/modules/cjs/loader:1091:12)
+2026-03-22T01:43:03.593049009Z [err]      at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+2026-03-22T01:43:03.593052711Z [err]    code: 'MODULE_NOT_FOUND',
+2026-03-22T01:43:03.593056124Z [err]    requireStack: [ '/app/artifacts/api-server/dist/index.cjs' ]
+2026-03-22T01:43:03.593059764Z [err]  }
+2026-03-22T01:43:03.593063727Z [err]  
+2026-03-22T01:43:03.593067535Z [err]  Node.js v20.20.1
+2026-03-22T01:43:03.593082983Z [err]    ^
+2026-03-22T01:43:03.593086927Z [err]  
+2026-03-22T01:43:03.593089863Z [err]  Error: Cannot find module 'zod'
+2026-03-22T01:43:03.593092953Z [err]  Require stack:
+2026-03-22T01:43:03.593095936Z [err]  - /app/artifacts/api-server/dist/index.cjs
+2026-03-22T01:43:03.593098950Z [err]      at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-03-22T01:43:03.593101697Z [err]      at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-03-22T01:43:03.593104552Z [err]      at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-22T01:43:04.055791878Z [err]  }
+2026-03-22T01:43:04.055797772Z [err]  
+2026-03-22T01:43:04.055798072Z [err]  node:internal/modules/cjs/loader:1210
+2026-03-22T01:43:04.055802899Z [err]  Node.js v20.20.1
+2026-03-22T01:43:04.055805396Z [err]    throw err;
+2026-03-22T01:43:04.055809730Z [err]    ^
+2026-03-22T01:43:04.055813403Z [err]  
+2026-03-22T01:43:04.055816587Z [err]  Error: Cannot find module 'zod'
+2026-03-22T01:43:04.055819864Z [err]  Require stack:
+2026-03-22T01:43:04.055823731Z [err]  - /app/artifacts/api-server/dist/index.cjs
+2026-03-22T01:43:04.055826737Z [err]      at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-03-22T01:43:04.055829700Z [err]      at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-03-22T01:43:04.055832663Z [err]      at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-22T01:43:04.055835750Z [err]      at require (node:internal/modules/helpers:182:18)
+2026-03-22T01:43:04.055838923Z [err]      at Object.<anonymous> (/app/artifacts/api-server/dist/index.cjs:1:17376)
+2026-03-22T01:43:04.055841849Z [err]      at Module._compile (node:internal/modules/cjs/loader:1521:14)
+2026-03-22T01:43:04.055844726Z [err]      at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2026-03-22T01:43:04.055847892Z [err]      at Module.load (node:internal/modules/cjs/loader:1266:32)
+2026-03-22T01:43:04.055850621Z [err]      at Module._load (node:internal/modules/cjs/loader:1091:12)
+2026-03-22T01:43:04.055853343Z [err]      at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+2026-03-22T01:43:04.055856591Z [err]    code: 'MODULE_NOT_FOUND',
+2026-03-22T01:43:04.055859709Z [err]    requireStack: [ '/app/artifacts/api-server/dist/index.cjs' ]
+2026-03-22T01:43:04.644014603Z [err]  node:internal/modules/cjs/loader:1210
+2026-03-22T01:43:04.644022753Z [err]    throw err;
+2026-03-22T01:43:04.644027894Z [err]    ^
+2026-03-22T01:43:04.644031824Z [err]  
+2026-03-22T01:43:04.644035367Z [err]  Error: Cannot find module 'zod'
+2026-03-22T01:43:04.644038834Z [err]  Require stack:
+2026-03-22T01:43:04.644042355Z [err]  - /app/artifacts/api-server/dist/index.cjs
+2026-03-22T01:43:04.644045788Z [err]      at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-03-22T01:43:04.644049081Z [err]      at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-03-22T01:43:04.644052531Z [err]      at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-22T01:43:04.644055454Z [err]      at require (node:internal/modules/helpers:182:18)
+2026-03-22T01:43:04.644058643Z [err]      at Object.<anonymous> (/app/artifacts/api-server/dist/index.cjs:1:17376)
+2026-03-22T01:43:04.644062493Z [err]      at Module._compile (node:internal/modules/cjs/loader:1521:14)
+2026-03-22T01:43:04.644065595Z [err]      at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2026-03-22T01:43:04.644068583Z [err]      at Module.load (node:internal/modules/cjs/loader:1266:32)
+2026-03-22T01:43:04.644072635Z [err]      at Module._load (node:internal/modules/cjs/loader:1091:12)
+2026-03-22T01:43:04.644075736Z [err]      at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+2026-03-22T01:43:04.644078860Z [err]    code: 'MODULE_NOT_FOUND',
+2026-03-22T01:43:04.644081611Z [err]    requireStack: [ '/app/artifacts/api-server/dist/index.cjs' ]
+2026-03-22T01:43:04.644084675Z [err]  }
+2026-03-22T01:43:04.644090661Z [err]  
+2026-03-22T01:43:04.644094992Z [err]  Node.js v20.20.1
