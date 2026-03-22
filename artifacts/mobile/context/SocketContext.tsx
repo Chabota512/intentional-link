@@ -248,6 +248,27 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setUnreadNotifCount((prev) => prev + 1);
     });
 
+    socket.on("contact_request_received", () => {
+      queryClient.invalidateQueries({ queryKey: ["contactRequests"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    });
+
+    socket.on("contact_accepted", () => {
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["contactRequests"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    });
+
+    socket.on("contact_declined", () => {
+      queryClient.invalidateQueries({ queryKey: ["contactRequests"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    });
+
+    socket.on("session_invite", () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    });
+
     const appStateSub = AppState.addEventListener("change", (state) => {
       appStateRef.current = state;
       if (state === "active" && !socket.connected) {

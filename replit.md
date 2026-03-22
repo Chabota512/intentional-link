@@ -50,7 +50,8 @@ artifacts-monorepo/
 - **Tab navigation**: Sessions, Contacts, Activity, Profile
 - **Notification History**: In-app Activity tab shows all past notifications (messages, calls, invites) with unread badges and read/mark-all-read support. Stored in `notifications` DB table, delivered in real-time via Socket.IO `new_notification` event.
 - **Call history in chat**: Voice/video calls are logged as special message bubbles in the session chat showing call type, status (answered/missed), and duration.
-- **Real-time messaging**: Full Socket.IO WebSocket integration for instant message delivery, typing indicators, read receipts, reactions, and presence status.
+- **Real-time messaging**: Full Socket.IO WebSocket integration for instant message delivery, typing indicators, read receipts, reactions, and presence status. Socket events also fire for contact requests, contact accepts/declines, and session invites for instant UI updates.
+- **Responsive data fetching**: React Query focusManager configured to refetch all queries when app returns from background. Reduced polling intervals (sessions 10s/3s, contacts 10s, requests 5s, invites/unread 5s). Message poll fallback at 2s when socket is disconnected.
 - **Invite UI**: Creator can invite contacts from inside a session via a People sheet
 - **Participants panel**: Tap participant count to see all participants, their status and online presence
 - **Profile editing**: Users can edit their name, username, and profile picture from the Profile tab

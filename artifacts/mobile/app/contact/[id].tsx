@@ -78,7 +78,7 @@ export default function ContactChatsScreen() {
   const { data: sessions = [], isLoading, isRefetching, refetch } = useQuery<Session[]>({
     queryKey: ["sessions"],
     queryFn: () => get("/sessions"),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const contact = contacts.find((c) => c.contactUser.id === contactUserId)?.contactUser;

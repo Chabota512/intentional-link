@@ -8,6 +8,7 @@ import {
   GetSessionResponse,
 } from "@workspace/api-zod";
 import { sendPushNotification, saveNotification } from "../lib/pushNotifications";
+import { emitToUser } from "../lib/socketio";
 
 const router: IRouter = Router();
 
@@ -432,6 +433,10 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
       userId: parsed.data.userId,
       status: "invited",
     });
+  } else if (existing[0].status !== "joined") {
+    await db.update(sessionParticipantsTable)
+      .set({ status: "invited", joinedAt: null })
+      .where(and(eq(sessionParticipantsTable.sessionId, sessionId), eq(sessionParticipantsTable.userId, parsed.data.userId)));
   }
 
   const [invitedUser] = await db.select({ id: usersTable.id, pushToken: usersTable.pushToken, name: usersTable.name })
@@ -444,6 +449,7 @@ router.post("/sessions/:sessionId/invite", async (req, res): Promise<void> => {
     const inviteBody = `${inviter.name} invited you to join "${membership.session.title}"`;
     const inviteData = { sessionId, type: "chat-invite" };
     await saveNotification(invitedUser.id, "invite", inviteTitle, inviteBody, inviteData);
+    emitToUser(parsed.data.userId, "session_invite", { sessionId, fromUserId: userId, title: membership.session.title });
     if (invitedUser.pushToken) {
       await sendPushNotification(invitedUser.pushToken, inviteTitle, inviteBody, inviteData);
     }

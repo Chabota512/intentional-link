@@ -14,9 +14,9 @@ export function usePendingContacts(): number {
   const { data } = useQuery<ContactRequests>({
     queryKey: ["contactRequests"],
     queryFn: () => get("/contacts/requests"),
-    refetchInterval: 15000,
+    refetchInterval: 5000,
     enabled: !!user,
-    staleTime: 10000,
+    staleTime: 2000,
   });
 
   return data?.incoming.length ?? 0;

@@ -1000,6 +1000,8 @@ export default function SessionScreen() {
   }, [session]);
 
   const isNotMember = sessionError instanceof ApiError && sessionError.status === 403;
+  const isCreator = session?.creatorId === user?.id;
+  const hasJoined = isCreator || session?.participants.some((p) => p.userId === user?.id && p.status === "joined");
 
   const { data: sessionPreview, isLoading: previewLoading } = useQuery<SessionPreview>({
     queryKey: ["session-preview", sessionId],
@@ -1045,6 +1047,7 @@ export default function SessionScreen() {
       }
       return data;
     },
+    enabled: !!session && !!hasJoined,
   });
 
   const chatImageUrls = useMemo(() => {
@@ -1085,7 +1088,7 @@ export default function SessionScreen() {
   }, [session, sessionId]);
 
   useEffect(() => {
-    if (!session || session.status !== "active" || socketConnected) return;
+    if (!session || session.status !== "active" || socketConnected || !hasJoined) return;
     const interval = setInterval(async () => {
       try {
         const newMsgs = await get(`/sessions/${sessionId}/messages/poll?since=${lastMsgId.current}`);
@@ -1098,9 +1101,9 @@ export default function SessionScreen() {
           });
         }
       } catch {}
-    }, 3000);
+    }, 2000);
     return () => clearInterval(interval);
-  }, [session, sessionId, socketConnected]);
+  }, [session, sessionId, socketConnected, hasJoined]);
 
   useEffect(() => {
     if (messages.length > 0 && session?.status === "active") {
@@ -1597,9 +1600,7 @@ export default function SessionScreen() {
   };
 
   const isParticipant = session?.participants.some((p) => p.userId === user?.id);
-  const hasJoined = session?.participants.some((p) => p.userId === user?.id && p.status === "joined");
   const isActive = session?.status === "active";
-  const isCreator = session?.creatorId === user?.id;
   const canSend = isActive && (isCreator || hasJoined);
   const canInvite = isActive && (isCreator || hasJoined);
 

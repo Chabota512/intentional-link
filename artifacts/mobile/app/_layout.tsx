@@ -5,12 +5,12 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
 import { Stack, router as expoRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from "expo-notifications";
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet, useColorScheme } from "react-native";
+import { AppState, Platform, View, Text, StyleSheet, useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +27,15 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 SplashScreen.preventAutoHideAsync();
+
+focusManager.setEventListener((setFocused) => {
+  const subscription = AppState.addEventListener("change", (status) => {
+    if (Platform.OS !== "web") {
+      setFocused(status === "active");
+    }
+  });
+  return () => subscription.remove();
+});
 
 const queryClient = new QueryClient();
 

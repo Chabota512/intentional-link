@@ -104,7 +104,7 @@ export default function SessionsScreen() {
   const { data: sessions = [], isLoading, isError, isRefetching, refetch } = useQuery<Session[]>({
     queryKey: ["sessions"],
     queryFn: () => get("/sessions"),
-    refetchInterval: socketConnected ? 30000 : 5000,
+    refetchInterval: socketConnected ? 10000 : 3000,
   });
 
   const filtered = sessions

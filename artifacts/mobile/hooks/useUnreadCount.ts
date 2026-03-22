@@ -14,9 +14,9 @@ export function useUnreadCount(): number {
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["sessions"],
     queryFn: () => get("/sessions"),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
     enabled: !!user,
-    staleTime: 5000,
+    staleTime: 2000,
   });
 
   return sessions.reduce((sum, s) => sum + (s.unreadCount ?? 0), 0);

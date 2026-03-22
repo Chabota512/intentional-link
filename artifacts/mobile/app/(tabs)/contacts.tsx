@@ -81,13 +81,13 @@ export default function ContactsScreen() {
   const { data: contacts = [], isLoading: contactsLoading, isRefetching, refetch } = useQuery<Contact[]>({
     queryKey: ["contacts"],
     queryFn: () => get("/contacts"),
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
 
   const { data: requests, isLoading: requestsLoading, refetch: refetchRequests } = useQuery<ContactRequests>({
     queryKey: ["contactRequests"],
     queryFn: () => get("/contacts/requests"),
-    refetchInterval: 15_000,
+    refetchInterval: 5_000,
   });
 
   const incomingCount = requests?.incoming.length ?? 0;

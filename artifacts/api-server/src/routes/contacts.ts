@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { db, contactsTable, usersTable } from "@workspace/db";
 import { AddContactBody, GetContactsResponseItem } from "@workspace/api-zod";
 import { sendPushNotification, saveNotification } from "../lib/pushNotifications";
+import { emitToUser } from "../lib/socketio";
 
 const router: IRouter = Router();
 
@@ -187,6 +188,8 @@ router.post("/contacts", async (req, res): Promise<void> => {
     createdAt: contact.createdAt,
   });
 
+  emitToUser(contactUserId, "contact_request_received", { fromUserId: userId });
+
   (async () => {
     try {
       const [me] = await db.select({ name: usersTable.name, pushToken: usersTable.pushToken })
@@ -252,6 +255,8 @@ router.post("/contacts/requests/:requestId/accept", async (req, res): Promise<vo
   const resp = myRow ? await buildContactResponse(myRow) : null;
   res.json(resp);
 
+  emitToUser(request.userId, "contact_accepted", { fromUserId: userId });
+
   (async () => {
     try {
       const [accepter] = await db.select({ name: usersTable.name })
@@ -282,6 +287,8 @@ router.post("/contacts/requests/:requestId/decline", async (req, res): Promise<v
   }
 
   res.sendStatus(204);
+
+  emitToUser(deleted.userId, "contact_declined", { fromUserId: userId });
 
   (async () => {
     try {
