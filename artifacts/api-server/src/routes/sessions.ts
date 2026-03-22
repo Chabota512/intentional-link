@@ -664,9 +664,9 @@ router.get("/sessions/:sessionId/media", async (req, res): Promise<void> => {
   const offset = Math.max(rawOffset, 0);
   const typeFilter = req.query.type as string | undefined;
 
-  const validTypes = ["image", "file", "voice"];
+  const validTypes = ["image", "video", "file", "voice"];
   if (typeFilter && !validTypes.includes(typeFilter)) {
-    res.status(400).json({ error: "Invalid type filter. Use 'image', 'file', or 'voice'" });
+    res.status(400).json({ error: "Invalid type filter. Use 'image', 'video', 'file', or 'voice'" });
     return;
   }
   const targetTypes = typeFilter ? [typeFilter] : validTypes;
@@ -717,6 +717,11 @@ router.get("/sessions/:sessionId/media", async (req, res): Promise<void> => {
     sender: senderMap.get(m.senderId) ?? null,
   }));
 
+  const videos = media.filter(m => m.type === "video").map(m => ({
+    ...m,
+    sender: senderMap.get(m.senderId) ?? null,
+  }));
+
   const files = media.filter(m => m.type === "file").map(m => ({
     ...m,
     sender: senderMap.get(m.senderId) ?? null,
@@ -729,6 +734,7 @@ router.get("/sessions/:sessionId/media", async (req, res): Promise<void> => {
 
   res.json({
     images,
+    videos,
     files,
     voiceNotes,
     total,

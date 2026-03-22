@@ -12,6 +12,9 @@ import {
   Linking,
   Modal,
   PanResponder,
+  ScrollView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -36,12 +39,14 @@ interface MediaItem {
 
 interface MediaResponse {
   images: MediaItem[];
+  videos: MediaItem[];
   files: MediaItem[];
   voiceNotes: MediaItem[];
   total: number;
 }
 
-type Tab = "images" | "files";
+type Tab = "images" | "videos" | "files";
+const TABS: Tab[] = ["images", "videos", "files"];
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -64,6 +69,7 @@ export default function MediaGalleryScreen() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const viewerIndexRef = useRef<number | null>(null);
   viewerIndexRef.current = viewerIndex;
+  const tabScrollRef = useRef<ScrollView>(null);
 
   const { data, isLoading } = useQuery<MediaResponse>({
     queryKey: ["media", sessionId],
@@ -71,6 +77,7 @@ export default function MediaGalleryScreen() {
   });
 
   const images = data?.images ?? [];
+  const videos = data?.videos ?? [];
   const files = data?.files ?? [];
 
   const topPad = insets.top + (Platform.OS === "web" ? 16 : 0);
@@ -122,6 +129,23 @@ export default function MediaGalleryScreen() {
 
   const currentUrl = viewerIndex !== null ? imageUrls[viewerIndex] : null;
 
+  const scrollToTab = (tab: Tab) => {
+    const index = TABS.indexOf(tab);
+    setActiveTab(tab);
+    tabScrollRef.current?.scrollTo({ x: SCREEN_WIDTH * index, animated: true });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleTabScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const index = Math.round(x / SCREEN_WIDTH);
+    const tab = TABS[index];
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
   const renderImage = ({ item, index }: { item: MediaItem; index: number }) => {
     const url = item.attachmentUrl ? getFileUrl(item.attachmentUrl) : null;
     if (!url) return null;
@@ -137,6 +161,35 @@ export default function MediaGalleryScreen() {
         }}
       >
         <Image source={{ uri: url }} style={styles.imageThumbImg} resizeMode="cover" />
+      </Pressable>
+    );
+  };
+
+  const renderVideo = ({ item }: { item: MediaItem }) => {
+    const url = item.attachmentUrl ? getFileUrl(item.attachmentUrl) : null;
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.fileCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
+        onPress={() => {
+          if (url) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            Linking.openURL(url);
+          }
+        }}
+      >
+        <View style={[styles.fileIcon, { backgroundColor: "#E3F2FD" }]}>
+          <Feather name="film" size={18} color="#2196F3" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.fileName, { color: colors.text, fontFamily: "Inter_500Medium" }]} numberOfLines={1}>
+            {item.attachmentName || "Video"}
+          </Text>
+          <Text style={[styles.fileMeta, { color: colors.textTertiary, fontFamily: "Inter_400Regular" }]}>
+            {item.sender?.name ?? "Unknown"} · {formatRelative(item.createdAt)}
+            {item.attachmentSize ? ` · ${formatFileSize(item.attachmentSize)}` : ""}
+          </Text>
+        </View>
+        <Feather name="play-circle" size={20} color="#2196F3" />
       </Pressable>
     );
   };
@@ -171,6 +224,18 @@ export default function MediaGalleryScreen() {
     );
   };
 
+  const tabLabels: Record<Tab, string> = {
+    images: `Photos (${images.length})`,
+    videos: `Videos (${videos.length})`,
+    files: `Files (${files.length})`,
+  };
+
+  const tabIcons: Record<Tab, React.ComponentProps<typeof Feather>["name"]> = {
+    images: "image",
+    videos: "film",
+    files: "file",
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 8, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -183,67 +248,101 @@ export default function MediaGalleryScreen() {
         <View style={{ width: 30 }} />
       </View>
 
-      <View style={[styles.tabRow, { borderBottomColor: colors.border }]}>
-        <Pressable
-          style={[styles.tab, activeTab === "images" && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
-          onPress={() => setActiveTab("images")}
-        >
-          <Feather name="image" size={16} color={activeTab === "images" ? colors.accent : colors.textSecondary} />
-          <Text style={[styles.tabText, { color: activeTab === "images" ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-            Photos ({images.length})
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === "files" && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
-          onPress={() => setActiveTab("files")}
-        >
-          <Feather name="file" size={16} color={activeTab === "files" ? colors.accent : colors.textSecondary} />
-          <Text style={[styles.tabText, { color: activeTab === "files" ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}>
-            Files ({files.length})
-          </Text>
-        </Pressable>
+      <View style={[styles.tabRow, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+        {TABS.map((tab) => (
+          <Pressable
+            key={tab}
+            style={[styles.tab, activeTab === tab && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
+            onPress={() => scrollToTab(tab)}
+          >
+            <Feather name={tabIcons[tab]} size={15} color={activeTab === tab ? colors.accent : colors.textSecondary} />
+            <Text
+              style={[styles.tabText, { color: activeTab === tab ? colors.accent : colors.textSecondary, fontFamily: "Inter_600SemiBold" }]}
+              numberOfLines={1}
+            >
+              {tabLabels[tab]}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
         </View>
-      ) : activeTab === "images" ? (
-        images.length === 0 ? (
-          <View style={styles.center}>
-            <Feather name="image" size={40} color={colors.textTertiary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-              No photos shared yet
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            key="images"
-            data={images}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderImage}
-            numColumns={3}
-            contentContainerStyle={[styles.imageGrid, { paddingBottom: bottomPad + 20 }]}
-            columnWrapperStyle={{ gap: 4 }}
-            showsVerticalScrollIndicator={false}
-          />
-        )
-      ) : files.length === 0 ? (
-        <View style={styles.center}>
-          <Feather name="file" size={40} color={colors.textTertiary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-            No files shared yet
-          </Text>
-        </View>
       ) : (
-        <FlatList
-          key="files"
-          data={files}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderFile}
-          contentContainerStyle={[styles.fileList, { paddingBottom: bottomPad + 20 }]}
-          showsVerticalScrollIndicator={false}
-        />
+        <ScrollView
+          ref={tabScrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handleTabScrollEnd}
+          scrollEventThrottle={16}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <View style={{ width: SCREEN_WIDTH, flex: 1 }}>
+            {images.length === 0 ? (
+              <View style={styles.center}>
+                <Feather name="image" size={40} color={colors.textTertiary} />
+                <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  No photos shared yet
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                key="images"
+                data={images}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={renderImage}
+                numColumns={3}
+                contentContainerStyle={[styles.imageGrid, { paddingBottom: bottomPad + 20 }]}
+                columnWrapperStyle={{ gap: 4 }}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
+
+          <View style={{ width: SCREEN_WIDTH, flex: 1 }}>
+            {videos.length === 0 ? (
+              <View style={styles.center}>
+                <Feather name="film" size={40} color={colors.textTertiary} />
+                <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  No videos shared yet
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                key="videos"
+                data={videos}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={renderVideo}
+                contentContainerStyle={[styles.fileList, { paddingBottom: bottomPad + 20 }]}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
+
+          <View style={{ width: SCREEN_WIDTH, flex: 1 }}>
+            {files.length === 0 ? (
+              <View style={styles.center}>
+                <Feather name="file" size={40} color={colors.textTertiary} />
+                <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  No files shared yet
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                key="files"
+                data={files}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={renderFile}
+                contentContainerStyle={[styles.fileList, { paddingBottom: bottomPad + 20 }]}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
+        </ScrollView>
       )}
 
       <Modal
@@ -314,10 +413,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 5,
     paddingVertical: 12,
+    paddingHorizontal: 4,
   },
-  tabText: { fontSize: 13 },
+  tabText: { fontSize: 12 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   emptyText: { fontSize: 14 },
   imageGrid: { padding: 16, gap: 4 },

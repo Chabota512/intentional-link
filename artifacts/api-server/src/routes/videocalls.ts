@@ -351,6 +351,7 @@ router.get("/sessions/:id/call-page", async (req, res) => {
   .btn-video.active { background: rgba(255,59,48,0.88); }
   .btn-speaker.active { background: rgba(76,175,80,0.88); }
   .btn-end { background: rgba(220,38,38,0.95); box-shadow: 0 4px 20px rgba(220,38,38,0.5); }
+  .btn-flip { transition: transform 0.3s cubic-bezier(.4,0,.2,1), background 0.2s, opacity 0.15s; }
 </style>
 </head>
 <body>
@@ -390,6 +391,10 @@ router.get("/sessions/:id/call-page", async (req, res) => {
   <button class="ctrl-btn btn-video" id="btnVideo" onclick="toggleVideo()">
     <svg id="iconVideo" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
     <span class="ctrl-label" id="labelVideo">Camera</span>
+  </button>
+  <button class="ctrl-btn btn-flip" id="btnFlip" onclick="flipCamera()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+    <span class="ctrl-label">Flip</span>
   </button>` : ""}
 
   <button class="ctrl-btn btn-speaker" id="btnSpeaker" onclick="toggleSpeaker()">
@@ -409,6 +414,8 @@ const isVoiceOnly = ${isVoiceOnly};
 let client, localAudioTrack, localVideoTrack;
 let muted = false, videoOff = false, speakerActive = true;
 const remoteUsers = {};
+let availableCameras = [];
+let currentCameraIndex = 0;
 
 function postToNative(msg) {
   if (window.ReactNativeWebView) {
@@ -712,6 +719,25 @@ function addRemoteVideo(user) {
 function removeRemoteVideo(uid) {
   delete remoteUsers[uid];
   updateVideoLayout();
+}
+
+async function flipCamera() {
+  if (!localVideoTrack) return;
+  try {
+    if (availableCameras.length < 2) {
+      availableCameras = await AgoraRTC.getCameras();
+    }
+    if (availableCameras.length < 2) return;
+    currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+    await localVideoTrack.setDevice(availableCameras[currentCameraIndex].deviceId);
+    const btn = document.getElementById('btnFlip');
+    if (btn) {
+      btn.style.transform = 'scale(0.85) rotate(180deg)';
+      setTimeout(() => { btn.style.transform = ''; }, 300);
+    }
+  } catch(e) {
+    console.warn('Camera flip failed:', e);
+  }
 }
 
 function toggleMute() {

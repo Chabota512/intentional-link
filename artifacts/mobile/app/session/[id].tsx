@@ -1382,7 +1382,7 @@ export default function SessionScreen() {
         const uploaded = await uploadFile(asset.uri, fileName, fileSize, contentType);
         sendMutation.mutate({
           content: "",
-          type: "file",
+          type: "video",
           attachmentUrl: uploaded.objectPath,
           attachmentName: fileName,
           attachmentSize: fileSize,
