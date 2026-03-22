@@ -60,7 +60,8 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#4BA896",
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "sounds": ["./assets/sounds/notification.mp3"]
         }
       ],
       "expo-font",

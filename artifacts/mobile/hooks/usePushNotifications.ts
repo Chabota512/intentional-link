@@ -28,7 +28,7 @@ export function usePushNotifications() {
         name: "Default",
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        sound: "default",
+        sound: "notification.mp3",
         lightColor: "#6C63FF",
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         showBadge: true,

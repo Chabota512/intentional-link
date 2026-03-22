@@ -46,7 +46,7 @@ export async function sendPushNotification(
     const messages = [
       {
         to: pushToken,
-        sound: "default" as const,
+        sound: "notification.mp3" as const,
         title,
         body,
         data: data ?? {},
@@ -76,7 +76,7 @@ export async function sendPushNotifications(
   try {
     const messages = validTokens.map(to => ({
       to,
-      sound: "default" as const,
+      sound: "notification.mp3" as const,
       title,
       body,
       data: data ?? {},

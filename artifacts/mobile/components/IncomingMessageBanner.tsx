@@ -10,6 +10,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Audio } from "expo-av";
 import { useSocket, IncomingMessageData } from "@/context/SocketContext";
 
 const AUTO_DISMISS_MS = 4000;
@@ -19,9 +20,16 @@ export function IncomingMessageBanner() {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(-200)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
   const msgKeyRef = useRef(0);
   const [visible, setVisible] = useState(false);
   const [displayed, setDisplayed] = useState<IncomingMessageData | null>(null);
+
+  useEffect(() => {
+    return () => {
+      soundRef.current?.unloadAsync();
+    };
+  }, []);
 
   useEffect(() => {
     if (incomingMessage) {
@@ -37,6 +45,28 @@ export function IncomingMessageBanner() {
         tension: 80,
         friction: 12,
       }).start();
+
+      if (Platform.OS !== "web") {
+        (async () => {
+          try {
+            if (soundRef.current) {
+              await soundRef.current.unloadAsync();
+              soundRef.current = null;
+            }
+            const { sound } = await Audio.Sound.createAsync(
+              require("../assets/sounds/notification.mp3"),
+              { shouldPlay: true, volume: 1.0 }
+            );
+            soundRef.current = sound;
+            sound.setOnPlaybackStatusUpdate((status) => {
+              if ("didJustFinish" in status && status.didJustFinish) {
+                sound.unloadAsync();
+                soundRef.current = null;
+              }
+            });
+          } catch {}
+        })();
+      }
 
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
