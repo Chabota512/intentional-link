@@ -1765,8 +1765,10 @@ export default function SessionScreen() {
               style={({ pressed }) => [styles.navIconBtn, { opacity: pressed ? 0.6 : 1 }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setEditTitle(session.title);
-                setEditDescription(session.description || "");
+                if (session) {
+                  setEditTitle(session.title);
+                  setEditDescription(session.description || "");
+                }
                 setEditModalVisible(true);
               }}
             >
