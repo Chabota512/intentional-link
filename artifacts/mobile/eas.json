@@ -10,7 +10,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-aaa8.up.railway.app"
+        "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-d04a.up.railway.app"
       }
     },
     "preview": {
@@ -19,7 +19,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-aaa8.up.railway.app"
+        "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-d04a.up.railway.app"
       }
     },
     "production": {
@@ -27,7 +27,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-aaa8.up.railway.app"
+        "EXPO_PUBLIC_DOMAIN": "workspaceapi-server-production-d04a.up.railway.app"
       }
     }
   },
