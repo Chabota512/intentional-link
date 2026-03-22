@@ -478,34 +478,16 @@ export default function SessionsScreen() {
               )}
 
               {/* Meta pill */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={[styles.infoMetaPill, { backgroundColor: colors.surfaceAlt, borderColor: colors.border, flex: 1 }]}>
-                  <Feather name="users" size={13} color={colors.textSecondary} />
-                  <Text style={[styles.infoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
-                    {previewSession?.participants.length ?? 0} participant{(previewSession?.participants.length ?? 0) !== 1 ? "s" : ""}
-                  </Text>
-                  <Text style={[styles.infoMetaText, { color: colors.border }]}>·</Text>
-                  <View style={[styles.infoStatusDot, { backgroundColor: previewSession?.status === "active" ? colors.success : colors.textTertiary }]} />
-                  <Text style={[styles.infoMetaText, { color: previewSession?.status === "active" ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }]}>
-                    {previewSession?.status === "active" ? "Active" : "Ended"}
-                  </Text>
-                </View>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.infoMetaPill,
-                    { backgroundColor: colors.accentSoft, borderColor: colors.accent, opacity: pressed ? 0.8 : 1 },
-                  ]}
-                  onPress={() => {
-                    setPreviewSession(null);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push(`/session/media/${previewSession?.id}` as any);
-                  }}
-                >
-                  <Feather name="image" size={13} color={colors.accent} />
-                  <Text style={[styles.infoMetaText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-                    Media
-                  </Text>
-                </Pressable>
+              <View style={[styles.infoMetaPill, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                <Feather name="users" size={13} color={colors.textSecondary} />
+                <Text style={[styles.infoMetaText, { color: colors.textSecondary, fontFamily: "Inter_400Regular" }]}>
+                  {previewSession?.participants.length ?? 0} participant{(previewSession?.participants.length ?? 0) !== 1 ? "s" : ""}
+                </Text>
+                <Text style={[styles.infoMetaText, { color: colors.border }]}>·</Text>
+                <View style={[styles.infoStatusDot, { backgroundColor: previewSession?.status === "active" ? colors.success : colors.textTertiary }]} />
+                <Text style={[styles.infoMetaText, { color: previewSession?.status === "active" ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }]}>
+                  {previewSession?.status === "active" ? "Active" : "Ended"}
+                </Text>
               </View>
             </View>
 
