@@ -12,4 +12,4 @@ RUN pnpm --filter @workspace/api-server run build
 
 ENV NODE_ENV=production
 
-CMD ["node", "artifacts/api-server/dist/index.cjs"]
+CMD ["node", "artifacts/api-server/dist/index.mjs"]

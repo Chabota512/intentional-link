@@ -15,7 +15,7 @@ pnpm workspace monorepo using TypeScript. The main artifact is Intentional Link 
 - **File storage**: PostgreSQL bytea (uploads stored directly in Neon DB, fully independent of Replit)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Build**: esbuild (ESM bundle)
 - **Mobile**: Expo (React Native) with Expo Router
 
 ## Structure
