@@ -1,0 +1,67 @@
+2026-03-22T01:51:11.158375684Z [inf]  Starting Container
+2026-03-22T01:51:11.612010854Z [err]    requireStack: [ '/app/artifacts/api-server/dist/index.cjs' ]
+2026-03-22T01:51:11.612021620Z [err]  }
+2026-03-22T01:51:11.612027685Z [err]  
+2026-03-22T01:51:11.612030159Z [err]  node:internal/modules/cjs/loader:1210
+2026-03-22T01:51:11.612035455Z [err]  Node.js v20.20.1
+2026-03-22T01:51:11.612035750Z [err]    throw err;
+2026-03-22T01:51:11.612039677Z [err]    ^
+2026-03-22T01:51:11.612047863Z [err]  
+2026-03-22T01:51:11.612050727Z [err]  Error: Cannot find module 'drizzle-zod'
+2026-03-22T01:51:11.612053560Z [err]  Require stack:
+2026-03-22T01:51:11.612056451Z [err]  - /app/artifacts/api-server/dist/index.cjs
+2026-03-22T01:51:11.612059371Z [err]      at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-03-22T01:51:11.612062398Z [err]      at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-03-22T01:51:11.612065368Z [err]      at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-22T01:51:11.612069665Z [err]      at require (node:internal/modules/helpers:182:18)
+2026-03-22T01:51:11.612072785Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:659
+2026-03-22T01:51:11.612075677Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226
+2026-03-22T01:51:11.612078646Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:8442
+2026-03-22T01:51:11.612081521Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226
+2026-03-22T01:51:11.612084525Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:8587
+2026-03-22T01:51:11.612087742Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226 {
+2026-03-22T01:51:11.612091301Z [err]    code: 'MODULE_NOT_FOUND',
+2026-03-22T01:51:12.232868147Z [err]  node:internal/modules/cjs/loader:1210
+2026-03-22T01:51:12.232870778Z [err]    throw err;
+2026-03-22T01:51:12.232874157Z [err]    ^
+2026-03-22T01:51:12.232876740Z [err]  
+2026-03-22T01:51:12.232880628Z [err]  Error: Cannot find module 'drizzle-zod'
+2026-03-22T01:51:12.232884258Z [err]  Require stack:
+2026-03-22T01:51:12.232887027Z [err]  - /app/artifacts/api-server/dist/index.cjs
+2026-03-22T01:51:12.232889938Z [err]      at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-03-22T01:51:12.232892697Z [err]      at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-03-22T01:51:12.232895331Z [err]      at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-22T01:51:12.232897942Z [err]      at require (node:internal/modules/helpers:182:18)
+2026-03-22T01:51:12.232901327Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:659
+2026-03-22T01:51:12.232904148Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226
+2026-03-22T01:51:12.232906801Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:8442
+2026-03-22T01:51:12.232918179Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226
+2026-03-22T01:51:12.232921023Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:8587
+2026-03-22T01:51:12.232925000Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226 {
+2026-03-22T01:51:12.232928595Z [err]    code: 'MODULE_NOT_FOUND',
+2026-03-22T01:51:12.232932329Z [err]    requireStack: [ '/app/artifacts/api-server/dist/index.cjs' ]
+2026-03-22T01:51:12.232935589Z [err]  }
+2026-03-22T01:51:12.232939169Z [err]  
+2026-03-22T01:51:12.232942085Z [err]  Node.js v20.20.1
+2026-03-22T01:51:13.188571495Z [err]  
+2026-03-22T01:51:13.188572082Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226
+2026-03-22T01:51:13.188581650Z [err]  Node.js v20.20.1
+2026-03-22T01:51:13.188590054Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:8442
+2026-03-22T01:51:13.188598125Z [err]  Require stack:
+2026-03-22T01:51:13.188598552Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226
+2026-03-22T01:51:13.188603059Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:8587
+2026-03-22T01:51:13.188606846Z [err]  - /app/artifacts/api-server/dist/index.cjs
+2026-03-22T01:51:13.188608906Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:226 {
+2026-03-22T01:51:13.188613667Z [err]      at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-03-22T01:51:13.188618520Z [err]    code: 'MODULE_NOT_FOUND',
+2026-03-22T01:51:13.188619324Z [err]      at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-03-22T01:51:13.188625128Z [err]    requireStack: [ '/app/artifacts/api-server/dist/index.cjs' ]
+2026-03-22T01:51:13.188625320Z [err]      at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-22T01:51:13.188631629Z [err]      at require (node:internal/modules/helpers:182:18)
+2026-03-22T01:51:13.188631887Z [err]  }
+2026-03-22T01:51:13.188636145Z [err]      at /app/artifacts/api-server/dist/index.cjs:1:659
+2026-03-22T01:51:13.188647647Z [err]  node:internal/modules/cjs/loader:1210
+2026-03-22T01:51:13.188651011Z [err]    throw err;
+2026-03-22T01:51:13.188653969Z [err]    ^
+2026-03-22T01:51:13.188656884Z [err]  
+2026-03-22T01:51:13.188660086Z [err]  Error: Cannot find module 'drizzle-zod'
