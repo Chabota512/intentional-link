@@ -2581,17 +2581,28 @@ export default function SessionScreen() {
                 );
               })}
 
-              {isActive && isCreator && (
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 <Pressable
-                  style={({ pressed }) => [styles.inviteMoreBtn, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1 }]}
-                  onPress={() => setSheetView("invite")}
+                  style={({ pressed }) => [styles.inviteMoreBtn, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1, flex: 1 }]}
+                  onPress={() => router.push(`/session/media/${sessionId}` as any)}
                 >
-                  <Feather name="user-plus" size={18} color={colors.accent} />
+                  <Feather name="image" size={18} color={colors.accent} />
                   <Text style={[styles.inviteMoreText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
-                    Invite More Contacts
+                    See Media
                   </Text>
                 </Pressable>
-              )}
+                {isActive && isCreator && (
+                  <Pressable
+                    style={({ pressed }) => [styles.inviteMoreBtn, { backgroundColor: colors.accentSoft, opacity: pressed ? 0.8 : 1, flex: 1 }]}
+                    onPress={() => setSheetView("invite")}
+                  >
+                    <Feather name="user-plus" size={18} color={colors.accent} />
+                    <Text style={[styles.inviteMoreText, { color: colors.accent, fontFamily: "Inter_600SemiBold" }]}>
+                      Invite More Contacts
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             </ScrollView>
           ) : (
             <ScrollView contentContainerStyle={[styles.sheetScroll, { padding: 16 }]} showsVerticalScrollIndicator={false}>
