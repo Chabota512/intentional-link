@@ -1,0 +1,9 @@
+node_modules
+artifacts/api-server/dist
+artifacts/api-server/node_modules
+lib/db/node_modules
+lib/api-zod/node_modules
+.git
+.replit
+replit.nix
+*.log
