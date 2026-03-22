@@ -2946,7 +2946,8 @@ export default function SessionScreen() {
                       description: editDescription
                     });
                     setEditModalVisible(false);
-                    refetch();
+                    queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+                    queryClient.invalidateQueries({ queryKey: ["sessions"] });
                   } catch (e) {
                     Alert.alert("Error", "Failed to update chat");
                   }
