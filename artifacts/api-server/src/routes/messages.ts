@@ -146,26 +146,6 @@ router.get("/sessions/:sessionId/messages", async (req, res): Promise<void> => {
   }
   msgs.reverse();
 
-  const readUpdated = await db.update(messagesTable)
-    .set({ status: "read" })
-    .where(
-      and(
-        eq(messagesTable.sessionId, sessionId),
-        ne(messagesTable.senderId, userId),
-        ne(messagesTable.status, "read")
-      )
-    )
-    .returning({ id: messagesTable.id, senderId: messagesTable.senderId });
-
-  if (readUpdated.length > 0) {
-    emitToSession(sessionId, "message_status_update", {
-      sessionId,
-      messageIds: readUpdated.map(m => m.id),
-      status: "read",
-      readBy: userId,
-    });
-  }
-
   const formatted = await formatMessages(msgs);
   res.json(formatted);
 });
@@ -199,7 +179,7 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
     return;
   }
 
-  if ((type === "image" || type === "file" || type === "voice") && !attachmentUrl) {
+  if ((type === "image" || type === "file" || type === "voice" || type === "video") && !attachmentUrl) {
     res.status(400).json({ error: "attachmentUrl is required for media messages" });
     return;
   }
@@ -267,8 +247,6 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
         });
       }
 
-      const offlineUserIds = otherUserIds.filter(id => !isUserOnline(id));
-
       const [sender] = await db.select({ name: usersTable.name })
         .from(usersTable)
         .where(eq(usersTable.id, userId))
@@ -285,15 +263,17 @@ router.post("/sessions/:sessionId/messages", async (req, res): Promise<void> => 
         ? `${senderName} sent a voice note`
         : type === "image"
           ? `${senderName} sent an image`
-          : type === "file"
-            ? `${senderName} sent a file`
-            : `${senderName}: ${(content || "").slice(0, 80)}`;
+          : type === "video"
+            ? `${senderName} sent a video`
+            : type === "file"
+              ? `${senderName} sent a file`
+              : `${senderName}: ${(content || "").slice(0, 80)}`;
 
-      if (offlineUserIds.length === 0) return;
+      if (otherUserIds.length === 0) return;
 
       const others = await db.select({ id: usersTable.id, pushToken: usersTable.pushToken })
         .from(usersTable)
-        .where(inArray(usersTable.id, offlineUserIds));
+        .where(inArray(usersTable.id, otherUserIds));
 
       await Promise.all(others.map(u =>
         saveNotification(u.id, "message", sessionName, notifBody, { sessionId })
@@ -330,16 +310,6 @@ router.get("/sessions/:sessionId/messages/poll", async (req, res): Promise<void>
   const msgs = await db.select().from(messagesTable)
     .where(and(eq(messagesTable.sessionId, sessionId), gt(messagesTable.id, since)))
     .orderBy(messagesTable.createdAt);
-
-  await db.update(messagesTable)
-    .set({ status: "read" })
-    .where(
-      and(
-        eq(messagesTable.sessionId, sessionId),
-        ne(messagesTable.senderId, userId),
-        ne(messagesTable.status, "read")
-      )
-    );
 
   const formatted = await formatMessages(msgs);
   res.json(formatted);

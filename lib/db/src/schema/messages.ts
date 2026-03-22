@@ -9,7 +9,7 @@ export const messagesTable = pgTable("messages", {
   sessionId: integer("session_id").notNull().references(() => sessionsTable.id, { onDelete: "cascade" }),
   senderId: integer("sender_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   content: text("content").notNull().default(""),
-  type: text("type", { enum: ["text", "image", "file", "voice", "call"] }).notNull().default("text"),
+  type: text("type", { enum: ["text", "image", "file", "voice", "video", "call"] }).notNull().default("text"),
   attachmentUrl: text("attachment_url"),
   attachmentName: text("attachment_name"),
   attachmentSize: integer("attachment_size"),

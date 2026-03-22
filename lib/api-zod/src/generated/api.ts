@@ -354,7 +354,7 @@ export const GetMessagesResponseItem = zod.object({
   sessionId: zod.number(),
   senderId: zod.number(),
   content: zod.string(),
-  type: zod.enum(["text", "image", "file", "voice"]).default("text"),
+  type: zod.enum(["text", "image", "file", "voice", "video"]).default("text"),
   attachmentUrl: zod.string().nullable().optional(),
   attachmentName: zod.string().nullable().optional(),
   attachmentSize: zod.number().nullable().optional(),
@@ -384,7 +384,7 @@ export const SendMessageHeader = zod.object({
 
 export const SendMessageBody = zod.object({
   content: zod.string().optional().default(""),
-  type: zod.enum(["text", "image", "file", "voice"]).optional().default("text"),
+  type: zod.enum(["text", "image", "file", "voice", "video"]).optional().default("text"),
   attachmentUrl: zod.string().optional(),
   attachmentName: zod.string().optional(),
   attachmentSize: zod.number().optional(),
@@ -411,7 +411,7 @@ export const PollMessagesResponseItem = zod.object({
   sessionId: zod.number(),
   senderId: zod.number(),
   content: zod.string(),
-  type: zod.enum(["text", "image", "file", "voice"]).default("text"),
+  type: zod.enum(["text", "image", "file", "voice", "video"]).default("text"),
   attachmentUrl: zod.string().nullable().optional(),
   attachmentName: zod.string().nullable().optional(),
   attachmentSize: zod.number().nullable().optional(),
