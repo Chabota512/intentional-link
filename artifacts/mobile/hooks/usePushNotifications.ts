@@ -23,6 +23,18 @@ export function usePushNotifications() {
   const registered = useRef(false);
 
   useEffect(() => {
+    if (Platform.OS === "android") {
+      Notifications.setNotificationChannelAsync("default", {
+        name: "Default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        sound: "default",
+        lightColor: "#6C63FF",
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     if (Platform.OS === "web") return;
 
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {

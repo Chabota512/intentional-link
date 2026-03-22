@@ -50,6 +50,8 @@ export async function sendPushNotification(
         title,
         body,
         data: data ?? {},
+        priority: "high" as const,
+        channelId: "default",
       },
     ];
 
@@ -78,6 +80,8 @@ export async function sendPushNotifications(
       title,
       body,
       data: data ?? {},
+      priority: "high" as const,
+      channelId: "default",
     }));
 
     const chunks = expo.chunkPushNotifications(messages);

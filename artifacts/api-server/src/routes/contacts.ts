@@ -201,7 +201,10 @@ router.post("/contacts", async (req, res): Promise<void> => {
         const senderName = me.name || "Someone";
         await saveNotification(contactUserId, "contact_request", "New Contact Request", `${senderName} wants to connect with you`, { fromUserId: userId });
         if (them?.pushToken) {
+          console.log(`[contacts] Sending push notification to user ${contactUserId} with token ${them.pushToken.substring(0, 20)}...`);
           await sendPushNotification(them.pushToken, "New Contact Request", `${senderName} wants to connect with you`, { contactUserId: userId });
+        } else {
+          console.log(`[contacts] No push token for user ${contactUserId}, skipping push notification`);
         }
       }
     } catch (err) {
