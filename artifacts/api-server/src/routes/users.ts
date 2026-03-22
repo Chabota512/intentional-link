@@ -292,7 +292,10 @@ router.put("/users/me", async (req, res): Promise<void> => {
       updates.username = normalizedUsername;
     }
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
-    if (pushToken !== undefined && typeof pushToken === "string") updates.pushToken = pushToken;
+    if (pushToken !== undefined && typeof pushToken === "string") {
+      console.log(`[users] Saving push token for user ${userId}: ${pushToken.substring(0, 25)}...`);
+      updates.pushToken = pushToken;
+    }
 
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: "No fields to update" });

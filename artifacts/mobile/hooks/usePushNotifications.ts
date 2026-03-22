@@ -69,18 +69,27 @@ export function usePushNotifications() {
           finalStatus = status;
         }
 
-        if (finalStatus !== "granted") return;
+        if (finalStatus !== "granted") {
+          console.log("[Push] Notification permission not granted:", finalStatus);
+          return;
+        }
 
         const tokenData = await Notifications.getExpoPushTokenAsync({
           projectId: EXPO_PROJECT_ID,
         });
 
         const pushToken = tokenData.data;
-        if (!pushToken) return;
+        if (!pushToken) {
+          console.log("[Push] No push token returned");
+          return;
+        }
 
+        console.log("[Push] Registering push token:", pushToken.substring(0, 25) + "...");
         await put("/users/me", { pushToken });
         registered.current = true;
-      } catch {
+        console.log("[Push] Push token registered successfully");
+      } catch (err) {
+        console.error("[Push] Failed to register push token:", err);
       }
     };
 
