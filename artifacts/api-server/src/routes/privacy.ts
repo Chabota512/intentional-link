@@ -10,6 +10,7 @@ import {
   sessionParticipantsTable,
   messagesTable,
 } from "@workspace/db";
+import { rebroadcastPresence } from "../lib/socketio";
 
 const router: IRouter = Router();
 
@@ -110,6 +111,9 @@ router.put("/users/privacy", authMiddleware, async (req: any, res): Promise<void
       .delete(presenceWhitelistTable)
       .where(eq(presenceWhitelistTable.userId, userId));
   }
+
+  // Re-broadcast presence so contacts see the updated status immediately
+  rebroadcastPresence(userId).catch(() => {});
 
   res.json({ ok: true });
 });

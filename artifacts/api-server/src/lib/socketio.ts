@@ -92,6 +92,7 @@ export function initSocketIO(httpServer: HttpServer): Server {
     await joinUserSessions(socket, userId);
 
     broadcastPresence(userId, "online", prevLastSeenAt);
+    syncPresenceToNewUser(userId);
 
     if (wasOfflineLong) {
       const [privSettings] = await db
@@ -384,6 +385,126 @@ export function emitToUser(userId: number, event: string, data: unknown): void {
   if (!sockets) return;
   for (const socketId of sockets) {
     io.to(socketId).emit(event, data);
+  }
+}
+
+// Called when a user changes their privacy settings mid-session so contacts update immediately
+export async function rebroadcastPresence(userId: number): Promise<void> {
+  if (!isUserOnline(userId)) return;
+  await broadcastPresence(userId, "online");
+}
+
+// Called on connect: sends this user the current online/offline status of every contact
+// already connected, applying the reciprocal filter both ways
+async function syncPresenceToNewUser(userId: number): Promise<void> {
+  if (!io) return;
+
+  const [myPrivRow, myWhitelistRows] = await Promise.all([
+    db.select({ presenceVisibility: userPrivacySettingsTable.presenceVisibility })
+      .from(userPrivacySettingsTable)
+      .where(eq(userPrivacySettingsTable.userId, userId))
+      .limit(1),
+    db.select({ allowedContactId: presenceWhitelistTable.allowedContactId })
+      .from(presenceWhitelistTable)
+      .where(eq(presenceWhitelistTable.userId, userId)),
+  ]);
+
+  const myVisibility = myPrivRow[0]?.presenceVisibility ?? "all";
+  const myWhitelistedIds = new Set(myWhitelistRows.map(w => w.allowedContactId));
+
+  // Collect all other users that share at least one session with me
+  const [participantRows, creatorRows] = await Promise.all([
+    db.select({ sessionId: sessionParticipantsTable.sessionId })
+      .from(sessionParticipantsTable)
+      .where(and(eq(sessionParticipantsTable.userId, userId), eq(sessionParticipantsTable.status, "joined"))),
+    db.select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.creatorId, userId)),
+  ]);
+
+  const mySessionIds = new Set([
+    ...participantRows.map(r => r.sessionId),
+    ...creatorRows.map(r => r.id),
+  ]);
+
+  if (mySessionIds.size === 0) return;
+
+  const sessionIdArr = Array.from(mySessionIds);
+  const [sessionParticipantsAll, sessionCreators] = await Promise.all([
+    db.select({ userId: sessionParticipantsTable.userId })
+      .from(sessionParticipantsTable)
+      .where(and(
+        inArray(sessionParticipantsTable.sessionId, sessionIdArr),
+        eq(sessionParticipantsTable.status, "joined"),
+        ne(sessionParticipantsTable.userId, userId),
+      )),
+    db.select({ creatorId: sessionsTable.creatorId })
+      .from(sessionsTable)
+      .where(inArray(sessionsTable.id, sessionIdArr)),
+  ]);
+
+  const contactUserIds = new Set([
+    ...sessionParticipantsAll.map(p => p.userId),
+    ...sessionCreators.map(s => s.creatorId).filter(id => id !== userId),
+  ]);
+
+  const contactUserIdsArr = Array.from(contactUserIds);
+  if (contactUserIdsArr.length === 0) return;
+
+  // Fetch all contacts' privacy settings, whitelists (for me specifically), and DND
+  const [contactPrivSettings, contactWhitelistsForMe, contactDndSettings] = await Promise.all([
+    db.select({ userId: userPrivacySettingsTable.userId, presenceVisibility: userPrivacySettingsTable.presenceVisibility })
+      .from(userPrivacySettingsTable)
+      .where(inArray(userPrivacySettingsTable.userId, contactUserIdsArr)),
+    db.select({ userId: presenceWhitelistTable.userId })
+      .from(presenceWhitelistTable)
+      .where(and(
+        inArray(presenceWhitelistTable.userId, contactUserIdsArr),
+        eq(presenceWhitelistTable.allowedContactId, userId),
+      )),
+    db.select({ userId: userDndSettingsTable.userId, isDndActive: userDndSettingsTable.isDndActive })
+      .from(userDndSettingsTable)
+      .where(inArray(userDndSettingsTable.userId, contactUserIdsArr)),
+  ]);
+
+  const contactPrivMap = new Map(contactPrivSettings.map(p => [p.userId, p.presenceVisibility]));
+  const contactDndMap = new Map(contactDndSettings.map(d => [d.userId, d.isDndActive]));
+  // Which contacts have ME in their whitelist
+  const contactsWhoWhitelistedMe = new Set(contactWhitelistsForMe.map(w => w.userId));
+
+  const [contactLastSeenRows] = await Promise.all([
+    db.select({ id: usersTable.id, lastSeenAt: usersTable.lastSeenAt })
+      .from(usersTable)
+      .where(inArray(usersTable.id, contactUserIdsArr)),
+  ]);
+  const contactLastSeenMap = new Map(contactLastSeenRows.map(u => [u.id, u.lastSeenAt]));
+
+  for (const contactId of contactUserIds) {
+    const isOnline = isUserOnline(contactId);
+    if (!isOnline) continue;
+
+    const contactVisibility = contactPrivMap.get(contactId) ?? "all";
+
+    // Can the contact show themselves to me?
+    const contactAllowsMeToSeeThem =
+      contactVisibility === "all" ||
+      (contactVisibility === "specific" && contactsWhoWhitelistedMe.has(contactId));
+
+    // Am I hiding from the contact? (reciprocal rule — if I hide from them, I don't see them either)
+    const iAmHidingFromContact =
+      myVisibility === "none" ||
+      (myVisibility === "specific" && !myWhitelistedIds.has(contactId));
+
+    const showOnline = contactAllowsMeToSeeThem && !iAmHidingFromContact;
+
+    const lastSeenAt = contactLastSeenMap.get(contactId);
+
+    emitToUser(userId, "presence_update", {
+      userId: contactId,
+      status: showOnline ? "online" : "offline",
+      isDndActive: showOnline ? (contactDndMap.get(contactId) ?? false) : false,
+      lastSeenAt: showOnline ? null : (lastSeenAt ? new Date(lastSeenAt).toISOString() : new Date().toISOString()),
+    });
   }
 }
 
