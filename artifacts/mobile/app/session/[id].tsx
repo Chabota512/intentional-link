@@ -1740,35 +1740,12 @@ export default function SessionScreen() {
               <Text style={[styles.navTitle, { color: colors.text, fontFamily: "Inter_600SemiBold" }]} numberOfLines={1}>
                 {session.title}
               </Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={[styles.navSub, { fontFamily: "Inter_400Regular", flex: 1 }]} numberOfLines={1}>
-                  <Text style={{ color: colors.textTertiary }}>{"› "}</Text>
-                  <Text style={{ color: colors.textSecondary }}>{`${totalPeople} participant${totalPeople !== 1 ? "s" : ""}`}</Text>
-                  <Text style={{ color: colors.textSecondary }}>{" · "}</Text>
-                  <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
-                </Text>
-                <Pressable
-                  style={({ pressed }) => [
-                    {
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 4,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 12,
-                      backgroundColor: colors.accentSoft,
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push(`/session/media/${sessionId}` as any);
-                  }}
-                >
-                  <Feather name="image" size={13} color={colors.accent} />
-                  <Text style={{ fontSize: 11, color: colors.accent, fontFamily: "Inter_600SemiBold" }}>Media</Text>
-                </Pressable>
-              </View>
+              <Text style={[styles.navSub, { fontFamily: "Inter_400Regular" }]} numberOfLines={1}>
+                <Text style={{ color: colors.textTertiary }}>{"› "}</Text>
+                <Text style={{ color: colors.textSecondary }}>{`${totalPeople} participant${totalPeople !== 1 ? "s" : ""}`}</Text>
+                <Text style={{ color: colors.textSecondary }}>{" · "}</Text>
+                <Text style={{ color: isActive ? colors.success : colors.textTertiary, fontFamily: "Inter_500Medium" }}>{activeLabel}</Text>
+              </Text>
             </View>
           </View>
         </Pressable>
