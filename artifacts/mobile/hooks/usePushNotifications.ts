@@ -30,6 +30,8 @@ export function usePushNotifications() {
         vibrationPattern: [0, 250, 250, 250],
         sound: "default",
         lightColor: "#6C63FF",
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: true,
       });
     }
   }, []);
@@ -65,7 +67,16 @@ export function usePushNotifications() {
         let finalStatus = existingStatus;
 
         if (existingStatus !== "granted") {
-          const { status } = await Notifications.requestPermissionsAsync();
+          const { status } = await Notifications.requestPermissionsAsync({
+            ios: {
+              allowAlert: true,
+              allowBadge: true,
+              allowSound: true,
+              allowCriticalAlerts: false,
+              provideAppNotificationSettings: false,
+              allowAnnouncements: false,
+            },
+          });
           finalStatus = status;
         }
 
